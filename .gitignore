@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Node / Vue
+node_modules/
+dist/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# 本项目里常见的大文件/中间文件，可按实际情况加
+uploads/
+media/
+tmp/
+*.zip
+*.pth
+*.pt
+*.onnx
