@@ -19,6 +19,9 @@ Thumbs.db
 # Logs
 *.log
 
+# word文档
+*.docx
+
 # 本项目里常见的大文件/中间文件，可按实际情况加
 uploads/
 media/
