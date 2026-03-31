@@ -1,0 +1,203 @@
+﻿\section{非功能性需求}
+
+\subsection{用户界面需求}
+
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{9.5cm}|}
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endfirsthead
+
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endhead
+
+界面整体布局 & Web 端采用清晰的左右分栏或上中下分区布局，导航区、内容区和操作区职责明确，保证用户可以快速定位主要功能与当前任务。 \tabularnewline
+\hline
+界面简洁美观 & 页面风格应保持统一，颜色、字体、图标与控件尺寸协调一致，减少冗余装饰与视觉干扰，保证信息展示清晰易读。 \tabularnewline
+\hline
+面向不同角色的界面设计 & 针对普通用户、管理员和超级管理员提供差异化界面与菜单权限，使不同角色只看到与自身职责相关的功能入口。 \tabularnewline
+\hline
+功能布局符合用户习惯 & 高频功能应放在显著位置，页面结构应符合用户阅读和操作习惯，常用操作路径不超过 3 次点击。 \tabularnewline
+\hline
+信息提示 & 系统应在上传、检测、审核、提交等关键操作后提供明确反馈，提示信息应简洁、可见、可理解，并区分成功、警告和失败状态。 \tabularnewline
+\hline
+个性化支持 & 系统应支持基础个性化能力，如列表筛选、排序、分页数量调整等，并提供反馈渠道以便用户提交建议与问题。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsection{软硬件环境需求}
+
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{9.5cm}|}
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endfirsthead
+
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endhead
+
+服务器环境 & 服务端应支持稳定运行的 Linux 或 Windows Server 环境，具备持续运行、日志记录、异常恢复和资源监控能力。 \tabularnewline
+\hline
+操作系统兼容性 & Web 端应兼容主流桌面操作系统环境下的浏览器访问，包括 Windows、macOS 等常见平台。 \tabularnewline
+\hline
+浏览器兼容性 & 系统应兼容 Chrome、Edge、Firefox 等主流现代浏览器，并保证主要页面和核心流程在这些浏览器中表现一致。 \tabularnewline
+\hline
+数据库环境 & 系统默认使用 MySQL 8.0 及以上版本，数据库应支持并发访问、事务处理、备份恢复和权限控制。 \tabularnewline
+\hline
+网络设备与带宽 & 系统部署环境应具备稳定网络连接，满足并发访问、文件上传和检测结果返回的需求，避免明显的网络延迟或频繁中断。 \tabularnewline
+\hline
+存储环境 & 服务器应具备足够的本地或网络存储空间，用于保存用户上传资源、检测报告、审核记录、日志与备份数据。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsection{产品/软件质量需求}
+
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{9.5cm}|}
+\hline
+\multicolumn{1}{|c|}{主要质量属性} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endfirsthead
+
+\hline
+\multicolumn{1}{|c|}{主要质量属性} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endhead
+
+正确性 & 系统应正确完成图像、论文与评审文本的上传、检测、审核与结果展示流程，输出结果与输入任务保持一致，不出现错配、漏项或重复。 \tabularnewline
+\hline
+鲁棒性 & 对异常输入、非法参数、超大文件、格式错误文件等情况应进行拦截与提示，避免系统崩溃或产生不可恢复错误。 \tabularnewline
+\hline
+可靠性 & 系统应支持长时间稳定运行，在高频访问与连续任务处理场景下维持可用服务，并具备必要的错误恢复能力。 \tabularnewline
+\hline
+性能与效率 & 在正常网络环境下，普通页面操作应在较短时间内返回结果；对上传、查询、审核等典型操作应保证可接受的交互时延。 \tabularnewline
+\hline
+易用性 & 系统应尽量降低学习成本，使新用户能够在较短时间内理解主要流程并独立完成上传、查看结果和发起审核等任务。 \tabularnewline
+\hline
+清晰性 & 页面文案、状态标签、按钮命名和检测结果说明应表达明确，避免歧义，确保用户能够理解系统当前状态和下一步操作。 \tabularnewline
+\hline
+安全性 & 系统应通过身份认证、权限控制、数据加密、日志审计等机制保护用户隐私和业务数据，防止未授权访问与数据泄露。 \tabularnewline
+\hline
+可扩展性 & 系统架构应支持后续新增检测模型、内容类型、统计维度和管理功能，减少大范围重构成本。 \tabularnewline
+\hline
+可移植性 & 系统应尽量减少对特定运行平台和特定环境的强耦合，便于后续迁移到新的服务器、数据库或部署环境。 \tabularnewline
+\hline
+可维护性 & 代码、配置、日志与数据结构应具备良好的可维护性，方便后续调试、修复缺陷和持续迭代。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsection{其它需求}
+
+\subsubsection{容量需求}
+
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{|>{\centering\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{6cm}|}
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体指标} \tabularnewline
+\hline
+\endfirsthead
+
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体指标} \tabularnewline
+\hline
+\endhead
+
+用户规模 & 指系统需支持的目标用户量级。 & 系统初期应支持不少于 1000 名注册用户，并能够根据业务增长继续扩容。 \tabularnewline
+\hline
+并发规模 & 指系统在同一时间内可承载的活跃访问量。 & 系统应能支持至少 100 名用户同时在线执行浏览、上传、查询等常见操作。 \tabularnewline
+\hline
+存储空间 & 指系统用于保存业务数据的物理或逻辑空间容量。 & 初期存储空间应满足 20GB 以上，并为检测文件、报告和日志预留扩展空间。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsubsection{数据备份与恢复}
+
+系统应提供数据备份能力，定期对用户信息、上传资源、检测结果、审核记录和系统日志进行自动备份。
+
+系统应提供恢复机制，在数据损坏、误删除或系统异常后，管理员可以按备份策略恢复到指定时间点附近的有效状态。
+
+\subsubsection{数据约束}
+
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{|>{\centering\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{5.5cm}|}
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体要求} \tabularnewline
+\hline
+\endfirsthead
+
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体要求} \tabularnewline
+\hline
+\endhead
+
+数据合法性 & 对输入数据进行格式和范围校验。 & 用户注册信息、上传文件类型、任务参数等应满足预定义规则，非法数据不得进入核心业务流程。 \tabularnewline
+\hline
+数据安全性 & 保护用户隐私和业务数据。 & 敏感数据应加密存储，关键操作应进行权限校验，并记录必要审计日志。 \tabularnewline
+\hline
+数据维护与治理 & 保证数据长期有效、完整、可追踪。 & 系统应支持定期清理失效数据、校验关键记录一致性，并提供备份与恢复支撑。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsubsection{代码质量要求}
+
+开发时业务逻辑类代码应满足以下要求：
+
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{|>{\centering\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{8.5cm}|}
+\hline
+\multicolumn{1}{|c|}{代码要求} & \multicolumn{1}{c|}{具体内容} \tabularnewline
+\hline
+\endfirsthead
+
+\hline
+\multicolumn{1}{|c|}{代码要求} & \multicolumn{1}{c|}{具体内容} \tabularnewline
+\hline
+\endhead
+
+简洁性 & 代码应保持合理的函数长度和模块边界，避免重复逻辑、过深嵌套和无意义复杂度。 \tabularnewline
+\hline
+可读性 & 关键业务函数应有必要注释，命名清晰，结构明确，便于团队成员快速理解和维护。 \tabularnewline
+\hline
+可复用性 & 公共能力应抽象为可复用模块，减少重复实现，为后续新增功能和重构提供基础。 \tabularnewline
+\hline
+可测试性 & 业务逻辑应尽量与界面和基础设施解耦，便于进行单元测试、集成测试和回归验证。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsubsection{高并发批量检测能力}
+
+系统应支持批量任务提交和排队处理机制，在高并发场景下保证检测任务有序执行，并避免因瞬时流量激增导致服务不可用。
+
+\subsubsection{多线程上传能力}
+
+系统应支持稳定的文件上传机制，能够在多用户并发上传场景下维持可接受的响应时间，并正确处理上传失败后的重试与提示。
+
+\subsubsection{检测状态实时同步能力}
+
+系统应向用户及时反馈任务状态变化，包括待处理、处理中、已完成、失败等状态，避免用户因信息延迟造成误判。
+
+\subsubsection{多格式兼容性要求}
+
+系统应兼容常见图像、文档和压缩包格式，并对不支持的格式提供明确提示，避免用户在上传阶段产生歧义。
+
+\subsubsection{检测结果可解释性要求}
+
+系统生成的检测结果应包含必要说明，能够向用户解释判定依据、可疑位置或主要风险点，提升结果的可理解性与可信度。

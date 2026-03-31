@@ -1,0 +1,98 @@
+﻿\documentclass[UTF8]{ctexart}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{multirow,longtable,array}
+
+\title{学术AI鉴伪系统需求规格说明书（迭代版）}
+\author{}
+\date{}
+
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+
+\begin{center}
+
+\vspace*{3.2cm}
+
+{\bfseries\zihao{3} 学术AI鉴伪系统需求规格说明书（迭代版）\par}
+
+\vspace{0.8cm}
+
+{\bfseries\zihao{-3} (AID-FR-1)\par}
+
+\vspace{1.5cm}
+
+{\zihao{3} 需求规格说明书\par}
+
+\vfill
+
+\renewcommand{\arraystretch}{1.9}
+\setlength{\tabcolsep}{10pt}
+
+\begin{tabular}{|>{\centering\arraybackslash}p{4.6cm}|>{\centering\arraybackslash}p{2.8cm}|>{\centering\arraybackslash}p{4.6cm}|}
+\hline
+\multirow{4}{4.6cm}{\centering 文件状态：\\[0.8em]
+\mbox{[√]} 草稿\\
+\mbox{[ ]} 正式发布\\
+\mbox{[ ]} 正在修改}
+& 文件标识： & AID-FR-1 \\ \cline{2-3}
+& 当前版本： & v0.1 \\ \cline{2-3}
+& 作\qquad 者： & 刘宇童\quad 聂薪羽\quad 苏天\\[0.3em]
+& & 翟润\quad 张与耕\quad  \\ \cline{2-3}
+& 完成日期： & 2026-4-5 \\ \hline
+\end{tabular}
+
+\vspace*{1.8cm}
+
+\end{center}
+\end{titlepage}
+
+\clearpage
+\thispagestyle{empty}
+
+\begin{center}
+\vspace*{2.5cm}
+{\zihao{4} 分工表}
+\end{center}
+
+\vspace{1.2cm}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.7}
+\setlength{\tabcolsep}{18pt}
+
+\begin{tabular}{|>{\centering\arraybackslash}p{8.2cm}|>{\centering\arraybackslash}p{3.2cm}|}
+\hline
+模块 & 作者 \\ \hline
+文档介绍、概述、非功能性需求 & 苏天 \\ \hline
+功能性需求分类 & 苏天 \\ \hline
+用户展示、管理维护模块 & 纪郅炀 \\ \hline
+用户上传、用户审核模块 & 王宇汀 \\ \hline
+图像检测模块 & 苏天 \\ \hline
+PPT制作和汇报展示 & 李从容 \\ \hline
+\end{tabular}
+\end{center}
+
+\clearpage
+
+\tableofcontents
+\newpage
+
+\input{sections/01-introduction.tex}
+\input{sections/02-overview.tex}
+
+\section{功能性需求}
+\input{sections/03-functional/03-functional-overview.tex}
+\input{sections/03-functional/03-2-user-display.tex}
+\input{sections/03-functional/03-3-user-upload.tex}
+\input{sections/03-functional/03-4-user-review.tex}
+\input{sections/03-functional/03-5-content-detection.tex}
+\input{sections/03-functional/03-6-admin.tex}
+
+\input{sections/04-nonfunctional.tex}
+\input{sections/05-appendix.tex}
+
+\end{document}
