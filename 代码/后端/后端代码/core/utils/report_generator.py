@@ -15,8 +15,16 @@ from ..models import DetectionTask, DetectionResult, SubDetectionResult
 
 # ─── 字体注册（宋体） ──────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-pdfmetrics.registerFont(TTFont('SimSun', 'SimSun.ttf'))  # 中文字体
-pdfmetrics.registerFont(TTFont('SimSun-Bold', 'SimSun-Bold.ttf'))  # 中文加粗字体
+# 字体文件放在后端代码的根目录下，使用绝对路径避免工作目录问题
+_FONT_DIR = Path(__file__).resolve().parent.parent.parent  # 指向 后端代码/ 目录
+_SIMSUN_PATH = str(_FONT_DIR / 'SimSun.ttf')
+_SIMSUN_BOLD_PATH = str(_FONT_DIR / 'SimSun-Bold.ttf')
+try:
+    pdfmetrics.registerFont(TTFont('SimSun', _SIMSUN_PATH))
+    pdfmetrics.registerFont(TTFont('SimSun-Bold', _SIMSUN_BOLD_PATH))
+except Exception as e:
+    import logging
+    logging.getLogger(__name__).warning(f"字体注册失败，PDF报告将使用默认字体: {e}")
 
 
 # ─── 工具函数：自动换行绘制 ───────────────────────────────
