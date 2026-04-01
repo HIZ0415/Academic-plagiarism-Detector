@@ -14,5 +14,17 @@ https://github.com/HIZ0415/Academic-plagiarism-Detector.git
 + 在GitHub上进入项目仓库，点击右上角`pull requrests(PR)` -> `New pull request`
 ![alt text](仓库主界面.png)
 ![alt text](<new pull requrest.png>)
-+ `base`栏选`main`，`compare`栏选自己刚提交需要合并的文档（比如图中的`dev`）
 ![alt text](compare.png)
++ `base`栏选`main`，`compare`栏选自己刚提交需要合并的文档（比如图中的`dev`）。选中之后应当出现如下图内容，点击`Create pull request`
+![alt text](<Create New Request.png>)
++ 在出现的对话框中填写适当的说明文字，方便其他同学阅读（对话框支持markdown语法）。添加完成之后点击下边的`Create pull request`
+![alt text](<add description.png>)
++ 在跳转的界面可以看到自己当前提交的相关信息，在右侧` Reviewers`栏选择需要审核的同学
+![alt text](<add reviewers.png>)
+4. 
++ 通知自己添加了review权限的同学，审核者同样在`PR`界面，点击进入下方出现的`new pull request`
+![alt text](reviewer_PR.jpg)
++ 点击上方`file changed`栏，下方可以浏览已提交请求合并的更改，确认***修改无误***之后点击`submit review`，填写对应的说明之后选择`Approve`选项，然后点击`submit review`
+![alt text](<file changed.jpg>)
+![alt text](approve.png)
+5. （应该需要和我说一下，我来完成合并到`main`分支的操作。不知道，大家写的时候再试试能不能自己`merge`）
