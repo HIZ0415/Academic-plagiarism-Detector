@@ -1,0 +1,30 @@
+# 小组GitHub仓库使用标准流程
+*Author:HIZ0415*
+*latest change:2026.4.1*
+## 前置：在vscode中准备好git
++ 0.在右侧工具栏点击源代码管理（git图标），点击克隆仓库，上方命令行会要求输出仓库名称，把仓库链接粘贴到上方。（这步只需要做一次，等待联网拉取仓库结束）
+仓库链接如下：
+https://github.com/HIZ0415/Academic-plagiarism-Detector.git
+
+## 每次的修改流程如下：
+1. 切换到`dev`分支（终端输入：`git checkout dev`）（这步一定要每次打开项目做一次，尤其是每次仓库内容有修改的时候，来同步到最新的代码）
+2. 修改代码，之后经典`git add .`和`git commit -m '提交信息'`和`git push`流程（同样在`dev`分支）
+（提交信息一定要尽量写清楚，可以参考GitHub上我今晚的提交信息是怎么写的，方便大家后续使用）
+3. 
++ 在GitHub上进入项目仓库，点击右上角`pull requrests(PR)` -> `New pull request`
+![alt text](仓库主界面.png)
+![alt text](<new pull requrest.png>)
+![alt text](compare.png)
++ `base`栏选`main`，`compare`栏选自己刚提交需要合并的文档（比如图中的`dev`）。选中之后应当出现如下图内容，点击`Create pull request`
+![alt text](<Create New Request.png>)
++ 在出现的对话框中填写适当的说明文字，方便其他同学阅读（对话框支持markdown语法）。添加完成之后点击下边的`Create pull request`
+![alt text](<add description.png>)
++ 在跳转的界面可以看到自己当前提交的相关信息，在右侧` Reviewers`栏选择需要审核的同学
+![alt text](<add reviewers.png>)
+4. 
++ 通知自己添加了review权限的同学，审核者同样在`PR`界面，点击进入下方出现的`new pull request`
+![alt text](reviewer_PR.jpg)
++ 点击上方`file changed`栏，下方可以浏览已提交请求合并的更改，确认***修改无误***之后点击`submit review`，填写对应的说明之后选择`Approve`选项，然后点击`submit review`
+![alt text](<file changed.jpg>)
+![alt text](approve.png)
+5. （应该需要和我说一下，我来完成合并到`main`分支的操作。不知道，大家写的时候再试试能不能自己`merge`）
