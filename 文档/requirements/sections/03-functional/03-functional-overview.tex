@@ -1,4 +1,4 @@
-﻿\subsection{功能性需求分类}
+\subsection{功能性需求分类}
 
 \begin{center}
 \renewcommand{\arraystretch}{1.5}
@@ -60,15 +60,15 @@
 \hline
 学术内容检测模块 & \shortstack[l]{图像可疑区域细粒度标注\\FR-TPJC-0003} & 在学术图像检测过程中，对 AI 可疑位置进行细粒度标注与可视化展示。 \tabularnewline
 \hline
-学术内容检测模块 & \shortstack[l]{全篇论文AIGC检测\\FR-LWJC-0001} & 支持对全文论文进行 AIGC 检测，识别论文中可能由 AI 生成的内容。 \tabularnewline
+学术内容检测模块 & \shortstack[l]{全篇论文AIGC检测\\FR-LWJC-0001} & 支持对全文论文进行 AIGC 检测；用户端展示全文级结论与摘要，模型推断由后端完成。 \tabularnewline
 \hline
-学术内容检测模块 & \shortstack[l]{AI生成段落识别\\FR-LWJC-0002} & 自动识别论文中疑似由 AI 生成的文本段落，并给出对应段落位置。 \tabularnewline
+学术内容检测模块 & \shortstack[l]{AI生成段落识别\\FR-LWJC-0002} & 标识疑似 AI 生成段落及位置；用户端负责高亮与导航展示，识别逻辑由后端完成。 \tabularnewline
 \hline
-学术内容检测模块 & \shortstack[l]{段落级AI生成概率分析\\FR-LWJC-0003} & 对论文中疑似 AI 生成段落输出对应的 AI 生成概率，用于辅助判断。 \tabularnewline
+学术内容检测模块 & \shortstack[l]{段落级AI生成概率分析\\FR-LWJC-0003} & 输出段落级 AI 生成概率或分档；用户端以表格或可视化呈现，计算由后端完成。 \tabularnewline
 \hline
-学术内容检测模块 & \shortstack[l]{事实性鉴伪子结论生成\\FR-LWJC-0004} & 针对论文内容生成事实性鉴伪子结论，用于说明文本中存在的问题类型。 \tabularnewline
+学术内容检测模块 & \shortstack[l]{事实性鉴伪子结论生成\\FR-LWJC-0004} & 生成事实性鉴伪子结论条目；用户端分组列表展示，推理与规则由后端完成。 \tabularnewline
 \hline
-学术内容检测模块 & \shortstack[l]{事实性鉴伪原因说明\\FR-LWJC-0005} & 针对事实性鉴伪结论给出原因解释，提高检测结果的可理解性。 \tabularnewline
+学术内容检测模块 & \shortstack[l]{事实性鉴伪原因说明\\FR-LWJC-0005} & 为子结论提供原因与依据说明；用户端展示与折叠交互，文案与证据结构由后端下发。 \tabularnewline
 \hline
 学术内容检测模块 & \shortstack[l]{同行评审Review检测\\FR-PLJC-0001} & 对同行评审 Review 内容进行检测，判断其是否存在 AI 生成或异常生成倾向。 \tabularnewline
 \hline
@@ -76,7 +76,7 @@
 \hline
 学术内容检测模块 & \shortstack[l]{综合鉴伪结果生成\\FR-NRJC-0001} & 系统整合图像、论文与 Review 的检测结果，生成统一的综合鉴伪结论。 \tabularnewline
 \hline
-学术内容检测模块 & \shortstack[l]{检测结果可视化解释\\FR-NRJC-0002} & 通过可视化方式解释 AI 判定“造假”的依据，提升检测结果的逻辑透明化程度。 \tabularnewline
+学术内容检测模块 & \shortstack[l]{检测结果可视化解释\\FR-NRJC-0002} & 通过图表、高亮等方式解释检测依据；用户端负责可视化渲染与交互，数据与结论字段由后端提供。 \tabularnewline
 \hline
 
 管理维护模块 & \shortstack[l]{实体添加\\FR-GLWH-0001} & 在管理端界面可以直接添加图像、论文、Review、用户等实体，新增实体可在用户端显示或使用。 \tabularnewline
