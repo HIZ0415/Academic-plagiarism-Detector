@@ -1,0 +1,22 @@
+\begin{tikzpicture}[
+  uc/.style={draw,ellipse,minimum width=2.45cm,minimum height=8mm,align=center,font=\tiny,inner sep=1pt},
+  arr/.style={semithick}
+]
+  \node[draw,rounded corners,minimum width=8.6cm,minimum height=5.2cm] (frame) at (5.2,2.5) {};
+  \node[anchor=north,yshift=-2pt] at (frame.north) {\small\textbf{用户审核模块}};
+  \node (actor) at (0.2,2.5) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 用户}};
+  \node[uc] (y1) at (3.2,4.1) {FR-YHSH-0001};
+  \node[uc] (y2) at (5.2,4.1) {FR-YHSH-0002};
+  \node[uc] (y3) at (7.2,4.1) {FR-YHSH-0003};
+  \node[uc] (y4) at (3.2,2.85) {FR-YHSH-0004};
+  \node[uc] (y5) at (5.2,2.85) {FR-YHSH-0005};
+  \node[uc] (y6) at (7.2,2.85) {FR-YHSH-0006};
+  \node[uc] (y7) at (5.2,1.15) {FR-YHSH-0007};
+  \draw[arr] (actor.east) -- ++(0.2,0) |- (y1.west);
+  \draw[arr] (actor.east) -- ++(0.2,0) |- (y2.west);
+  \draw[arr] (actor.east) -- ++(0.2,0) |- (y3.west);
+  \draw[arr] (actor.east) -- ++(0.2,0) |- (y4.west);
+  \draw[arr] (actor.east) -- ++(0.2,0) |- (y5.west);
+  \draw[arr] (actor.east) -- ++(0.2,0) |- (y6.west);
+  \draw[arr] (actor.east) -- ++(0.2,0) |- (y7.west);
+\end{tikzpicture}

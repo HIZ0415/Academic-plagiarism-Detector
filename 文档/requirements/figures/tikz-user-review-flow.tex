@@ -1,0 +1,14 @@
+\begin{tikzpicture}[
+  node distance=7mm,
+  box/.style={draw,rounded corners,align=center,minimum height=9mm,inner sep=3pt,font=\footnotesize},
+  arr/.style={-{Stealth[length=2mm]},semithick}
+]
+  \node[box] (a) {登录};
+  \node[box,right=of a] (b) {人工审核首页};
+  \node[box,right=of b] (c) {筛选任务};
+  \node[box,right=of c] (d) {任务详情};
+  \node[box,below=8mm of d] (e) {提交审核/互动};
+  \node[box,left=of e] (f) {结果汇总};
+  \draw[arr] (a) -- (b) -- (c) -- (d);
+  \draw[arr] (d) -- (e) -- (f);
+\end{tikzpicture}
