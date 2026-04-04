@@ -1,0 +1,16 @@
+\begin{tikzpicture}[
+  uc/.style={draw,ellipse,minimum width=2.6cm,minimum height=9mm,align=center,font=\scriptsize,inner sep=2pt},
+  arr/.style={semithick}
+]
+  \node[draw,rounded corners,minimum width=7cm,minimum height=4.6cm] (frame) at (4.5,2.3) {};
+  \node[anchor=north,yshift=-2pt] at (frame.north) {\small\textbf{用户展示模块}};
+  \node (actor) at (0,2.3) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 普通用户}};
+  \node[uc] (u1) at (4.5,3.55) {FR-YHZS-0001};
+  \node[uc] (u2) at (4.5,2.65) {FR-YHZS-0002};
+  \node[uc] (u5) at (4.5,1.75) {FR-YHZS-0005};
+  \node[uc] (u6) at (4.5,0.85) {FR-YHZS-0006};
+  \draw[arr] (actor.east) -- ++(0.25,0) |- (u1.west);
+  \draw[arr] (actor.east) -- ++(0.25,0) |- (u2.west);
+  \draw[arr] (actor.east) -- ++(0.25,0) |- (u5.west);
+  \draw[arr] (actor.east) -- ++(0.25,0) |- (u6.west);
+\end{tikzpicture}

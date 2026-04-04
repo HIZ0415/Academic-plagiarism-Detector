@@ -1,0 +1,15 @@
+\begin{tikzpicture}[
+  node distance=8mm,
+  box/.style={draw,rounded corners,align=center,minimum height=9mm,inner sep=4pt,font=\small},
+  arr/.style={-{Stealth[length=2mm]},semithick}
+]
+  \node[box] (login) {登录};
+  \node[box,right=of login] (center) {个人中心};
+  \node[box,right=of center] (records) {检测记录};
+  \node[box,below=of records] (detail) {任务详情};
+  \node[box,left=of detail] (report) {综合鉴伪报告};
+  \node[box,left=of report] (audit) {人工审核进度};
+  \draw[arr] (login) -- (center) -- (records);
+  \draw[arr] (records) -- (detail);
+  \draw[arr] (detail) -- (report) -- (audit);
+\end{tikzpicture}
