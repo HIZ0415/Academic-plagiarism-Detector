@@ -1,8 +1,18 @@
-\subsection{管理维护模块}
+﻿\subsection{管理维护模块}
 
 \paragraph*{业务流程}
 
+\begin{center}
+\resizebox{0.98\linewidth}{!}{\input{figures/tikz-admin-flow.tex}}
+\end{center}
+
 \paragraph*{用例图}
+
+
+\begin{center}
+\resizebox{0.98\linewidth}{!}{\input{figures/tikz-admin-usecase.tex}}
+\end{center}
+
 
 \subsubsection{功能点——实体添加（FR-GLWH-0001）}
 
@@ -208,8 +218,90 @@
 
 \subsubsection{功能点——学术资源管理（FR-GLWH-0010）}
 
+\paragraph*{简述}
+
+管理员可统一管理论文、图像与 Review 资源，支持检索、分类、详情查看、状态维护与删除。
+
+\paragraph*{前提条件}
+
+管理员已登录且具备资源管理权限，系统中已存在可管理的学术资源记录。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 管理员进入“学术资源管理”页面。
+    \item 系统按类型、时间或标签展示资源，支持检索与筛选。
+    \item 管理员查看资源详情并执行分类调整、状态维护或删除。
+    \item 系统更新资源状态与展示结果，并记录操作日志。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+资源分类与状态可被统一维护并与前台展示保持一致；删除资源不再参与后续流程。失败时系统应提示原因并允许重试。
+
 \subsubsection{功能点——论文检测日志管理（FR-GLWH-0011）}
+
+\paragraph*{简述}
+
+管理端应支持论文检测日志的记录、查询与追踪，用于任务复核和异常排查。
+
+\paragraph*{前提条件}
+
+系统已生成论文检测任务及其日志，当前用户具备日志查看或管理权限。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 管理员进入“论文检测日志”页面。
+    \item 系统按时间展示日志并支持按任务、用户、时间和状态筛选。
+    \item 管理员查看任务阶段与结果摘要，必要时定位异常并导出或标记日志。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+管理员可追踪任务执行状态并定位异常；日志可用于排障与复核。无匹配日志应提示空状态，加载失败应提示并支持重试。
 
 \subsubsection{功能点——Review检测日志管理（FR-GLWH-0012）}
 
+\paragraph*{简述}
+
+管理端应支持 Review 检测日志的记录、查询与追踪，用于审计和异常排查。
+
+\paragraph*{前提条件}
+
+系统已生成 Review 检测任务及其日志，当前用户具备日志查看或管理权限。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 管理员进入“Review检测日志”页面。
+    \item 系统按时间展示日志并支持按任务、用户、时间和状态筛选。
+    \item 管理员查看任务处理阶段与结果摘要，必要时定位异常并导出或标记日志。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+管理员可追踪 Review 任务执行情况并定位异常；日志可用于审计与复核。无匹配日志应提示空状态，加载失败应提示并支持重试。
+
 \subsubsection{功能点——模型管理与配置（FR-GLWH-0013）}
+
+\paragraph*{简述}
+
+后台应支持检测模型的统一管理与配置，包括模型信息、参数、启停状态和任务调用策略。
+
+\paragraph*{前提条件}
+
+管理员已登录且具备模型管理权限，系统具备模型接入与配置持久化能力。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 管理员进入“模型管理与配置”页面。
+    \item 系统展示模型列表及版本、适用任务、状态和参数信息。
+    \item 管理员新增或编辑模型配置，调整参数、启停状态和默认调用关系。
+    \item 系统完成配置校验并保存结果，记录日志并用于后续任务调用。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+管理员可完成模型新增、编辑、启停与调用配置；新配置对后续任务生效且变更可追溯。配置不合法或权限不足时系统应阻止生效并提示原因。
