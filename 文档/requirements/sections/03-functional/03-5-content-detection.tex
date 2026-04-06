@@ -12,6 +12,191 @@
 \resizebox{0.98\linewidth}{!}{\input{figures/tikz-content-detection-usecase.tex}}
 \end{center}
 
+\subsubsection{功能点——提取图片（FR-TPJC-0001）}
+
+\paragraph*{简述}
+
+从用户上传的 PDF、压缩包及论文文件等非图像格式文件中自动抽取学术图像，便于后续进行图像AI鉴伪检测。
+
+该功能旨在自动化处理多种文件格式，确保图像检测流程顺利进行。
+
+系统能够快速提取高质量图像数据，为后续AI算法提供输入。
+
+\paragraph*{前提条件}
+
+用户上传文件格式为 PDF、ZIP、RAR、DOCX、TAR、7Z 等非图像格式。
+
+文件大小不超过系统规定上限（如 500MB）。
+
+文件中至少包含一张图像。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 用户上传文件；
+    \item 系统自动识别文件格式；
+    \item 调用对应解析工具：
+    \begin{enumerate}
+        \item PDF解析库
+        \item 压缩文件解压工具
+        \item DOCX文档解析工具
+    \end{enumerate}
+    \item 对PDF逐页提取嵌入图像；
+    \item 对压缩文件递归遍历子目录提取图像；
+    \item 对论文文档抽取正文插图、实验图及附录图像；
+    \item 图像预处理：
+    \begin{enumerate}
+        \item 格式统一为 JPG / PNG
+        \item 分辨率标准化
+        \item 色彩空间统一
+    \end{enumerate}
+    \item 临时存储；
+    \item 生成图像文件列表。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+系统输出结构化图像列表，包含：
+
+\begin{enumerate}
+    \item 文件名
+    \item 格式
+    \item 分辨率
+    \item 来源页码
+    \item 图像编号
+\end{enumerate}
+
+图像列表以 JSON 格式存储。
+
+\paragraph*{补充说明}
+
+支持批量文件处理；
+
+支持异常提示：
+
+文件损坏、格式不支持、解析失败。
+
+\subsubsection{功能点——学术图像AI鉴伪（FR-TPJC-0002）}
+
+\paragraph*{简述}
+
+基于深度学习和图像处理技术，对提取图像进行自动化学术造假检测。
+
+检测内容包括：
+
+\begin{enumerate}
+    \item 美化修饰
+    \item 背景掩盖
+    \item 复制伪造
+    \item 跨图拼接
+    \item AI生成图像识别
+\end{enumerate}
+
+系统能够高效识别图像异常区域并输出可解释结果。
+
+\paragraph*{前提条件}
+
+系统已成功提取图像数据；
+
+图像已完成预处理。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 图像预处理：
+    \begin{enumerate}
+        \item 尺寸归一化
+        \item 色彩归一化
+        \item 噪声去除
+    \end{enumerate}
+    
+    \item 特征提取：
+    \begin{enumerate}
+        \item CNN深度特征
+        \item 边缘纹理特征
+        \item 频域特征
+    \end{enumerate}
+    
+    \item 图像鉴伪检测：
+    \begin{enumerate}
+        \item 美化修饰检测
+        \item 背景掩盖检测
+        \item 同图复制检测
+        \item 跨图拼接检测
+        \item AI生成痕迹检测
+    \end{enumerate}
+    
+    \item 计算风险评分；
+    
+    \item 输出可疑区域坐标；
+    
+    \item 生成检测报告。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+系统输出检测报告，包括：
+
+\begin{enumerate}
+    \item 原图
+    \item 标注图
+    \item 可疑区域说明
+    \item 造假类型
+    \item 风险等级
+    \item 置信度评分
+\end{enumerate}
+
+报告支持 JSON / PDF / HTML 格式。
+
+\paragraph*{补充说明}
+
+支持单图检测与批量检测；
+
+支持综合鉴伪报告生成；
+
+支持可视化展示。
+
+\subsubsection{功能点——图像可疑区域细粒度标注（FR-TPJC-0003）}
+
+\paragraph*{简述}
+
+对AI检测出的疑似造假区域进行细粒度可视化标注，辅助用户和人工审核人员快速定位异常区域。
+
+\paragraph*{前提条件}
+
+学术图像AI鉴伪任务已完成。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 获取AI检测输出的可疑区域坐标；
+    \item 在原图上绘制高亮边框；
+    \item 对不同造假类型使用不同标注标签；
+    \item 支持局部放大查看；
+    \item 展示区域风险评分。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+输出标注图像，包括：
+
+\begin{enumerate}
+    \item 异常区域框选
+    \item 区域编号
+    \item 风险等级
+    \item 类型说明
+\end{enumerate}
+
+支持用户下载标注图。
+
+\paragraph*{补充说明}
+
+支持多区域同时标注；
+
+支持细粒度像素级区域高亮；
+
+支持人工审核二次标记。
+
 
 \subsubsection{功能点——全篇论文AIGC检测（FR-LWJC-0001）}
 
