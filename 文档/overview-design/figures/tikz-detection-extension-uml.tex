@@ -1,0 +1,114 @@
+\begin{tikzpicture}[
+    node distance=1.9cm and 1.8cm,
+    every node/.style={font=\small},
+    umlclass/.style={
+        draw,
+        rectangle split,
+        rectangle split parts=3,
+        rectangle split part align={center,left,left},
+        rounded corners=3pt,
+        line width=0.8pt,
+        minimum width=4.15cm,
+        text width=4.15cm,
+        inner sep=5pt
+    },
+    relation/.style={-{Latex[length=2.4mm]}, thick, draw=black!75},
+    inherit/.style={-{Triangle[open,length=3.2mm,width=4.8mm]}, thick, draw=black!75}
+]
+
+\node[umlclass, fill=blue!10] (resource) {
+\textbf{学术资源}
+\nodepart{second}
++ 资源编号\\
++ 资源类型\\
++ 所有者编号
+\nodepart{third}
++ 创建()\\
++ 校验()\\
++ 归档()
+};
+
+\node[umlclass, fill=blue!10, right=of resource] (task) {
+\textbf{检测任务}
+\nodepart{second}
++ 任务编号\\
++ 任务状态\\
++ 创建时间
+\nodepart{third}
++ 提交()\\
++ 调度()\\
++ 完成()
+};
+
+\node[umlclass, fill=blue!10, right=of task] (result) {
+\textbf{检测结果}
+\nodepart{second}
++ 结果编号\\
++ 风险等级\\
++ 报告引用
+\nodepart{third}
++ 汇总()\\
++ 持久化()\\
++ 导出报告()
+};
+
+\node[umlclass, fill=orange!10, below=of task] (adapter) {
+\textbf{<<抽象>> 检测适配器}
+\nodepart{second}
++ 资源类型\\
++ 模型配置
+\nodepart{third}
++ 预处理()\\
++ 推理()\\
++ 后处理()
+};
+
+\node[umlclass, fill=orange!8, below left=of adapter] (image) {
+\textbf{图像检测适配器}
+\nodepart{second}
++ 图像元数据\\
++ 可疑区域
+\nodepart{third}
++ 检测伪造()\\
++ 生成热力图()
+};
+
+\node[umlclass, fill=orange!8, below=of adapter] (paper) {
+\textbf{论文检测适配器}
+\nodepart{second}
++ 分段结果\\
++ AIGC评分
+\nodepart{third}
++ 切分论文()\\
++ 检测AIGC()
+};
+
+\node[umlclass, fill=orange!8, below right=of adapter] (review) {
+\textbf{评审检测适配器}
+\nodepart{second}
++ 评审文本\\
++ 模板评分
+\nodepart{third}
++ 检测模板化()\\
++ 检测生成痕迹()
+};
+
+\node[umlclass, fill=green!10, below=of result] (report) {
+\textbf{报告服务}
+\nodepart{second}
++ 报告模板\\
++ 导出格式
+\nodepart{third}
++ 生成报告()\\
++ 合并结果()
+};
+
+\draw[relation] (resource) -- node[above, font=\scriptsize, fill=white, inner sep=1pt] {创建} (task);
+\draw[relation] (task) -- node[above, font=\scriptsize, fill=white, inner sep=1pt] {产出} (result);
+\draw[relation] (task) -- node[right, font=\scriptsize, fill=white, inner sep=1pt] {使用} (adapter);
+\draw[inherit] (image) -- (adapter);
+\draw[inherit] (paper) -- (adapter);
+\draw[inherit] (review) -- (adapter);
+\draw[relation] (result) -- node[right, font=\scriptsize, fill=white, inner sep=1pt] {导出} (report);
+
+\end{tikzpicture}

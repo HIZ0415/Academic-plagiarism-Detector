@@ -1,0 +1,112 @@
+\begin{tikzpicture}[
+    node distance=2.0cm and 1.9cm,
+    every node/.style={font=\small},
+    umlclass/.style={
+        draw,
+        rectangle split,
+        rectangle split parts=3,
+        rectangle split part align={center,left,left},
+        rounded corners=3pt,
+        line width=0.8pt,
+        minimum width=4.25cm,
+        text width=4.25cm,
+        inner sep=5pt
+    },
+    relation/.style={-{Latex[length=2.4mm]}, thick, draw=black!75}
+]
+
+\node[umlclass, fill=blue!8] (user) {
+\textbf{用户端}
+\nodepart{second}
++ 资源上传\\
++ 检测发起\\
++ 结果查看
+\nodepart{third}
++ 提交资源()\\
++ 创建任务()\\
++ 查询结果()
+};
+
+\node[umlclass, fill=blue!8, right=of user] (admin) {
+\textbf{管理端}
+\nodepart{second}
++ 用户治理\\
++ 审核审批\\
++ 日志统计
+\nodepart{third}
++ 审批复核()\\
++ 管理组织()\\
++ 查询日志()
+};
+
+\node[umlclass, fill=orange!12, below=of $(user)!0.5!(admin)$] (backend) {
+\textbf{后端业务服务}
+\nodepart{second}
++ 认证鉴权\\
++ 任务编排\\
++ 报告生成
+\nodepart{third}
++ 身份校验()\\
++ 分派任务()\\
++ 生成报告()
+};
+
+\node[umlclass, fill=orange!10, below left=of backend] (task) {
+\textbf{异步任务调度}
+\nodepart{second}
++ 任务排队\\
++ 状态同步\\
++ 失败重试
+\nodepart{third}
++ 加入队列()\\
++ 执行任务()\\
++ 更新状态()
+};
+
+\node[umlclass, fill=orange!10, below right=of backend] (ai) {
+\textbf{AI推理服务}
+\nodepart{second}
++ 图像检测\\
++ 论文检测\\
++ 评审检测
+\nodepart{third}
++ 检测图像()\\
++ 检测论文()\\
++ 检测评审()
+};
+
+\node[umlclass, fill=green!10, below=of task] (db) {
+\textbf{数据库}
+\nodepart{second}
++ 用户数据\\
++ 任务数据\\
++ 审核日志
+\nodepart{third}
++ 保存()\\
++ 查询()\\
++ 更新()
+};
+
+\node[umlclass, fill=green!10, below=of ai] (fs) {
+\textbf{文件存储}
+\nodepart{second}
++ 上传文件\\
++ 中间产物\\
++ 报告文件
+\nodepart{third}
++ 存储()\\
++ 读取()\\
++ 归档()
+};
+
+\draw[relation] (user) -- node[left, font=\scriptsize, fill=white, inner sep=1pt] {接口访问} (backend);
+\draw[relation] (admin) -- node[right, font=\scriptsize, fill=white, inner sep=1pt] {接口访问} (backend);
+\draw[relation] (backend) -- node[left, font=\scriptsize, fill=white, inner sep=1pt] {任务分派} (task);
+\draw[relation] (task) -- node[above, font=\scriptsize, fill=white, inner sep=1pt] {调用} (ai);
+\draw[relation] (backend) -- node[left, font=\scriptsize, fill=white, inner sep=1pt] {读写} (db);
+\draw[relation] (backend) -- node[right, font=\scriptsize, fill=white, inner sep=1pt] {读写} (fs);
+\draw[relation] (task) -- node[left, font=\scriptsize, fill=white, inner sep=1pt] {状态回写} (db);
+\draw[relation] (ai) -- node[right, font=\scriptsize, fill=white, inner sep=1pt] {结果产物} (fs);
+\draw[relation] (task) -- node[below, font=\scriptsize, fill=white, inner sep=1pt] {回调} (backend);
+
+\end{tikzpicture}

@@ -1,0 +1,23 @@
+\section{运行与部署设计}
+
+\subsection{部署结构}
+系统部署上至少包含以下节点：
+\begin{itemize}[leftmargin=2em]
+    \item Web前端部署节点；
+    \item Django后端服务节点；
+    \item Redis与异步任务处理节点；
+    \item AI推理服务节点；
+    \item MySQL数据库节点；
+    \item 文件存储目录或对象存储节点。
+\end{itemize}
+
+\subsection{运行机制}
+用户请求首先到达前端和后端，短请求由后端同步处理，长时检测任务通过异步队列提交到任务系统，再由AI推理服务执行，最终检测结果、日志和报告回写数据库与文件存储，并通过轮询或消息机制反馈到前端。
+
+\subsection{部署约束}
+\begin{itemize}[leftmargin=2em]
+    \item AI推理服务对运行环境、模型文件和GPU资源有依赖；
+    \item 异步任务系统依赖消息中间件与稳定的任务状态存储；
+    \item 文件上传、结果图片和PDF报告需要统一的存储路径管理；
+    \item 生产部署时需明确静态资源、媒体文件、WebSocket与API代理配置。
+\end{itemize}

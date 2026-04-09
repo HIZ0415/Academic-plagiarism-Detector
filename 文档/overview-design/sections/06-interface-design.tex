@@ -1,0 +1,31 @@
+\section{接口设计}
+
+\subsection{接口设计原则}
+\begin{itemize}[leftmargin=2em]
+    \item 对前端提供统一风格的REST接口；
+    \item 对长时任务提供可轮询或可推送的状态查询能力；
+    \item 对不同资源类型采用统一任务接口与差异化结果接口结合的方式；
+    \item 对内部AI服务调用进行适配封装，避免前端或业务层直接依赖具体模型实现。
+\end{itemize}
+
+\subsection{外部接口分类}
+\begin{itemize}[leftmargin=2em]
+    \item 用户认证接口；
+    \item 资源上传与查询接口；
+    \item 检测任务提交与状态接口；
+    \item 检测结果查询与报告下载接口；
+    \item 人工审核相关接口；
+    \item 通知与消息接口；
+    \item 管理端治理与统计接口。
+\end{itemize}
+
+\subsection{内部接口分类}
+\begin{itemize}[leftmargin=2em]
+    \item 后端业务服务与异步任务系统之间的调度接口；
+    \item 后端与AI推理服务之间的检测调用接口；
+    \item 后端与文件存储之间的资源访问接口；
+    \item 后端与消息通道之间的状态推送接口。
+\end{itemize}
+
+\subsection{接口分层说明}
+本节后续将根据详细设计需要补充关键接口的职责、输入输出和调用关系，但不在概要设计阶段展开到字段级参数说明。

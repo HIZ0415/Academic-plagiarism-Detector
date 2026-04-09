@@ -1,0 +1,122 @@
+\begin{tikzpicture}[
+    node distance=1.8cm and 1.6cm,
+    every node/.style={font=\small},
+    umlclass/.style={
+        draw,
+        rectangle split,
+        rectangle split parts=2,
+        rectangle split part align={center,left},
+        rounded corners=3pt,
+        line width=0.8pt,
+        minimum width=4.2cm,
+        text width=4.2cm,
+        inner sep=5pt
+    },
+    relation/.style={-{Latex[length=2.3mm]}, thick, draw=black!75}
+]
+
+\node[umlclass, fill=blue!8] (auth) {
+\textbf{用户与权限模块}
+\nodepart{second}
++ 注册登录\\
++ 角色权限\\
++ 身份认证
+};
+
+\node[umlclass, fill=blue!8, right=of auth] (org) {
+\textbf{组织与成员模块}
+\nodepart{second}
++ 组织申请\\
++ 成员关系\\
++ 组织配额
+};
+
+\node[umlclass, fill=green!10, below=of auth] (resource) {
+\textbf{资源管理模块}
+\nodepart{second}
++ 文件上传\\
++ 资源登记\\
++ PDF图片提取
+};
+
+\node[umlclass, fill=orange!12, right=of resource] (task) {
+\textbf{检测任务管理模块}
+\nodepart{second}
++ 任务创建\\
++ 状态流转\\
++ 结果聚合
+};
+
+\node[umlclass, fill=orange!8, below left=of task] (image) {
+\textbf{图像检测模块}
+\nodepart{second}
++ 图像伪造识别\\
++ 子方法结果\\
++ 可疑区域生成
+};
+
+\node[umlclass, fill=orange!8, below=of task] (paper) {
+\textbf{论文检测模块}
+\nodepart{second}
++ 论文解析\\
++ 段落切分\\
++ AIGC分析
+};
+
+\node[umlclass, fill=orange!8, below right=of task] (review) {
+\textbf{评审检测模块}
+\nodepart{second}
++ 模板化分析\\
++ 生成痕迹识别\\
++ 评审结果封装
+};
+
+\node[umlclass, fill=purple!8, right=of task] (manual) {
+\textbf{人工审核模块}
+\nodepart{second}
++ 审核申请\\
++ 审核分派\\
++ 审核结论汇总
+};
+
+\node[umlclass, fill=green!10, below=of manual] (report) {
+\textbf{报告服务模块}
+\nodepart{second}
++ 检测报告\\
++ 人工审核报告\\
++ 文件归档
+};
+
+\node[umlclass, fill=yellow!15, left=of report] (notify) {
+\textbf{通知消息模块}
+\nodepart{second}
++ 站内通知\\
++ WebSocket推送\\
++ 状态反馈
+};
+
+\node[umlclass, fill=gray!15, left=of image] (log) {
+\textbf{统计日志模块}
+\nodepart{second}
++ 操作日志\\
++ 任务统计\\
++ 审核统计
+};
+
+\draw[relation] (auth) -- node[above, font=\scriptsize, fill=white, inner sep=1pt] {组织归属} (org);
+\draw[relation] (auth) -- node[left, font=\scriptsize, fill=white, inner sep=1pt] {权限控制} (resource);
+\draw[relation] (org) -- node[right, font=\scriptsize, fill=white, inner sep=1pt] {成员约束} (task);
+\draw[relation] (resource) -- node[above, font=\scriptsize, fill=white, inner sep=1pt] {创建任务} (task);
+\draw[relation] (task) -- node[above left, font=\scriptsize, fill=white, inner sep=1pt] {调度} (image);
+\draw[relation] (task) -- node[right, font=\scriptsize, fill=white, inner sep=1pt] {调度} (paper);
+\draw[relation] (task) -- node[above right, font=\scriptsize, fill=white, inner sep=1pt] {调度} (review);
+\draw[relation] (task) -- node[above, font=\scriptsize, fill=white, inner sep=1pt] {申请复核} (manual);
+\draw[relation] (manual) -- node[right, font=\scriptsize, fill=white, inner sep=1pt] {生成} (report);
+\draw[relation] (task) -- node[below, font=\scriptsize, fill=white, inner sep=1pt] {生成} (report);
+\draw[relation] (task) -- node[above, font=\scriptsize, fill=white, inner sep=1pt] {通知} (notify);
+\draw[relation] (manual) -- node[below, font=\scriptsize, fill=white, inner sep=1pt] {通知} (notify);
+\draw[relation] (log) -- node[below, font=\scriptsize, fill=white, inner sep=1pt] {记录} (resource);
+\draw[relation] (log) -- node[left, font=\scriptsize, fill=white, inner sep=1pt] {记录} (task);
+\draw[relation] (log) -- node[above, font=\scriptsize, fill=white, inner sep=1pt] {记录} (manual);
+
+\end{tikzpicture}
