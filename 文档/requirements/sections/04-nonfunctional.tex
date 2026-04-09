@@ -1,11 +1,11 @@
 ﻿\section{非功能性需求}
 
-\subsection{用户界面需求}
+\subsection{用户界面与交互需求}
 
 \renewcommand{\arraystretch}{1.5}
-\setlength{\LTleft}{0pt}
-\setlength{\LTright}{0pt}
-\begin{longtable}{|>{\centering\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{9.5cm}|}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{10.6cm}|}
 \hline
 \multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{详细要求} \tabularnewline
 \hline
@@ -16,26 +16,30 @@
 \hline
 \endhead
 
-界面整体布局 & Web 端采用清晰的左右分栏或上中下分区布局，导航区、内容区和操作区职责明确，保证用户可以快速定位主要功能与当前任务。 \tabularnewline
+界面一致性 & 系统 Web 端页面风格应保持统一，导航结构、按钮样式、提示信息、表格布局、颜色与图标语义应一致，降低用户在不同页面与不同角色界面之间切换时的理解成本。 \tabularnewline
 \hline
-界面简洁美观 & 页面风格应保持统一，颜色、字体、图标与控件尺寸协调一致，减少冗余装饰与视觉干扰，保证信息展示清晰易读。 \tabularnewline
+角色适配性 & 系统应针对普通用户、管理员和超级管理员提供差异化界面与菜单权限，保证不同角色仅访问与其职责相符的功能入口，同时避免无关功能造成的干扰。 \tabularnewline
 \hline
-面向不同角色的界面设计 & 针对普通用户、管理员和超级管理员提供差异化界面与菜单权限，使不同角色只看到与自身职责相关的功能入口。 \tabularnewline
+流程清晰性 & 上传、检测、查看结果、下载报告、申请人工审核、参与审核、后台管理等核心流程应具备清晰的页面引导、状态反馈和可追踪的操作路径，使用户能够准确理解当前所处阶段及下一步操作。 \tabularnewline
 \hline
-功能布局符合用户习惯 & 高频功能应放在显著位置，页面结构应符合用户阅读和操作习惯，常用操作路径不超过 3 次点击。 \tabularnewline
+结果展示可读性 & 检测结果页面应清晰展示不同内容类型的核心信息，包括论文疑似 AI 生成段落、段落级概率、事实性鉴伪子结论与原因说明，Review 的 AI 生成或模板化倾向说明，以及图像 AI 可疑区域标注结果，避免信息堆叠和语义歧义。 \tabularnewline
 \hline
-信息提示 & 系统应在上传、检测、审核、提交等关键操作后提供明确反馈，提示信息应简洁、可见、可理解，并区分成功、警告和失败状态。 \tabularnewline
+可视化解释能力 & 系统界面应支持对综合鉴伪结果进行可视化展示，通过段落高亮、风险标签、概率标识、图像局部标注等方式帮助用户理解系统判定依据，满足结果逻辑透明化的要求。 \tabularnewline
 \hline
-个性化支持 & 系统应支持基础个性化能力，如列表筛选、排序、分页数量调整等，并提供反馈渠道以便用户提交建议与问题。 \tabularnewline
+状态反馈及时性 & 在上传、排队、检测、审核、失败重试、结果生成等关键节点，系统应向用户提供明确、及时、可区分的状态反馈，至少覆盖待处理、处理中、已完成、失败、待人工审核、人工审核中、人工审核结束等状态。 \tabularnewline
+\hline
+操作容错性 & 对错误格式、重复提交、必填项缺失、网络中断、上传失败等异常场景，界面应提供明确提示、原因说明和必要的修正建议，避免用户因误操作导致任务丢失或流程中断。 \tabularnewline
+\hline
+列表与检索友好性 & 历史检测记录、人工审核任务、后台资源列表、日志记录等页面应支持分页、筛选、排序、条件查询和结果定位，便于用户和管理员快速查找所需内容。 \tabularnewline
 \hline
 \end{longtable}
 
-\subsection{软硬件环境需求}
+\subsection{运行环境与兼容性需求}
 
 \renewcommand{\arraystretch}{1.5}
-\setlength{\LTleft}{0pt}
-\setlength{\LTright}{0pt}
-\begin{longtable}{|>{\centering\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{9.5cm}|}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{10.6cm}|}
 \hline
 \multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{详细要求} \tabularnewline
 \hline
@@ -46,96 +50,114 @@
 \hline
 \endhead
 
-服务器环境 & 服务端应支持稳定运行的 Linux 或 Windows Server 环境，具备持续运行、日志记录、异常恢复和资源监控能力。 \tabularnewline
+服务端运行环境 & 服务端应支持在稳定的 Linux 或 Windows Server 环境中部署运行，具备持续运行、日志记录、任务调度、资源监控和异常恢复能力，以支撑检测服务和后台管理服务的长期稳定运行。 \tabularnewline
 \hline
-操作系统兼容性 & Web 端应兼容主流桌面操作系统环境下的浏览器访问，包括 Windows、macOS 等常见平台。 \tabularnewline
+浏览器兼容性 & Web 端应兼容 Chrome、Edge、Firefox 等主流现代浏览器，保证普通用户端和管理端在主流桌面浏览器中的主要页面布局、交互逻辑和核心功能保持一致。 \tabularnewline
 \hline
-浏览器兼容性 & 系统应兼容 Chrome、Edge、Firefox 等主流现代浏览器，并保证主要页面和核心流程在这些浏览器中表现一致。 \tabularnewline
+数据库与存储环境 & 系统应具备稳定的数据存储环境，用于保存用户信息、上传资源、检测记录、综合鉴伪报告、人工审核结果、系统日志和模型配置数据，并支持备份、恢复和权限控制。 \tabularnewline
 \hline
-数据库环境 & 系统默认使用 MySQL 8.0 及以上版本，数据库应支持并发访问、事务处理、备份恢复和权限控制。 \tabularnewline
+网络环境适应性 & 部署环境应具备稳定网络连接，能够支撑大文件上传、批量任务提交、检测状态同步、结果查询和后台管理访问，避免因网络抖动导致任务状态异常或数据传输中断。 \tabularnewline
 \hline
-网络设备与带宽 & 系统部署环境应具备稳定网络连接，满足并发访问、文件上传和检测结果返回的需求，避免明显的网络延迟或频繁中断。 \tabularnewline
+多格式兼容性 & 系统应支持学术图像、论文文本和同行评审 Review 的常见输入格式，并对不支持的格式给出明确提示；对多格式资源的解析、上传和检测流程应保持一致的交互体验与错误反馈机制。 \tabularnewline
 \hline
-存储环境 & 服务器应具备足够的本地或网络存储空间，用于保存用户上传资源、检测报告、审核记录、日志与备份数据。 \tabularnewline
+模型接入兼容性 & 后台应具备对不同检测模型进行接入、切换和配置的兼容能力，使系统能够根据图像检测、论文检测和 Review 检测等不同任务场景选择合适模型，减少因模型替换引起的大范围改动。 \tabularnewline
 \hline
 \end{longtable}
 
-\subsection{产品/软件质量需求}
+\subsection{性能与容量需求}
+
+\subsubsection{性能需求}
 
 \renewcommand{\arraystretch}{1.5}
-\setlength{\LTleft}{0pt}
-\setlength{\LTright}{0pt}
-\begin{longtable}{|>{\centering\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{9.5cm}|}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{10.6cm}|}
 \hline
-\multicolumn{1}{|c|}{主要质量属性} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\multicolumn{1}{|c|}{性能指标} & \multicolumn{1}{c|}{详细要求} \tabularnewline
 \hline
 \endfirsthead
 
 \hline
-\multicolumn{1}{|c|}{主要质量属性} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\multicolumn{1}{|c|}{性能指标} & \multicolumn{1}{c|}{详细要求} \tabularnewline
 \hline
 \endhead
 
-正确性 & 系统应正确完成图像、论文与评审文本的上传、检测、审核与结果展示流程，输出结果与输入任务保持一致，不出现错配、漏项或重复。 \tabularnewline
+页面响应性能 & 在正常网络环境与合理服务器资源条件下，登录、页面跳转、列表查询、记录筛选、审核任务查看等常规交互操作应保持较快响应，避免明显卡顿或长时间无反馈。 \tabularnewline
 \hline
-鲁棒性 & 对异常输入、非法参数、超大文件、格式错误文件等情况应进行拦截与提示，避免系统崩溃或产生不可恢复错误。 \tabularnewline
+检测任务处理性能 & 系统对单个检测任务应具备及时启动和持续处理能力，能够在任务排队、执行和完成过程中持续反馈状态变化，满足“检测结果及时返回”的业务要求。 \tabularnewline
 \hline
-可靠性 & 系统应支持长时间稳定运行，在高频访问与连续任务处理场景下维持可用服务，并具备必要的错误恢复能力。 \tabularnewline
+批量处理性能 & 系统应支持批量上传与批量检测场景下的任务分发、排队和并发处理，在负载升高时保持服务可用，避免因瞬时请求集中导致前端阻塞、任务丢失或后台服务不可用。 \tabularnewline
 \hline
-性能与效率 & 在正常网络环境下，普通页面操作应在较短时间内返回结果；对上传、查询、审核等典型操作应保证可接受的交互时延。 \tabularnewline
+状态同步性能 & 对批量任务和长时检测任务，系统应及时同步任务状态，保证用户能够持续获取任务进度信息，而非在结果生成前长期处于不可感知状态。 \tabularnewline
 \hline
-易用性 & 系统应尽量降低学习成本，使新用户能够在较短时间内理解主要流程并独立完成上传、查看结果和发起审核等任务。 \tabularnewline
-\hline
-清晰性 & 页面文案、状态标签、按钮命名和检测结果说明应表达明确，避免歧义，确保用户能够理解系统当前状态和下一步操作。 \tabularnewline
-\hline
-安全性 & 系统应通过身份认证、权限控制、数据加密、日志审计等机制保护用户隐私和业务数据，防止未授权访问与数据泄露。 \tabularnewline
-\hline
-可扩展性 & 系统架构应支持后续新增检测模型、内容类型、统计维度和管理功能，减少大范围重构成本。 \tabularnewline
-\hline
-可移植性 & 系统应尽量减少对特定运行平台和特定环境的强耦合，便于后续迁移到新的服务器、数据库或部署环境。 \tabularnewline
-\hline
-可维护性 & 代码、配置、日志与数据结构应具备良好的可维护性，方便后续调试、修复缺陷和持续迭代。 \tabularnewline
+报告生成性能 & 综合鉴伪报告生成过程应在检测完成后尽快触发并可被用户下载，避免因报告生成延迟过长影响结果使用与人工审核衔接。 \tabularnewline
 \hline
 \end{longtable}
-
-\subsection{其它需求}
 
 \subsubsection{容量需求}
 
 \renewcommand{\arraystretch}{1.5}
-\setlength{\LTleft}{0pt}
-\setlength{\LTright}{0pt}
-\begin{longtable}{|>{\centering\arraybackslash}p{2.5cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{6cm}|}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.1cm}|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{6.0cm}|}
 \hline
-\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体指标} \tabularnewline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体要求} \tabularnewline
 \hline
 \endfirsthead
 
 \hline
-\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体指标} \tabularnewline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体要求} \tabularnewline
 \hline
 \endhead
 
-用户规模 & 指系统需支持的目标用户量级。 & 系统初期应支持不少于 1000 名注册用户，并能够根据业务增长继续扩容。 \tabularnewline
+用户容量 & 指系统需支持的用户规模与业务增长能力。 & 系统应支持普通用户、管理员和超级管理员等多角色长期使用，并预留后续扩容能力，以适应检测任务数量持续增长的场景。 \tabularnewline
 \hline
-并发规模 & 指系统在同一时间内可承载的活跃访问量。 & 系统应能支持至少 100 名用户同时在线执行浏览、上传、查询等常见操作。 \tabularnewline
+任务容量 & 指系统可承载的检测任务、人工审核任务和日志数据规模。 & 系统应能够持续保存一定时期内的检测记录、审核记录、报告和日志信息，并支持按任务类型、用户、时间范围等维度进行检索。 \tabularnewline
 \hline
-存储空间 & 指系统用于保存业务数据的物理或逻辑空间容量。 & 初期存储空间应满足 20GB 以上，并为检测文件、报告和日志预留扩展空间。 \tabularnewline
+存储容量 & 指系统对上传资源、检测结果及日志文件的存储能力。 & 存储环境应为论文文本、图像资源、Review 文本、综合鉴伪报告、图像标注结果以及系统日志预留充足空间，并支持后续按业务规模平滑扩展。 \tabularnewline
+\hline
+并发容量 & 指系统在多用户同时访问和批量提交任务场景下的承载能力。 & 系统应支持高并发批量检测和多线程上传场景，保证在并发压力上升时核心功能仍可使用，任务状态仍可正确同步。 \tabularnewline
 \hline
 \end{longtable}
 
-\subsubsection{数据备份与恢复}
+\subsection{安全与权限控制需求}
 
-系统应提供数据备份能力，定期对用户信息、上传资源、检测结果、审核记录和系统日志进行自动备份。
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{10.6cm}|}
+\hline
+\multicolumn{1}{|c|}{安全属性} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endfirsthead
 
-系统应提供恢复机制，在数据损坏、误删除或系统异常后，管理员可以按备份策略恢复到指定时间点附近的有效状态。
+\hline
+\multicolumn{1}{|c|}{安全属性} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endhead
+
+身份认证 & 系统应提供可靠的身份认证机制，防止未授权用户访问平台；登录态管理应安全、稳定，避免因认证失效或会话异常导致越权操作。 \tabularnewline
+\hline
+权限隔离 & 系统应基于角色实施分级授权，对普通用户、管理员和超级管理员的功能权限、数据访问范围和操作边界进行严格控制，防止越权查看、越权修改和越权删除。 \tabularnewline
+\hline
+数据安全 & 用户基本信息、上传资源、检测结果、审核意见、日志记录和模型配置等数据应采取必要的保护措施，敏感数据应支持加密存储或加密传输，降低数据泄露风险。 \tabularnewline
+\hline
+资源访问控制 & 用户只能访问与自身相关的检测记录、审核记录和报告内容；管理员和超级管理员访问敏感数据时应符合平台权限策略，并保留必要审计痕迹。 \tabularnewline
+\hline
+操作审计 & 对登录、上传、删除, 审核、配置修改、日志查看、模型切换等关键操作，应进行审计记录，以支持问题追踪、责任定位和安全检查。 \tabularnewline
+\hline
+异常防护 & 系统应对恶意文件上传、非法参数调用、频繁重复请求、异常评论内容和其他可能影响平台安全或稳定的行为采取拦截、限制和告警措施。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsection{数据、日志与报告管理需求}
 
 \subsubsection{数据约束}
 
 \renewcommand{\arraystretch}{1.5}
-\setlength{\LTleft}{0pt}
-\setlength{\LTright}{0pt}
-\begin{longtable}{|>{\centering\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{4cm}|>{\raggedright\arraybackslash}p{5.5cm}|}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.1cm}|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{6.0cm}|}
 \hline
 \multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{需求解释} & \multicolumn{1}{c|}{具体要求} \tabularnewline
 \hline
@@ -146,22 +168,88 @@
 \hline
 \endhead
 
-数据合法性 & 对输入数据进行格式和范围校验。 & 用户注册信息、上传文件类型、任务参数等应满足预定义规则，非法数据不得进入核心业务流程。 \tabularnewline
+数据合法性 & 对输入数据进行格式、范围与完整性校验。 & 用户注册信息、上传资源、任务参数、审核评论和管理配置项等数据应满足预定义规则，非法或缺失数据不得进入核心业务流程。 \tabularnewline
 \hline
-数据安全性 & 保护用户隐私和业务数据。 & 敏感数据应加密存储，关键操作应进行权限校验，并记录必要审计日志。 \tabularnewline
+数据一致性 & 保证不同业务对象之间的数据对应关系正确。 & 上传资源、检测结果、报告文件、审核任务、审核结果与日志记录之间应建立稳定映射关系，避免出现任务错配、记录丢失或状态不一致。 \tabularnewline
 \hline
-数据维护与治理 & 保证数据长期有效、完整、可追踪。 & 系统应支持定期清理失效数据、校验关键记录一致性，并提供备份与恢复支撑。 \tabularnewline
+数据可追溯性 & 保证关键业务结果可以回查来源。 & 系统应能够依据任务编号、用户信息、时间范围和资源类型追溯对应的检测记录、审核记录和日志信息。 \tabularnewline
+\hline
+数据生命周期管理 & 保证业务数据长期可治理。 & 系统应支持对历史资源、失效报告、过期日志和异常数据进行归档、清理或标记处理，同时避免对有效业务记录造成破坏。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsubsection{日志管理需求}
+
+系统应对用户操作、检测任务执行过程、人工审核流程和后台管理行为进行完整记录，并支持查询、筛选、追溯和必要的审计分析。
+
+除通用操作日志外，系统还应重点支持论文检测日志与 Review 检测日志的管理，确保管理员能够针对不同内容类型分别查看任务状态、处理过程、异常情况和结果记录，以满足迭代开发中新增的日志管理需求。
+
+\subsubsection{综合鉴伪报告管理需求}
+
+系统应支持综合鉴伪报告的生成、存储、下载和查询。报告内容应与检测结果保持一致，能够覆盖 AI 贡献占比、图像 AI 可疑位置、论文段落级分析结果、使用建议、综合结论以及人工审核相关信息等核心内容，并保证报告内容的完整性、可读性和可追溯性。
+
+\subsection{可靠性、可用性与恢复需求}
+
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{10.6cm}|}
+\hline
+\multicolumn{1}{|c|}{质量属性} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endfirsthead
+
+\hline
+\multicolumn{1}{|c|}{质量属性} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endhead
+
+可靠性 & 系统应能够持续稳定地支持上传、检测、查询、审核、报告下载与后台管理等核心业务，在长时间运行和多任务并行处理场景下不应频繁出现服务中断或任务异常。 \tabularnewline
+\hline
+鲁棒性 & 对网络中断、模型调用失败、文件解析异常、数据库暂时不可用等异常情况，系统应具备容错与恢复能力，避免因单点故障导致整个业务流程失效。 \tabularnewline
+\hline
+可用性 & 系统应保证核心功能在绝大多数正常使用场景下可访问、可操作、可反馈，并对不可用状态进行清晰提示，减少用户等待过程中的不确定性。 \tabularnewline
+\hline
+任务恢复能力 & 对上传中断、检测失败、人工审核中断等场景，系统应尽量保留必要上下文信息，支持失败提示、重试机制或人工介入处理，避免用户重复执行全部流程。 \tabularnewline
+\hline
+数据备份与恢复 & 系统应定期对用户信息、上传资源、检测结果、审核记录、综合报告、模型配置和系统日志进行备份，并在数据损坏、误删除或系统异常后支持恢复到有效状态。 \tabularnewline
+\hline
+\end{longtable}
+
+\subsection{可维护性、可扩展性与代码质量需求}
+
+\subsubsection{可维护性与可扩展性}
+
+\renewcommand{\arraystretch}{1.5}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{10.6cm}|}
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endfirsthead
+
+\hline
+\multicolumn{1}{|c|}{需求名称} & \multicolumn{1}{c|}{详细要求} \tabularnewline
+\hline
+\endhead
+
+模块化设计 & 系统应按用户端、检测服务、人工审核、报告生成、日志管理、后台管理、模型配置等业务边界进行模块划分，降低模块间耦合度，便于后续维护和功能迭代。 \tabularnewline
+\hline
+模型扩展能力 & 系统架构应支持后续新增或替换图像检测模型、论文 AIGC 检测模型、Review 检测模型及其参数配置，避免因模型变更影响现有业务主流程。 \tabularnewline
+\hline
+功能扩展能力 & 系统应支持后续增加新的检测对象、统计维度、审核机制、报告字段和后台治理能力，为后续版本演进保留空间。 \tabularnewline
+\hline
+配置可管理性 & 关键业务参数、模型配置、日志策略和资源管理规则应尽量通过配置化方式维护，减少频繁修改底层代码带来的风险。 \tabularnewline
 \hline
 \end{longtable}
 
 \subsubsection{代码质量要求}
 
-开发时业务逻辑类代码应满足以下要求：
-
 \renewcommand{\arraystretch}{1.5}
-\setlength{\LTleft}{0pt}
-\setlength{\LTright}{0pt}
-\begin{longtable}{|>{\centering\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}p{8.5cm}|}
+\setlength{\LTleft}{\fill}
+\setlength{\LTright}{\fill}
+\begin{longtable}{|>{\centering\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{10.4cm}|}
 \hline
 \multicolumn{1}{|c|}{代码要求} & \multicolumn{1}{c|}{具体内容} \tabularnewline
 \hline
@@ -172,32 +260,22 @@
 \hline
 \endhead
 
-简洁性 & 代码应保持合理的函数长度和模块边界，避免重复逻辑、过深嵌套和无意义复杂度。 \tabularnewline
+可读性 & 代码命名、目录结构和模块职责应清晰明确，关键业务逻辑应配有必要注释，便于团队成员理解和协作。 \tabularnewline
 \hline
-可读性 & 关键业务函数应有必要注释，命名清晰，结构明确，便于团队成员快速理解和维护。 \tabularnewline
+简洁性 & 代码应避免重复实现、无意义复杂度和过深嵌套，保证核心流程表达直接清楚，降低后续修改成本。 \tabularnewline
 \hline
-可复用性 & 公共能力应抽象为可复用模块，减少重复实现，为后续新增功能和重构提供基础。 \tabularnewline
+可测试性 & 业务逻辑应尽量与界面层、存储层和模型调用层解耦，便于开展单元测试、集成测试和回归测试。 \tabularnewline
 \hline
-可测试性 & 业务逻辑应尽量与界面和基础设施解耦，便于进行单元测试、集成测试和回归验证。 \tabularnewline
+可复用性 & 上传处理、状态同步、日志记录、结果封装、权限校验等通用能力应抽象为可复用模块，以支撑多内容类型和多业务场景复用。 \tabularnewline
+\hline
+规范性 & 项目开发应遵循统一的编码规范、异常处理规范和日志记录规范，保证团队交付质量和后续维护效率。 \tabularnewline
 \hline
 \end{longtable}
 
-\subsubsection{高并发批量检测能力}
+\subsection{结果可解释性与业务审慎性需求}
 
-系统应支持批量任务提交和排队处理机制，在高并发场景下保证检测任务有序执行，并避免因瞬时流量激增导致服务不可用。
+系统生成的检测结果不应仅给出简单的“是”或“否”判定，而应尽可能提供与判定相关的解释信息，使用户能够理解结果来源和风险含义。这一要求尤其适用于全篇论文 AIGC 检测、图像可疑区域标注以及 Review 模板化倾向识别等场景。
 
-\subsubsection{多线程上传能力}
+系统应支持从不同内容类型出发提供差异化解释信息，例如对论文给出段落级概率和事实性鉴伪原因说明，对图像给出可疑区域标注，对 Review 给出模板化或 AI 生成倾向提示，并在综合鉴伪报告中进行统一整合。
 
-系统应支持稳定的文件上传机制，能够在多用户并发上传场景下维持可接受的响应时间，并正确处理上传失败后的重试与提示。
-
-\subsubsection{检测状态实时同步能力}
-
-系统应向用户及时反馈任务状态变化，包括待处理、处理中、已完成、失败等状态，避免用户因信息延迟造成误判。
-
-\subsubsection{多格式兼容性要求}
-
-系统应兼容常见图像、文档和压缩包格式，并对不支持的格式提供明确提示，避免用户在上传阶段产生歧义。
-
-\subsubsection{检测结果可解释性要求}
-
-系统生成的检测结果应包含必要说明，能够向用户解释判定依据、可疑位置或主要风险点，提升结果的可理解性与可信度。
+同时，系统应体现业务审慎性。检测结果用于辅助识别学术内容中的风险，不应被设计为脱离上下文的绝对裁决依据；平台应通过人工审核机制、结果说明机制和日志可追溯机制，共同降低误判带来的不利影响。

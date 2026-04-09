@@ -1,0 +1,18 @@
+% 用户上传模块整体用例图（FR-YHSC-0001～0006，与 03-3-user-upload.tex 一致）
+\begin{tikzpicture}[
+  uc/.style={draw,ellipse,minimum width=2.65cm,minimum height=8mm,align=center,font=\scriptsize,inner sep=1.5pt},
+  arr/.style={semithick}
+]
+  \node[draw,rounded corners,minimum width=9.1cm,minimum height=5.9cm] (frame) at (5.4,3) {};
+  \node[anchor=north,yshift=-2pt] at (frame.north) {\small\textbf{用户上传模块（全部功能点）}};
+  \node (actor) at (-0.2,3) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 普通用户\\[-2pt]\tiny （已登录）}};
+  \node[uc] (u1) at (3.2,4.75) {文件上传\\FR-YHSC-0001};
+  \node[uc] (u2) at (5.4,4.75) {AI检测\\FR-YHSC-0002};
+  \node[uc] (u3) at (7.6,4.75) {人工审核请求\\FR-YHSC-0003};
+  \node[uc] (u4) at (3.2,2.9) {批量上传\\FR-YHSC-0004};
+  \node[uc] (u5) at (5.4,2.9) {高并发批量检测\\FR-YHSC-0005};
+  \node[uc] (u6) at (7.6,2.9) {检测状态实时同步\\FR-YHSC-0006};
+  \foreach \x in {u1,u2,u3,u4,u5,u6} {
+    \draw[arr] (actor.east) -- ++(0.22,0) |- (\x.west);
+  }
+\end{tikzpicture}

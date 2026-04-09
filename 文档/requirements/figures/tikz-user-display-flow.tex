@@ -1,0 +1,21 @@
+% 用户展示模块整体业务流程（对应 03-2-user-display.tex 全部功能点 FR-YHZS-0001～0006）
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,minimum width=2.35cm,inner sep=2pt,font=\tiny},
+  arr/.style={-{Stealth[length=1.6mm]},semithick}
+]
+  \node[box] (login) at (0,0) {登录};
+  \node[box] (n1) at (0,-1.25) {个人中心\\\textbf{YHZS-0001}};
+  \node[box] (n2) at (-3.5,-2.85) {检测记录\\\textbf{YHZS-0002}};
+  \node[box] (n3) at (0,-2.85) {审核任务展示\\\textbf{YHZS-0003}};
+  \node[box] (n4) at (3.5,-2.85) {社区反馈\\\textbf{YHZS-0004}};
+  \node[box] (d2) at (-3.5,-4.35) {检测任务详情};
+  \node[box] (d3) at (0,-4.35) {审核任务详情\\\footnotesize 进度/报告/终止};
+  \node[box] (n5) at (-3.5,-5.85) {综合鉴伪报告\\\textbf{YHZS-0005}};
+  \node[box] (n6) at (0,-5.85) {人工审核进度\\与结果 \textbf{YHZS-0006}};
+  \draw[arr] (login) -- (n1);
+  \draw[arr] (n1) -| (n2);
+  \draw[arr] (n1) -- (n3);
+  \draw[arr] (n1) -| (n4);
+  \draw[arr] (n2) -- (d2) -- (n5);
+  \draw[arr] (n3) -- (d3) -- (n6);
+\end{tikzpicture}

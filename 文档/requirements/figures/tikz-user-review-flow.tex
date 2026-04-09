@@ -1,0 +1,26 @@
+% 用户审核模块整体业务流程（对应 03-4-user-review.tex 全部功能点 FR-YHSH-0001～0007）
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,minimum width=2.05cm,inner sep=1.5pt,font=\tiny},
+  arr/.style={-{Stealth[length=1.5mm]},semithick}
+]
+  \node[box] (L) at (0,0) {登录};
+  \node[box] (Y1) at (0,-1.2) {任务列表与筛选\\\textbf{YHSH-0001}};
+  \node[box] (Det) at (0,-2.55) {任务详情\\\footnotesize AI检测/审核信息};
+  \node[box] (Y2) at (-3.3,-3.95) {用户审核\\\textbf{YHSH-0002}};
+  \node[box] (Y5) at (0,-3.95) {论文人工审核\\\textbf{YHSH-0005}};
+  \node[box] (Y6) at (3.3,-3.95) {Review人工审核\\\textbf{YHSH-0006}};
+  \node[box] (Y3) at (-2.2,-5.25) {评论点赞\\\textbf{YHSH-0003}};
+  \node[box] (Y4) at (2.2,-5.25) {用户举报\\\textbf{YHSH-0004}};
+  \node[box] (Y7) at (0,-6.55) {人工审核结果汇总\\\textbf{YHSH-0007}};
+  \draw[arr] (L) -- (Y1) -- (Det);
+  \draw[arr] (Det) -- (Y2);
+  \draw[arr] (Det) -- (Y5);
+  \draw[arr] (Det) -- (Y6);
+  \draw[arr] (Det) -| (Y3);
+  \draw[arr] (Det) -| (Y4);
+  \draw[arr] (Y2) -- (Y7);
+  \draw[arr] (Y5) -- (Y7);
+  \draw[arr] (Y6) -- (Y7);
+  \draw[arr] (Y3.south) -- ++(0,-0.2) -| (Y7.north);
+  \draw[arr] (Y4.south) -- ++(0,-0.2) -| (Y7.north);
+\end{tikzpicture}

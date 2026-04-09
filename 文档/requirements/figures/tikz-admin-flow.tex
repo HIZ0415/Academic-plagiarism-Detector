@@ -1,0 +1,49 @@
+% 管理维护模块整体业务流程（对应 03-6-admin.tex 全部功能点 FR-GLWH-0001～0013）
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,minimum width=2.35cm,inner sep=1.6pt,font=\tiny},
+  arr/.style={-{Stealth[length=1.5mm]},semithick}
+]
+  \node[box] (L) at (0,0) {管理员登录};
+  \node[box] (Home) at (0,-1.15) {管理端首页};
+
+  \node[box] (E) at (-5.4,-2.7) {实体管理入口};
+  \node[box] (S) at (0,-2.6) {统计与日志入口};
+  \node[box] (R) at (5.4,-2.7) {治理与配置入口};
+
+  \node[box] (E1) at (-7.2,-4.25) {实体添加\\\textbf{GLWH-0001}};
+  \node[box] (E2) at (-7.2,-5.65) {实体修改\\\textbf{GLWH-0002}};
+  \node[box] (E3) at (-7.2,-7.05) {实体删除\\\textbf{GLWH-0003}};
+  \node[box] (E4) at (-4.2,-4.25) {实体检索\\\textbf{GLWH-0004}};
+  \node[box] (E5) at (-4.2,-5.65) {实体分类\\\textbf{GLWH-0005}};
+  \node[box] (E10) at (-4.2,-7.05) {学术资源管理\\\textbf{GLWH-0010}};
+
+  \node[box] (S6) at (-1.2,-4.25) {数据信息统计\\\textbf{GLWH-0006}};
+  \node[box] (S7) at (-1.2,-5.65) {操作记录统计\\\textbf{GLWH-0007}};
+  \node[box] (S11) at (1.8,-4.25) {论文检测日志\\\textbf{GLWH-0011}};
+  \node[box] (S12) at (1.8,-5.65) {Review检测日志\\\textbf{GLWH-0012}};
+
+  \node[box] (R8) at (5.4,-4.25) {超级管理员\\\textbf{GLWH-0008}};
+  \node[box] (R9) at (5.4,-5.65) {用户举报审核\\\textbf{GLWH-0009}};
+  \node[box] (R13) at (5.4,-7.05) {模型管理与配置\\\textbf{GLWH-0013}};
+
+  \draw[arr] (L) -- (Home);
+  \draw[arr] (Home) -- (E);
+  \draw[arr] (Home) -- (S);
+  \draw[arr] (Home) -- (R);
+
+  \draw[arr] (E) -- (E1);
+  \draw[arr] (E) -- (E2);
+  \draw[arr] (E) -- (E3);
+  \draw[arr] (E) -- (E4);
+  \draw[arr] (E) -- (E5);
+  \draw[arr] (E) -- (E10);
+
+  \draw[arr] (S) -- (S6);
+  \draw[arr] (S) -- (S7);
+  \draw[arr] (S) -- (S11);
+  \draw[arr] (S) -- (S12);
+
+  \draw[arr] (R) -- (R8);
+  \draw[arr] (R) -- (R9);
+  \draw[arr] (R) -- (R13);
+\end{tikzpicture}

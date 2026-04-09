@@ -1,8 +1,11 @@
-﻿\documentclass[UTF8]{ctexart}
+\documentclass[UTF8]{ctexart}
 
 \usepackage[a4paper,margin=2.5cm]{geometry}
 \usepackage[hidelinks]{hyperref}
 \usepackage{multirow,longtable,array}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
 
 \title{学术AI鉴伪系统需求规格说明书（迭代版）}
 \author{}
@@ -69,10 +72,10 @@
 模块 & 作者 \\ \hline
 文档介绍、概述、非功能性需求 & 苏天 \\ \hline
 功能性需求分类 & 苏天 \\ \hline
-用户展示、管理维护模块 & 纪郅炀 \\ \hline
-用户上传、用户审核模块 & 王宇汀 \\ \hline
-图像检测模块 & 苏天 \\ \hline
-PPT制作和汇报展示 & 李从容 \\ \hline
+用户展示、用户审核模块 & 翟润、聂薪羽 \\ \hline
+学术内容检测模块 & 苏天、翟润 \\ \hline
+管理维护模块 & 刘宇童、张与耕 \\ \hline
+PPT制作和汇报展示 & 翟润 \\ \hline
 \end{tabular}
 \end{center}
 
@@ -93,6 +96,5 @@ PPT制作和汇报展示 & 李从容 \\ \hline
 \input{sections/03-functional/03-6-admin.tex}
 
 \input{sections/04-nonfunctional.tex}
-\input{sections/05-appendix.tex}
 
 \end{document}
