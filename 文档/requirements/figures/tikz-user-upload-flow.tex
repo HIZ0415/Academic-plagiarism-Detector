@@ -1,0 +1,28 @@
+% 用户上传模块整体业务流程（对应 03-3-user-upload.tex 全部功能点 FR-YHSC-0001～0006）
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,minimum width=2.15cm,inner sep=1.8pt,font=\tiny},
+  arr/.style={-{Stealth[length=1.5mm]},semithick}
+]
+  \node[box] (L) at (0,0) {登录};
+  \node[box] (P) at (0,-1.2) {学术检测页面};
+  \node[box] (U1) at (-2.8,-2.6) {文件上传\\\textbf{YHSC-0001}};
+  \node[box] (U4) at (2.8,-2.6) {批量上传\\\textbf{YHSC-0004}};
+  \node[box] (Q) at (0,-3.95) {任务创建/校验\\\footnotesize 类型识别与入队};
+  \node[box] (U5) at (2.8,-5.2) {高并发批量检测\\\textbf{YHSC-0005}};
+  \node[box] (U2) at (0,-5.2) {AI检测\\\textbf{YHSC-0002}};
+  \node[box] (U6) at (-2.8,-5.2) {状态实时同步\\\textbf{YHSC-0006}};
+  \node[box] (R) at (0,-6.55) {检测结果/报告查看};
+  \node[box] (U3) at (0,-7.9) {人工审核请求\\\textbf{YHSC-0003}};
+  \draw[arr] (L) -- (P);
+  \draw[arr] (P) -- (U1);
+  \draw[arr] (P) -- (U4);
+  \draw[arr] (U1) -- (Q);
+  \draw[arr] (U4) -- (Q);
+  \draw[arr] (Q) -- (U2);
+  \draw[arr] (Q) -- (U5);
+  \draw[arr] (Q) -- (U6);
+  \draw[arr] (U2) -- (R);
+  \draw[arr] (U5.south) -- ++(0,-0.18) -| (R.east);
+  \draw[arr] (U6.south) -- ++(0,-0.18) -| (R.west);
+  \draw[arr] (R) -- (U3);
+\end{tikzpicture}

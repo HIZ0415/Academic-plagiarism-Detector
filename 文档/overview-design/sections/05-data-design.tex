@@ -1,0 +1,33 @@
+\section{数据设计}
+
+\subsection{数据设计目标}
+数据设计需要同时满足统一资源抽象、现有图像业务兼容、异步任务追踪和后续扩展支持等要求。
+
+\subsection{核心实体}
+\begin{longtable}{|p{4cm}|p{10cm}|}
+\hline
+实体名称 & 说明 \\ \hline
+User & 系统用户，包含普通用户、审核者、组织管理员和超级管理员。 \\ \hline
+Organization & 用户所属组织及其资源配额、管理关系和邀请关系。 \\ \hline
+Resource & 统一学术资源抽象，用于表示图像、论文和Review。 \\ \hline
+DetectionTask & 检测任务主体，用于关联用户、资源集合、状态与任务参数。 \\ \hline
+DetectionResult & 检测结果主体，用于承载自动检测输出及其状态。 \\ \hline
+ManualReview & 人工审核任务与审核执行记录。 \\ \hline
+Report & 检测或审核报告文件及其元数据。 \\ \hline
+Log & 操作日志、检测日志、审核日志及管理日志。 \\ \hline
+Notification & 系统消息与状态通知。 \\ \hline
+\end{longtable}
+
+\subsection{实体关系说明}
+本节后续将补充核心实体关系图，重点体现用户、组织、资源、检测任务、检测结果、人工审核、报告和日志之间的映射关系。
+
+\subsection{状态设计}
+\begin{itemize}[leftmargin=2em]
+    \item 资源状态：已上传、已解析、可检测、已归档等；
+    \item 任务状态：待处理、处理中、已完成、失败、待人工审核等；
+    \item 审核状态：待审批、审核中、已完成、已拒绝等；
+    \item 通知状态：未读、已读。
+\end{itemize}
+
+\subsection{兼容与演进说明}
+考虑到当前代码实现中已有围绕图像任务构建的数据模型，后续详细设计阶段需要明确哪些现有表结构继续复用，哪些通过扩展字段过渡，哪些需要新增统一资源抽象表。

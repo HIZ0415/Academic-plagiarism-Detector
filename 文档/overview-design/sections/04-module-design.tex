@@ -1,0 +1,789 @@
+\section{模块设计}
+
+\subsection{模块划分原则}
+本系统的模块划分不按代码目录机械展开，而是按业务职责、数据边界和协作关系进行组织。其核心目标是将当前代码中已经存在的用户、组织、资源、检测、审核、通知和日志能力沉淀为稳定模块，同时为论文检测、评审文本检测和统一报告等迭代需求预留扩展空间。
+
+在划分过程中遵循以下原则：
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{围绕业务能力划分模块}。模块对应稳定业务职责，而不是简单对应前端页面或后端文件夹；
+    \item \textbf{高内聚、低耦合}。单个模块内部尽量完成同一类业务闭环，不直接依赖过多外部模块细节；
+    \item \textbf{统一入口、差异化实现}。资源管理、检测任务管理和结果输出尽量统一，不同检测对象的差异通过专用检测模块或适配器处理；
+    \item \textbf{兼顾现有实现与后续演进}。模块设计既要能映射当前 Django 后端、Vue 前端、Celery 任务和 AI 服务实现，也要能支撑下一阶段新增论文与评审能力。
+\end{itemize}
+
+\subsection{模块总体关系类图}
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-module-design-uml.tex}}
+    \caption{系统模块关系 UML 类图}
+\end{figure}
+
+\subsection{模块总览}
+\noindent 本章模块标识符采用“SD-模块缩写-序号”的统一编码方式，其中 ``SD'' 表示概要设计阶段，模块缩写用于区分不同业务模块，序号用于标识该模块条目。
+
+\begin{longtable}{|p{3.8cm}|p{6.1cm}|p{4.1cm}|}
+\hline
+模块名称、标识符 & 主要职责 & 主要依赖 \\ \hline
+\shortstack[l]{用户与权限模块\\SD-YHQX-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{组织与成员模块\\SD-ZZCY-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{资源管理模块\\SD-ZYGL-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{检测任务管理模块\\SD-JCRW-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{图像检测模块\\SD-TPJC-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{论文检测模块\\SD-LWJC-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{评审检测模块\\SD-PSJC-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{人工审核模块\\SD-RGSH-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{报告服务模块\\SD-BGFW-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{通知消息模块\\SD-TZXX-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{统计日志模块\\SD-TJRZ-0001} & 待补充 & 待补充 \\ \hline
+\end{longtable}
+
+\subsection{用户与权限模块（SD-YHQX-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{组织与成员模块（SD-ZZCY-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{资源管理模块（SD-ZYGL-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{检测任务管理模块（SD-JCRW-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{图像检测模块（SD-TPJC-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{论文检测模块（SD-LWJC-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{评审检测模块（SD-PSJC-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{人工审核模块（SD-RGSH-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{报告服务模块（SD-BGFW-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{通知消息模块（SD-TZXX-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{统计日志模块（SD-TJRZ-0001）}
+
+\subsubsection{模块目标}
+待补充。
+
+\subsubsection{模块职责}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{功能组成}
+\begin{itemize}[leftmargin=2em]
+    \item 功能点 1：待补充；
+    \item 功能点 2：待补充；
+    \item 功能点 3：待补充。
+\end{itemize}
+
+\subsubsection{输入与输出}
+输入：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+输出：
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{核心数据对象}
+\begin{itemize}[leftmargin=2em]
+    \item 对象 1：待补充；
+    \item 对象 2：待补充；
+    \item 对象 3：待补充。
+\end{itemize}
+
+\subsubsection{处理流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{enumerate}
+
+\subsubsection{模块接口与交互关系}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{设计要点}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充；
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsubsection{后续扩展方向}
+\begin{itemize}[leftmargin=2em]
+    \item 待补充；
+    \item 待补充。
+\end{itemize}
+
+\subsection{本章小结}
+本章给出了统一的模块写作模板。后续填充正文时，可按“模块目标、模块职责、功能组成、输入与输出、核心数据对象、处理流程、模块接口与交互关系、设计要点、后续扩展方向”的顺序逐项补全，以保证整章结构一致。

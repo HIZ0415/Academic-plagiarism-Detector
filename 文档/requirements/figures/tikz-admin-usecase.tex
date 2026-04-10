@@ -1,0 +1,34 @@
+% 管理维护模块整体用例图（对应 03-6-admin.tex 全部功能点 FR-GLWH-0001～0013）
+\begin{tikzpicture}[
+  uc/.style={draw,ellipse,minimum width=2.3cm,minimum height=7mm,align=center,font=\tiny,inner sep=1pt},
+  arr/.style={semithick}
+]
+  \node[draw,rounded corners,minimum width=11.4cm,minimum height=7.6cm] (frame) at (6.2,3.95) {};
+  \node[anchor=north,yshift=-2pt] at (frame.north) {\small\textbf{管理维护模块（全部功能点）}};
+  \node (admin) at (-0.4,4.6) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 管理员}};
+  \node (super) at (-0.4,2.75) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 超级管理员}};
+
+  \node[uc] (u1) at (2.7,6.35) {实体添加\\FR-GLWH-0001};
+  \node[uc] (u2) at (4.95,6.35) {实体修改\\FR-GLWH-0002};
+  \node[uc] (u3) at (7.2,6.35) {实体删除\\FR-GLWH-0003};
+  \node[uc] (u4) at (9.45,6.35) {实体检索\\FR-GLWH-0004};
+
+  \node[uc] (u5) at (2.7,4.95) {实体分类\\FR-GLWH-0005};
+  \node[uc] (u6) at (4.95,4.95) {数据信息统计\\FR-GLWH-0006};
+  \node[uc] (u7) at (7.2,4.95) {操作记录统计\\FR-GLWH-0007};
+  \node[uc] (u8) at (9.45,4.95) {超级管理员\\FR-GLWH-0008};
+
+  \node[uc] (u9) at (2.7,3.55) {用户举报审核\\FR-GLWH-0009};
+  \node[uc] (u10) at (4.95,3.55) {学术资源管理\\FR-GLWH-0010};
+  \node[uc] (u11) at (7.2,3.55) {论文检测日志\\FR-GLWH-0011};
+  \node[uc] (u12) at (9.45,3.55) {Review检测日志\\FR-GLWH-0012};
+
+  \node[uc] (u13) at (6.1,2.15) {模型管理与配置\\FR-GLWH-0013};
+
+  \foreach \x in {u1,u2,u3,u4,u5,u6,u7,u9,u10,u11,u12,u13} {
+    \draw[arr] (admin.east) -- ++(0.22,0) |- (\x.west);
+  }
+  \foreach \x in {u8,u13} {
+    \draw[arr] (super.east) -- ++(0.22,0) |- (\x.west);
+  }
+\end{tikzpicture}
