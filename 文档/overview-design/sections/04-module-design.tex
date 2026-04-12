@@ -555,137 +555,136 @@
 \subsection{人工审核模块（SD-RGSH-0001）}
 
 \subsubsection{模块目标}
-待补充。
+本模块的目标是实现学术资源的人工审核功能，支持图像、论文和评审结果的人工审核。通过专家审核任务分配与管理，确保AI检测结果的准确性与可信度。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item \textbf{人工审核任务管理：} 分配和管理用户提交的人工审核请求，包括图像、论文和评审的审核。
+    \item \textbf{专家审核任务分配：} 根据AI检测结果分配审核任务，确保任务按时完成并汇总结果。
+    \item \textbf{审核结果汇总：} 汇总所有专家的审核结果，生成最终的人工审核报告。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item \textbf{功能点 1：任务分配：} 根据AI检测结果分配人工审核任务给相关领域的专家，保证任务的针对性与效率。
+    \item \textbf{功能点 2：专家审核：} 专家依据AI检测结果进行人工审核，标注图像问题、分析论文内容或评审质量，最终提交审核报告。
+    \item \textbf{功能点 3：审核报告生成：} 汇总专家的审核结果并生成详细的人工审核报告，提供最终结论。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item AI检测结果（图像/论文/评审）；
+    \item 审核任务分配信息（专家任务分配、任务详情）。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 审核结果（人工审核报告）；
+    \item 审核任务完成情况（专家评分、审核意见）。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \textbf{审核任务：} 记录审核任务的基本信息，包括任务类型、分配专家、审核状态等。
+    \item \textbf{专家审核结果：} 包含专家的评分、审核意见、标注信息等。
+    \item \textbf{人工审核报告：} 汇总所有专家审核意见的最终报告，包含检测结论、建议等。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 系统根据AI检测结果生成人工审核任务，并分配给相关专家；
+    \item 专家接收任务并进行人工审核，标注问题并提供审核意见；
+    \item 专家完成审核后提交结果，系统汇总所有专家的审核报告；
+    \item 最终审核结果生成报告，供用户查看与下载。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item \textbf{任务分配接口：} 系统与任务分配平台交互，分配审核任务；
+    \item \textbf{审核提交接口：} 专家通过系统提交审核结果，上传标注内容；
+    \item \textbf{报告生成接口：} 将专家审核结果生成最终报告，并提供下载接口。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 确保任务分配的精确性和及时性，保证审核任务高效流转；
+    \item 审核结果的可追溯性，确保每个专家的评分和评论能够追溯和验证；
+    \item 设计合理的专家任务管理系统，支持审核进度跟踪。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+   \item 增强专家审核质量控制，提供更多维度的专家评价；
+   \item 支持多语言或跨领域的专家审核。
 \end{itemize}
 
 \subsection{报告服务模块（SD-BGFW-0001）}
 
 \subsubsection{模块目标}
-待补充。
+报告服务模块的目标是为用户提供检测报告的生成、存储和下载功能。报告涵盖AI生成内容检测、图像篡改识别、评审验证等方面，帮助用户深入理解学术资源的真实性。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item \textbf{报告生成：} 根据AI检测结果和人工审核结果生成综合报告；
+    \item \textbf{报告存储：} 存储生成的报告，供用户随时访问；
+    \item \textbf{报告下载：} 提供下载接口，允许用户下载PDF或其他格式的报告。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item \textbf{功能点 1：生成综合报告：} 汇总AI检测结果与人工审核结果，生成详细的报告。
+    \item \textbf{功能点 2：报告格式支持：} 支持多种格式的报告输出，如PDF、Word等，满足用户需求。
+    \item \textbf{功能点 3：报告管理：} 提供报告存储和查询功能，用户可以查看历史报告，管理报告。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+   \item AI检测结果；
+   \item 人工审核结果；
+   \item 用户请求（如报告下载请求）。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 综合报告（PDF/Word格式）；
+    \item 报告查询结果。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \textbf{报告：} 包括报告的基本信息（报告ID、生成时间、相关检测任务等）。
+    \item \textbf{检测结果：} AI检测和人工审核结果，用于生成报告的核心数据。
+    \item \textbf{报告格式：} 定义不同格式报告的模板和输出方式。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 用户提交检测任务，系统进行AI检测并生成初步报告；
+    \item 如果需要，人工审核任务将触发，专家审核结果将合并入报告；
+    \item 系统根据最终结果生成报告，并存储在报告管理系统中；
+    \item 用户可以随时查看和下载报告。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item \textbf{生成报告接口：} 与报告生成引擎交互，生成最终报告；
+    \item \textbf{报告存储接口：} 将生成的报告存储到数据库中，并提供查询接口；
+    \item \textbf{报告下载接口：} 提供下载接口，用户可以下载生成的报告。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 确保报告内容的完整性与准确性，避免任何遗漏；
+    \item 提供多种报告格式支持，满足不同用户的需求；
+    \item 加强报告的安全性和权限控制，确保用户隐私。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 增加更多格式的报告支持，如Excel、HTML等；
+    \item 提供定期报告生成功能，帮助用户跟踪检测历史。
 \end{itemize}
 
 \subsection{通知消息模块（SD-TZXX-0001）}
