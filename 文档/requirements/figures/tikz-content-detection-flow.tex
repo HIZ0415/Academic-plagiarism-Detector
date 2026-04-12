@@ -23,6 +23,10 @@
   \node[box] (N1) at (0,-9.05) {综合鉴伪结果生成\\\textbf{NRJC-0001}};
   \node[box] (N2) at (0,-10.4) {检测结果可视化解释\\\textbf{NRJC-0002}};
 
+  \node[box] (N3) at (0,-11.75) {多模态联合检测\\\textbf{XNJC-0006}};
+  \node[box] (N4) at (0,-13.1) {综合结果融合分析\\\textbf{XNJC-0007}};
+
+
   \draw[arr] (L) -- (S);
   \draw[arr] (S) -- (T1);
   \draw[arr] (S) -- (P1);
@@ -34,4 +38,6 @@
   \draw[arr] (P5) -- (N1);
   \draw[arr] (R2.south) -- ++(0,-0.18) -| (N1.east);
   \draw[arr] (N1) -- (N2);
+  \draw[arr] (N2) -- (N3);
+  \draw[arr] (N3) -- (N4);
 \end{tikzpicture}
