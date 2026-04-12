@@ -28,9 +28,9 @@
 \shortstack[l]{组织与成员模块\\SD-ZZCY-0001} & 待补充 & 待补充 \\ \hline
 \shortstack[l]{资源管理模块\\SD-ZYGL-0001} & 待补充 & 待补充 \\ \hline
 \shortstack[l]{检测任务管理模块\\SD-JCRW-0001} & 待补充 & 待补充 \\ \hline
-\shortstack[l]{图像检测模块\\SD-TPJC-0001} & 待补充 & 待补充 \\ \hline
-\shortstack[l]{论文检测模块\\SD-LWJC-0001} & 待补充 & 待补充 \\ \hline
-\shortstack[l]{评审检测模块\\SD-PSJC-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{图像检测模块\\SD-TPJC-0001} & 对学术图像进行自动检测、子方法分析和可疑区域标注。 & 资源管理模块、检测任务管理模块、报告服务模块 \\ \hline
+\shortstack[l]{论文检测模块\\SD-LWJC-0001} & 对全篇论文进行 AIGC 检测、段落级风险分析和事实性鉴伪说明。 & 资源管理模块、检测任务管理模块、报告服务模块 \\ \hline
+\shortstack[l]{评审检测模块\\SD-PSJC-0001} & 对同行评审 Review 进行 AI 生成倾向和模板化倾向检测。 & 资源管理模块、检测任务管理模块、报告服务模块 \\ \hline
 \shortstack[l]{人工审核模块\\SD-RGSH-0001} & 待补充 & 待补充 \\ \hline
 \shortstack[l]{报告服务模块\\SD-BGFW-0001} & 待补充 & 待补充 \\ \hline
 \shortstack[l]{通知消息模块\\SD-TZXX-0001} & 待补充 & 待补充 \\ \hline
@@ -312,341 +312,379 @@
 \subsection{图像检测模块（SD-TPJC-0001）}
 
 \subsubsection{模块目标}
-待补充。
+本模块面向用户上传或系统解析得到的学术图像，完成自动化 AI 鉴伪、异常痕迹识别和可疑区域标注。该模块需要在现有图像检测能力基础上，为检测任务、结果展示、综合报告和人工审核提供结构化图像检测结果。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 接收资源管理模块登记的图像文件或从论文、压缩包、PDF 中提取出的图像资源；
+    \item 调用图像检测模型或图像鉴伪算法，判断图像是否存在 AI 生成、复制伪造、拼接篡改、背景掩盖等风险；
+    \item 记录图像检测的整体结论、置信度、子方法结果、可疑区域掩膜和可视化标注结果；
+    \item 将图像检测结果回写到检测任务，并向报告服务模块、人工审核模块和通知消息模块提供结果数据。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 图像来源解析：对直接上传图像和从 PDF、压缩包、论文文档中抽取出的图像进行统一登记；
+    \item 学术图像 AI 鉴伪：对图像进行整体风险判断，输出是否可疑、置信度和风险等级；
+    \item 子方法检测结果汇总：保存多种检测方法的概率、掩膜矩阵和可视化结果；
+    \item 图像可疑区域标注：在原图或标注图中展示可疑区域、区域编号、风险类型和局部说明。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 图像资源文件及其元数据，包括文件名称、文件类型、上传用户、所属组织、来源页码或来源文件；
+    \item 检测任务信息，包括任务编号、任务状态、检测参数、是否启用大语言模型辅助判断等配置；
+    \item 图像检测服务所需的模型参数、图像预处理参数和可视化标注参数。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 图像整体检测结果，包括是否可疑、置信度、检测时间、任务状态和文字判断说明；
+    \item 子检测结果，包括各检测方法概率、掩膜图、掩膜矩阵、ELA 图像、LLM 可视化图像等解释性数据；
+    \item 面向用户端、管理端和报告服务的结构化结果数据。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{FileManagement}：记录用户上传文件的名称、大小、类型、标签和组织归属；
+    \item \texttt{ImageUpload}：记录图像文件、来源文件、来源页码、检测状态、审核状态和图像级结论；
+    \item \texttt{DetectionTask}：记录一次检测任务的发起用户、任务状态、检测参数和报告文件；
+    \item \texttt{DetectionResult}：记录图像整体检测结论、置信度、检测状态、可视化结果和人工审核关联；
+    \item \texttt{SubDetectionResult}：记录不同子检测方法的概率、掩膜图片和掩膜矩阵。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 用户上传图像或包含图像的文件后，资源管理模块完成文件校验、存储和图像资源登记；
+    \item 检测任务管理模块创建图像检测任务，并将任务状态置为待处理或进行中；
+    \item 图像检测模块读取图像资源，执行尺寸归一化、色彩空间转换、格式转换等预处理；
+    \item 系统调用图像检测模型或外部 AI 服务，生成整体风险判断、子方法概率和可疑区域信息；
+    \item 检测结果写入 \texttt{DetectionResult} 与 \texttt{SubDetectionResult}，同步更新图像和任务状态；
+    \item 报告服务模块读取图像检测结果生成报告，通知消息模块向用户推送任务完成状态。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 与资源管理模块交互，获取已上传图像、PDF 提取图像或压缩包解析图像；
+    \item 与检测任务管理模块交互，接收任务调度请求并回写任务状态；
+    \item 与 AI 推理服务交互，提交图像文件和检测参数，接收检测概率、掩膜和可视化结果；
+    \item 与报告服务模块交互，提供图像检测结论、可疑区域和解释性数据；
+    \item 与人工审核模块交互，为用户提交人工审核申请和审核人员复核提供图像检测依据。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 检测过程应采用异步任务方式执行，避免大图、批量图像和外部模型调用阻塞用户请求；
+    \item 图像资源、检测任务、检测结果和报告之间应保持可追溯关系，便于后续复核和问题排查；
+    \item 子检测方法结果应以可扩展结构保存，支持后续新增检测方法或替换模型；
+    \item 可疑区域标注应与原始图像保持坐标一致，避免前端展示、报告生成和人工审核之间出现位置错位；
+    \item 模型调用失败、图像损坏、格式不支持等异常应回写明确状态，避免任务长期停留在进行中。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 扩展图像检测模型适配器，使系统支持不同鉴伪模型、不同检测策略和模型版本切换；
+    \item 将图像检测结果纳入统一资源与综合鉴伪结果模型，便于与论文检测和评审检测结果合并生成综合报告；
+    \item 增强图像局部解释能力，支持像素级高亮、区域级风险说明和人工复核标注回写。
 \end{itemize}
 
 \subsection{论文检测模块（SD-LWJC-0001）}
 
 \subsubsection{模块目标}
-待补充。
+本模块面向用户上传的全篇论文，完成论文文本解析、AIGC 风险检测、段落级概率分析和事实性鉴伪说明。该模块是本轮迭代在现有图像检测基础上扩展出的文本检测能力，设计上应接入统一检测任务和报告生成链路。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 对论文文件或论文文本进行格式校验、文本抽取、结构化解析和段落切分；
+    \item 调用论文 AIGC 检测模型，输出全文级 AI 贡献占比、整体风险结论和结果摘要；
+    \item 生成段落级 AI 生成概率、疑似 AI 生成段落列表、事实性鉴伪子结论及原因说明；
+    \item 将论文检测结果写入统一检测任务，并为结果展示、综合报告和人工审核提供数据。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 全篇论文 AIGC 检测：输出全文级检测结论、AI 贡献占比或等价风险指标；
+    \item AI 生成段落识别：标识疑似 AI 生成段落及其段落编号、文本内容和原文位置；
+    \item 段落级 AI 生成概率分析：为段落生成概率、风险分值或风险等级；
+    \item 事实性鉴伪子结论生成：针对论文中的可疑内容形成条目化子结论；
+    \item 事实性鉴伪原因说明：为子结论提供原因、依据摘要和关联段落说明。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 用户上传的论文文件或论文文本，包含 PDF、DOCX、TXT 等系统支持格式；
+    \item 论文资源元数据，包括标题、文件名、上传用户、所属组织、学科标签和任务编号；
+    \item 论文检测参数，包括是否启用事实性鉴伪、段落切分策略、模型版本和阈值配置。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 论文全文级检测结果，包括整体风险等级、AI 贡献占比、结果摘要和检测状态；
+    \item 段落级检测结果，包括段落编号、段落内容、AI 生成概率、风险标签和原文定位信息；
+    \item 事实性鉴伪结果，包括子结论、原因说明、证据摘要和关联段落；
+    \item 可被综合报告、用户端详情页和人工审核模块复用的结构化结果数据。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{FileManagement}：复用现有文件管理对象记录论文文件的上传信息和归属关系；
+    \item \texttt{DetectionTask}：复用统一检测任务对象记录论文检测任务的状态、发起人和报告文件；
+    \item 论文资源对象：建议在后续数据设计中新增或扩展，用于记录论文标题、正文文本、解析状态和结构化段落；
+    \item 论文检测结果对象：建议用于记录全文级风险、AI 贡献占比、检测摘要和模型版本；
+    \item 段落检测结果对象：建议用于记录段落编号、段落内容、段落级概率、风险标签、事实性子结论和原因说明。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 用户上传论文文件或提交论文文本后，资源管理模块完成格式校验、文件存储和资源登记；
+    \item 检测任务管理模块创建论文检测任务，并记录任务类型、检测参数和初始状态；
+    \item 论文检测模块解析论文文本，完成正文抽取、章节识别、段落切分和清洗；
+    \item 系统调用论文 AIGC 检测模型，生成全文级风险结论和段落级概率结果；
+    \item 系统基于高风险段落生成事实性鉴伪子结论和原因说明，并建立结果与原文段落的映射关系；
+    \item 检测结果写入统一任务结果，并触发报告生成、结果展示和通知推送。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 与资源管理模块交互，接收论文文件、解析后的文本内容和论文元数据；
+    \item 与检测任务管理模块交互，接收任务调度请求并更新论文检测状态；
+    \item 与 AI 推理服务或文本检测适配器交互，提交论文文本、段落列表和检测参数；
+    \item 与报告服务模块交互，提供全文结论、段落级结果、事实性子结论和原因说明；
+    \item 与人工审核模块交互，为论文人工复核提供疑似段落、概率结果和事实性鉴伪依据。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 论文解析与模型检测应分阶段处理，解析失败、检测失败和结果生成失败应分别记录状态；
+    \item 段落编号、段落内容、概率结果和事实性说明之间应保持稳定映射，避免前端高亮和报告内容错位；
+    \item 论文文本可能包含公式、表格、参考文献和附录，检测前应明确正文抽取和噪声过滤策略；
+    \item 论文内容属于敏感学术资源，结果展示、下载和人工审核流转应遵守用户权限和组织边界；
+    \item 论文检测模型应通过适配器接入，避免后续替换模型时影响上传、任务和报告主流程。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 增加论文专用数据表或统一资源子类型，用于保存论文结构、段落索引和检测版本；
+    \item 支持多模型融合检测，将 AIGC 检测、事实性鉴伪、引用异常检测等能力统一聚合；
+    \item 支持论文检测结果与图像检测结果联动，形成面向整篇论文的综合鉴伪报告。
 \end{itemize}
 
 \subsection{评审检测模块（SD-PSJC-0001）}
 
 \subsubsection{模块目标}
-待补充。
+本模块面向同行评审 Review 文本，检测其是否存在 AI 生成、异常生成或模板化倾向。该模块用于补充论文与图像检测之外的评审文本风险识别能力，为虚假评审识别、综合鉴伪报告和人工审核提供依据。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 接收用户上传或输入的同行评审文本，并完成格式校验、文本抽取和预处理；
+    \item 调用评审文本检测模型，判断 Review 是否存在 AI 生成倾向、异常文本特征或模板化表达；
+    \item 输出风险等级、置信度、可疑语句、模板化短语和结构化说明；
+    \item 将评审检测结果纳入统一检测任务，并支持后续报告生成、日志追踪和人工复核。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 同行评审 Review 检测：识别评审文本是否存在 AI 生成或异常生成倾向；
+    \item 模板化评审倾向识别：识别固定句式、高重复表达、常见模板短语和异常长度特征；
+    \item 可疑语句定位：返回可疑句子、段落位置、风险标签和解释说明；
+    \item 评审检测结果归档：保存检测状态、风险评分、模型输出和报告所需结构化数据。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 用户上传的 Review 文本文件或在线输入内容，包含 TXT、DOCX、PDF 等系统支持格式；
+    \item Review 元数据，包括上传用户、所属组织、任务编号、语言类型和可选的论文关联信息；
+    \item 评审检测参数，包括 AI 生成阈值、模板短语库、相似度比对策略和模型版本。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item Review 整体检测结果，包括是否疑似 AI 生成、风险等级、置信度和结果摘要；
+    \item 模板化倾向结果，包括模板化风险评分、高重复语句、模板短语匹配和相似文本提示；
+    \item 可疑文本定位结果，包括句子或段落位置、风险标签和解释说明；
+    \item 面向综合报告、用户详情页、管理端日志和人工审核的结构化结果数据。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{FileManagement}：复用现有文件管理对象记录 Review 文件的上传信息、类型和归属关系；
+    \item \texttt{DetectionTask}：复用统一检测任务对象记录 Review 检测任务状态、用户和报告文件；
+    \item Review 资源对象：建议在后续数据设计中新增或扩展，用于保存 Review 文本、语言类型、来源信息和解析状态；
+    \item Review 检测结果对象：建议用于记录 AI 生成风险、模板化倾向、可疑语句、置信度和模型版本；
+    \item 检测日志对象：用于记录评审检测过程、异常情况和管理端查询所需的追踪信息。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 用户上传 Review 文件或输入 Review 文本后，资源管理模块完成格式校验和资源登记；
+    \item 检测任务管理模块创建 Review 检测任务，并记录任务类型、检测参数和初始状态；
+    \item 评审检测模块对文本进行清洗、分句、分词、语言标准化和结构化预处理；
+    \item 系统调用评审检测模型，计算 AI 生成概率、语义重复率、语言流畅度异常和模板化风险；
+    \item 系统生成整体风险结论、模板化倾向说明和可疑语句定位结果；
+    \item 检测结果写入统一任务结果，并触发报告生成、用户通知和日志记录。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 与资源管理模块交互，获取 Review 文件、文本内容和元数据；
+    \item 与检测任务管理模块交互，接收任务调度请求并回写检测状态；
+    \item 与 AI 推理服务或文本检测适配器交互，提交 Review 文本和模板化检测参数；
+    \item 与报告服务模块交互，提供整体风险、模板化结果、可疑语句和解释说明；
+    \item 与统计日志模块交互，记录 Review 检测任务执行过程、异常信息和管理端检索数据。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item Review 文本通常篇幅较短，检测设计应避免仅凭长度或固定阈值给出过度结论；
+    \item 模板化检测应区分正常评审常用表达和异常批量生成表达，降低误判风险；
+    \item 检测结果应提供可疑语句或模板化片段，不能只返回单一风险分数；
+    \item 模板短语库、相似度比对策略和模型阈值应可配置，便于后续在管理端进行调整；
+    \item Review 检测结果应与权限、组织边界和日志追踪机制保持一致，防止评审内容泄露。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 支持中英文及多语言 Review 检测，并根据语言类型选择不同模型或模板规则；
+    \item 支持历史 Review 相似度比对，用于发现批量复制、模板化改写和虚假评审行为；
+    \item 将 Review 检测结果与论文检测、人工审核意见合并，形成面向投稿或评审流程的综合风险判断。
 \end{itemize}
 
 \subsection{人工审核模块（SD-RGSH-0001）}
 
 \subsubsection{模块目标}
-待补充。
+本模块的目标是实现学术资源的人工审核功能，支持图像、论文和评审结果的人工审核。通过专家审核任务分配与管理，确保AI检测结果的准确性与可信度。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item \textbf{人工审核任务管理：} 分配和管理用户提交的人工审核请求，包括图像、论文和评审的审核。
+    \item \textbf{专家审核任务分配：} 根据AI检测结果分配审核任务，确保任务按时完成并汇总结果。
+    \item \textbf{审核结果汇总：} 汇总所有专家的审核结果，生成最终的人工审核报告。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item \textbf{功能点 1：任务分配：} 根据AI检测结果分配人工审核任务给相关领域的专家，保证任务的针对性与效率。
+    \item \textbf{功能点 2：专家审核：} 专家依据AI检测结果进行人工审核，标注图像问题、分析论文内容或评审质量，最终提交审核报告。
+    \item \textbf{功能点 3：审核报告生成：} 汇总专家的审核结果并生成详细的人工审核报告，提供最终结论。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item AI检测结果（图像/论文/评审）；
+    \item 审核任务分配信息（专家任务分配、任务详情）。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 审核结果（人工审核报告）；
+    \item 审核任务完成情况（专家评分、审核意见）。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \textbf{审核任务：} 记录审核任务的基本信息，包括任务类型、分配专家、审核状态等。
+    \item \textbf{专家审核结果：} 包含专家的评分、审核意见、标注信息等。
+    \item \textbf{人工审核报告：} 汇总所有专家审核意见的最终报告，包含检测结论、建议等。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 系统根据AI检测结果生成人工审核任务，并分配给相关专家；
+    \item 专家接收任务并进行人工审核，标注问题并提供审核意见；
+    \item 专家完成审核后提交结果，系统汇总所有专家的审核报告；
+    \item 最终审核结果生成报告，供用户查看与下载。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item \textbf{任务分配接口：} 系统与任务分配平台交互，分配审核任务；
+    \item \textbf{审核提交接口：} 专家通过系统提交审核结果，上传标注内容；
+    \item \textbf{报告生成接口：} 将专家审核结果生成最终报告，并提供下载接口。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 确保任务分配的精确性和及时性，保证审核任务高效流转；
+    \item 审核结果的可追溯性，确保每个专家的评分和评论能够追溯和验证；
+    \item 设计合理的专家任务管理系统，支持审核进度跟踪。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+   \item 增强专家审核质量控制，提供更多维度的专家评价；
+   \item 支持多语言或跨领域的专家审核。
 \end{itemize}
 
 \subsection{报告服务模块（SD-BGFW-0001）}
 
 \subsubsection{模块目标}
-待补充。
+报告服务模块的目标是为用户提供检测报告的生成、存储和下载功能。报告涵盖AI生成内容检测、图像篡改识别、评审验证等方面，帮助用户深入理解学术资源的真实性。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item \textbf{报告生成：} 根据AI检测结果和人工审核结果生成综合报告；
+    \item \textbf{报告存储：} 存储生成的报告，供用户随时访问；
+    \item \textbf{报告下载：} 提供下载接口，允许用户下载PDF或其他格式的报告。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item \textbf{功能点 1：生成综合报告：} 汇总AI检测结果与人工审核结果，生成详细的报告。
+    \item \textbf{功能点 2：报告格式支持：} 支持多种格式的报告输出，如PDF、Word等，满足用户需求。
+    \item \textbf{功能点 3：报告管理：} 提供报告存储和查询功能，用户可以查看历史报告，管理报告。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+   \item AI检测结果；
+   \item 人工审核结果；
+   \item 用户请求（如报告下载请求）。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 综合报告（PDF/Word格式）；
+    \item 报告查询结果。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \textbf{报告：} 包括报告的基本信息（报告ID、生成时间、相关检测任务等）。
+    \item \textbf{检测结果：} AI检测和人工审核结果，用于生成报告的核心数据。
+    \item \textbf{报告格式：} 定义不同格式报告的模板和输出方式。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 用户提交检测任务，系统进行AI检测并生成初步报告；
+    \item 如果需要，人工审核任务将触发，专家审核结果将合并入报告；
+    \item 系统根据最终结果生成报告，并存储在报告管理系统中；
+    \item 用户可以随时查看和下载报告。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item \textbf{生成报告接口：} 与报告生成引擎交互，生成最终报告；
+    \item \textbf{报告存储接口：} 将生成的报告存储到数据库中，并提供查询接口；
+    \item \textbf{报告下载接口：} 提供下载接口，用户可以下载生成的报告。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 确保报告内容的完整性与准确性，避免任何遗漏；
+    \item 提供多种报告格式支持，满足不同用户的需求；
+    \item 加强报告的安全性和权限控制，确保用户隐私。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 增加更多格式的报告支持，如Excel、HTML等；
+    \item 提供定期报告生成功能，帮助用户跟踪检测历史。
 \end{itemize}
 
 \subsection{通知消息模块（SD-TZXX-0001）}
