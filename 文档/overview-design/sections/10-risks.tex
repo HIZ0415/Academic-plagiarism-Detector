@@ -1,0 +1,21 @@
+\section{设计约束与待定问题}
+
+\subsection{当前约束}
+\begin{itemize}[leftmargin=2em]
+    \item 现有实现以学术图像检测为核心，论文与Review能力仍需扩展；
+    \item 当前数据模型与接口设计中存在图像中心化特征；
+    \item AI推理链路与后端任务链路的耦合仍需在后续设计中进一步梳理；
+    \item 部分管理能力和模型配置能力尚未形成统一抽象。
+\end{itemize}
+
+\subsection{待定问题}
+\begin{itemize}[leftmargin=2em]
+    \item 统一资源抽象与现有图像表结构的兼容迁移方案；
+    \item 论文检测与Review检测的结果数据结构；
+    \item 综合报告中多类型资源结果的整合方式；
+    \item 模型管理配置在管理端中的可视化表达方式；
+    \item 论文与Review专用日志的存储粒度和查询维度。
+\end{itemize}
+
+\subsection{后续工作}
+后续将基于本概要设计继续细化详细设计，包括数据库设计、接口字段设计、模块内部类与函数设计、关键流程图、异常处理策略和测试设计。

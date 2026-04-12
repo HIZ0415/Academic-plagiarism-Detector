@@ -1,4 +1,202 @@
-\subsection{学术内容检测模块}
+﻿\subsection{学术内容检测模块}
+
+\paragraph*{业务流程}
+
+\begin{center}
+\resizebox{0.98\linewidth}{!}{\input{figures/tikz-content-detection-flow.tex}}
+\end{center}
+
+\paragraph*{用例图}
+
+\begin{center}
+\resizebox{0.98\linewidth}{!}{\input{figures/tikz-content-detection-usecase.tex}}
+\end{center}
+
+\subsubsection{功能点——提取图片（FR-TPJC-0001）}
+
+\paragraph*{简述}
+
+从用户上传的 PDF、压缩包及论文文件等非图像格式文件中自动抽取学术图像，便于后续进行图像AI鉴伪检测。
+
+该功能旨在自动化处理多种文件格式，确保图像检测流程顺利进行。
+
+系统能够快速提取高质量图像数据，为后续AI算法提供输入。
+
+\paragraph*{前提条件}
+
+用户上传文件格式为 PDF、ZIP、RAR、DOCX、TAR、7Z 等非图像格式。
+
+文件大小不超过系统规定上限（如 500MB）。
+
+文件中至少包含一张图像。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 用户上传文件；
+    \item 系统自动识别文件格式；
+    \item 调用对应解析工具：
+    \begin{enumerate}
+        \item PDF解析库
+        \item 压缩文件解压工具
+        \item DOCX文档解析工具
+    \end{enumerate}
+    \item 对PDF逐页提取嵌入图像；
+    \item 对压缩文件递归遍历子目录提取图像；
+    \item 对论文文档抽取正文插图、实验图及附录图像；
+    \item 图像预处理：
+    \begin{enumerate}
+        \item 格式统一为 JPG / PNG
+        \item 分辨率标准化
+        \item 色彩空间统一
+    \end{enumerate}
+    \item 临时存储；
+    \item 生成图像文件列表。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+系统输出结构化图像列表，包含：
+
+\begin{enumerate}
+    \item 文件名
+    \item 格式
+    \item 分辨率
+    \item 来源页码
+    \item 图像编号
+\end{enumerate}
+
+图像列表以 JSON 格式存储。
+
+\paragraph*{补充说明}
+
+支持批量文件处理；
+
+支持异常提示：
+
+文件损坏、格式不支持、解析失败。
+
+\subsubsection{功能点——学术图像AI鉴伪（FR-TPJC-0002）}
+
+\paragraph*{简述}
+
+基于深度学习和图像处理技术，对提取图像进行自动化学术造假检测。
+
+检测内容包括：
+
+\begin{enumerate}
+    \item 美化修饰
+    \item 背景掩盖
+    \item 复制伪造
+    \item 跨图拼接
+    \item AI生成图像识别
+\end{enumerate}
+
+系统能够高效识别图像异常区域并输出可解释结果。
+
+\paragraph*{前提条件}
+
+系统已成功提取图像数据；
+
+图像已完成预处理。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 图像预处理：
+    \begin{enumerate}
+        \item 尺寸归一化
+        \item 色彩归一化
+        \item 噪声去除
+    \end{enumerate}
+    
+    \item 特征提取：
+    \begin{enumerate}
+        \item CNN深度特征
+        \item 边缘纹理特征
+        \item 频域特征
+    \end{enumerate}
+    
+    \item 图像鉴伪检测：
+    \begin{enumerate}
+        \item 美化修饰检测
+        \item 背景掩盖检测
+        \item 同图复制检测
+        \item 跨图拼接检测
+        \item AI生成痕迹检测
+    \end{enumerate}
+    
+    \item 计算风险评分；
+    
+    \item 输出可疑区域坐标；
+    
+    \item 生成检测报告。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+系统输出检测报告，包括：
+
+\begin{enumerate}
+    \item 原图
+    \item 标注图
+    \item 可疑区域说明
+    \item 造假类型
+    \item 风险等级
+    \item 置信度评分
+\end{enumerate}
+
+报告支持 JSON / PDF / HTML 格式。
+
+\paragraph*{补充说明}
+
+支持单图检测与批量检测；
+
+支持综合鉴伪报告生成；
+
+支持可视化展示。
+
+\subsubsection{功能点——图像可疑区域细粒度标注（FR-TPJC-0003）}
+
+\paragraph*{简述}
+
+对AI检测出的疑似造假区域进行细粒度可视化标注，辅助用户和人工审核人员快速定位异常区域。
+
+\paragraph*{前提条件}
+
+学术图像AI鉴伪任务已完成。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 获取AI检测输出的可疑区域坐标；
+    \item 在原图上绘制高亮边框；
+    \item 对不同造假类型使用不同标注标签；
+    \item 支持局部放大查看；
+    \item 展示区域风险评分。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+输出标注图像，包括：
+
+\begin{enumerate}
+    \item 异常区域框选
+    \item 区域编号
+    \item 风险等级
+    \item 类型说明
+\end{enumerate}
+
+支持用户下载标注图。
+
+\paragraph*{补充说明}
+
+支持多区域同时标注；
+
+支持细粒度像素级区域高亮；
+
+支持人工审核二次标记。
+
 
 \subsubsection{功能点——全篇论文AIGC检测（FR-LWJC-0001）}
 
@@ -118,9 +316,163 @@
 
 \subsubsection{功能点——同行评审Review检测（FR-PLJC-0001）}
 
+\paragraph*{简述}
+
+系统针对用户上传的同行评审（Review）文本内容进行自动化AI检测，识别其中是否存在AI生成、虚假评审或异常文本特征。
+
+该功能主要用于辅助期刊编辑、科研管理人员及用户识别虚假同行评审行为，维护学术评审的真实性和可信度。
+
+\paragraph*{前提条件}
+
+用户已成功上传Review文本文件或输入Review文本内容。
+
+支持格式包括：
+
+TXT、DOCX、PDF、在线文本输入。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 用户上传同行评审文本；
+    \item 系统自动进行文本预处理：
+    \begin{enumerate}
+        \item 去除格式符号
+        \item 分句与分词
+        \item 语言标准化
+    \end{enumerate}
+    \item 调用NLP检测模型；
+    \item 分析文本特征：
+    \begin{enumerate}
+        \item 语言流畅度
+        \item 语义重复率
+        \item AI生成概率
+        \item 情感倾向异常
+    \end{enumerate}
+    \item 识别是否存在AI生成痕迹；
+    \item 输出风险评分及检测结论；
+    \item 保存检测记录。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+输出检测结果，包括：
+
+\begin{enumerate}
+    \item 是否疑似AI生成
+    \item 风险等级
+    \item 可疑段落位置
+    \item 置信度评分
+\end{enumerate}
+
+检测结果自动进入用户检测任务记录。
+
+\paragraph*{补充说明}
+
+支持批量Review检测；
+
+支持英文及中文评审文本检测。
+
 \subsubsection{功能点——模板化评审倾向识别（FR-PLJC-0002）}
 
-\subsubsection{功能点——综合鉴伪结果生成（FR-NRJC-0001）}
+\paragraph*{简述}
+
+系统对同行评审文本进行模板化倾向分析，识别是否存在高度重复、机械化或批量生成的评审内容。
+
+主要用于发现批量刷评审、虚假同行评审及低质量模板化意见。
+
+\paragraph*{前提条件}
+
+同行评审Review检测任务已创建。
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 获取Review文本内容；
+    \item 提取语义特征和句式结构特征；
+    \item 分析以下内容：
+    \begin{enumerate}
+        \item 固定句式重复率
+        \item 常见模板短语匹配
+        \item 历史评审相似度比对
+        \item 内容长度异常
+    \end{enumerate}
+    \item 判断是否存在模板化倾向；
+    \item 输出模板化风险评分；
+    \item 标注可疑语句。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+输出信息包括：
+
+\begin{enumerate}
+    \item 模板化倾向等级
+    \item 高重复语句位置
+    \item 历史相似文本匹配结果
+    \item 综合风险评分
+\end{enumerate}
+
+\paragraph*{补充说明}
+
+支持跨历史数据库相似评审比对；
+
+支持多语言模板检测扩展。
+
+\subsubsection{功能点——综合鉴伪结果生成（FR-NRJC-0001）}\paragraph*{简述}
+
+系统整合图像检测、论文检测、同行评审检测及人工审核结果，自动生成综合鉴伪报告。
+
+该报告用于向用户提供完整、可解释的最终检测结果。
+
+\paragraph*{前提条件}
+
+至少完成以下任一检测任务：
+
+\begin{enumerate}
+    \item 图像AI鉴伪
+    \item 论文AIGC检测
+    \item Review检测
+    \item 人工审核
+\end{enumerate}
+
+\paragraph*{主要流程}
+
+\begin{enumerate}
+    \item 汇总所有检测子模块结果；
+    \item 统一风险评分标准；
+    \item 综合计算最终风险等级；
+    \item 汇总：
+    \begin{enumerate}
+        \item 图像可疑区域
+        \item 可疑文本段落
+        \item Review异常内容
+        \item 人工审核意见
+    \end{enumerate}
+    \item 自动生成综合鉴伪报告；
+    \item 支持PDF / HTML导出。
+\end{enumerate}
+
+\paragraph*{后继结果}
+
+输出综合鉴伪报告，包括：
+
+\begin{enumerate}
+    \item 综合风险等级
+    \item 总体结论
+    \item 各子模块详细结果
+    \item 人工审核建议
+    \item 使用风险提示
+\end{enumerate}
+
+报告自动保存至用户历史记录页面。
+
+\paragraph*{补充说明}
+
+支持多任务合并报告；
+
+支持后续追加检测结果动态更新。
+
+
 
 \subsubsection{功能点——检测结果可视化解释（FR-NRJC-0002）}
 
