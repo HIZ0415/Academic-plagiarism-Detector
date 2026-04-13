@@ -1,87 +1,87 @@
-\section{文档介绍}
+\section{\unchangedtext{文档介绍}}
 
-\subsection{文档目的}
+\subsection{\unchangedtext{文档目的}}
 
 本文档为《学术AI鉴伪系统》的需求规格说明书，旨在依据最新迭代开发要求，对系统建设目标、适用范围、用户对象、核心业务边界以及功能性与非功能性需求进行统一、明确和规范化描述，为后续系统设计、开发实现、测试验证、项目验收及迭代优化提供依据。
 
-本项目已由原有的单一学术图像检测场景，扩展为面向学术图像、全篇论文与同行评审 Review 三类对象的综合学术 AI 鉴伪平台。系统不仅需要支持多类型学术资源的上传与自动检测，还需要支持人工审核参与、历史记录管理、综合鉴伪报告生成、高并发批量检测，以及管理端的用户管理、学术资源管理、日志统计和模型配置等能力。本文档的目的在于将上述迭代后的业务范围和系统要求形成清晰、一致、可执行的规格说明，避免开发、测试和验收阶段出现理解偏差。 
+\addedtext{本项目已由原有的单一学术图像检测场景，扩展为面向学术图像、全篇论文与同行评审 Review 三类对象的综合学术 AI 鉴伪平台。系统不仅需要支持多类型学术资源的上传与自动检测，还需要支持人工审核参与、历史记录管理、综合鉴伪报告生成、高并发批量检测，以及管理端的用户管理、学术资源管理、日志统计和模型配置等能力。本文档的目的在于将上述迭代后的业务范围和系统要求形成清晰、一致、可执行的规格说明，避免开发、测试和验收阶段出现理解偏差。}
 
 本文档面向软件开发人员、测试人员、项目管理人员、系统维护人员以及平台使用方，力求从需求层面对系统进行完整说明，为项目实施过程中的方案设计、模块拆分、功能交付和质量控制提供统一参考。
 
-\subsection{文档范围}
+\subsection{\unchangedtext{文档范围}}
 
 本需求规格说明书主要覆盖学术AI鉴伪系统在本轮迭代开发中的总体说明和需求定义，内容包括但不限于以下方面：
 
 \begin{itemize}
     \item 说明本文档的编写目的、使用范围、读者对象、参考资料以及相关术语与缩写；
     \item 说明系统的项目背景、建设目标、用户群体、适用规范及整体业务范围；
-    \item 描述系统面向普通用户、管理员和超级管理员等不同角色所需支持的主要功能；
-    \item 描述系统在学术图像、全篇论文与同行评审 Review 三类内容上的上传、检测、结果展示、人工审核和记录管理等需求；
-    \item 描述系统在高并发批量检测、多格式兼容、检测状态实时同步、综合鉴伪报告生成、结果可视化解释等方面的要求；
-    \item 描述管理端在用户管理、学术资源管理、日志与统计分析、模型管理与配置等方面的需求；
+    \item \addedtext{描述系统面向普通用户、管理员和超级管理员等不同角色所需支持的主要功能；}
+    \item \addedtext{描述系统在学术图像、全篇论文与同行评审 Review 三类内容上的上传、检测、结果展示、人工审核和记录管理等需求；}
+    \item \addedtext{描述系统在高并发批量检测、多格式兼容、检测状态实时同步、综合鉴伪报告生成、结果可视化解释等方面的要求；}
+    \item \addedtext{描述管理端在用户管理、学术资源管理、日志与统计分析、模型管理与配置等方面的需求；}
     \item 概述系统开发、部署、运行、维护及后续迭代中需要遵循的总体约束和质量要求。
 \end{itemize}
 
-需要说明的是，本文档关注的是系统需求层面的定义与约束，重点回答“系统应当具备什么能力”和“系统应达到什么目标”，而不对具体技术实现方案、算法细节和代码设计作展开说明。
+\addedtext{需要说明的是，本文档关注的是系统需求层面的定义与约束，重点回答“系统应当具备什么能力”和“系统应达到什么目标”，而不对具体技术实现方案、算法细节和代码设计作展开说明。}
 
-\subsection{读者对象}
+\subsection{\unchangedtext{读者对象}}
 
-本文档主要面向以下读者：
+\unchangedtext{本文档主要面向以下读者：}
 
 \begin{itemize}
     \item 开发团队：负责系统架构设计、前后端实现、算法集成、接口联调和部署维护的人员；
-    \item 测试与质量保障人员：负责需求核对、测试设计、缺陷验证和验收支持的人员；
+    \item \addedtext{测试与质量保障人员：负责需求核对、测试设计、缺陷验证和验收支持的人员；}
     \item 项目管理人员：负责项目计划推进、任务协调、资源分配和质量控制的人员；
-    \item 管理端使用者：包括管理员和超级管理员，用于理解后台管理、日志审计、资源维护和模型配置等业务需求；
+    \item \addedtext{管理端使用者：包括管理员和超级管理员，用于理解后台管理、日志审计、资源维护和模型配置等业务需求；}
     \item 平台最终用户：包括科研人员、学生、学术编辑、审稿人及其他需要使用学术AI鉴伪服务的人员，用于了解系统支持的业务范围和使用方式。
 \end{itemize}
 
-\subsection{参考文档}
+\subsection{\unchangedtext{参考文档}}
 
 \begin{center}
 \renewcommand{\arraystretch}{1.5}
 \begin{tabular}{|p{1.5cm}|p{6.2cm}|p{3cm}|p{2.2cm}|}
 \hline
-\centering 编号 & \centering 文档名称 & \centering 单位 & \centering 日期 \tabularnewline
+\centering \unchangedtext{编号} & \centering \unchangedtext{文档名称} & \centering \unchangedtext{单位} & \centering \unchangedtext{日期} \tabularnewline
 \hline
-\centering 1 & 学术AI鉴伪系统开发（迭代开发） & \centering 课程组提供 & \centering 2026-3 \tabularnewline
+\centering \addedtext{1} & \addedtext{学术AI鉴伪系统开发（迭代开发）} & \centering \addedtext{课程组提供} & \centering \addedtext{2026-3} \tabularnewline
 \hline
-\centering 2 & AID-FR-1\_需求规格说明书 & \centering 北京航空航天大学 & \centering 2024-03-26 \tabularnewline
+\centering \addedtext{2} & \addedtext{AID-FR-1\_需求规格说明书} & \centering \addedtext{北京航空航天大学} & \centering \addedtext{2024-03-26} \tabularnewline
 \hline
 \end{tabular}
 \end{center}
 
-\subsection{术语与缩写解释}
+\subsection{\unchangedtext{术语与缩写解释}}
 
 \begin{center}
 \renewcommand{\arraystretch}{1.5}
 \begin{longtable}{|p{3.5cm}|p{9cm}|}
 \hline
-\centering 缩写、术语 & \centering 解 释 \tabularnewline
+\centering \unchangedtext{缩写、术语} & \centering \unchangedtext{解 释} \tabularnewline
 \hline
-学术AI鉴伪系统 & 面向学术图像、全篇论文与同行评审 Review 的综合检测平台，用于识别学术内容中的 AI 生成、异常生成、模板化倾向或其他可疑风险，并支持结果展示、人工审核和后台管理。 \tabularnewline
+\addedtext{学术AI鉴伪系统} & \addedtext{面向学术图像、全篇论文与同行评审 Review 的综合检测平台，用于识别学术内容中的 AI 生成、异常生成、模板化倾向或其他可疑风险，并支持结果展示、人工审核和后台管理。} \tabularnewline
 \hline
-AIGC & Artificial Intelligence Generated Content 的缩写，指由人工智能模型自动生成的文本、图像等内容。在本系统中，AIGC 检测是指识别学术内容中是否存在 AI 生成痕迹或较高 AI 生成概率。 \tabularnewline
+\addedtext{AIGC} & \addedtext{Artificial Intelligence Generated Content 的缩写，指由人工智能模型自动生成的文本、图像等内容。在本系统中，AIGC 检测是指识别学术内容中是否存在 AI 生成痕迹或较高 AI 生成概率。} \tabularnewline
 \hline
-Review & 在本项目中指同行评审意见文本。系统需要检测其是否存在 AI 生成或模板化倾向，以辅助识别“虚假评审”等问题。 \tabularnewline
+\addedtext{Review} & \addedtext{在本项目中指同行评审意见文本。系统需要检测其是否存在 AI 生成或模板化倾向，以辅助识别“虚假评审”等问题。} \tabularnewline
 \hline
-全篇论文AIGC检测 & 指对上传的整篇论文文本进行分析，识别疑似 AI 生成段落，并输出对应段落、段落级 AI 生成概率、事实性鉴伪子结论及原因说明。 \tabularnewline
+\addedtext{全篇论文AIGC检测} & \addedtext{指对上传的整篇论文文本进行分析，识别疑似 AI 生成段落，并输出对应段落、段落级 AI 生成概率、事实性鉴伪子结论及原因说明。} \tabularnewline
 \hline
-学术图像检测 & 指对学术图像进行检测，判断其是否存在 AI 生成或异常痕迹，并对图像中的 AI 可疑位置进行细粒度标注。 \tabularnewline
+\addedtext{学术图像检测} & \addedtext{指对学术图像进行检测，判断其是否存在 AI 生成或异常痕迹，并对图像中的 AI 可疑位置进行细粒度标注。} \tabularnewline
 \hline
-综合鉴伪报告 & 指系统根据检测结果生成的综合性输出结果，通常包含 AI 贡献占比、可疑内容说明、图像可疑位置、使用建议、综合结论以及人工审核相关信息等。 \tabularnewline
+\addedtext{综合鉴伪报告} & \addedtext{指系统根据检测结果生成的综合性输出结果，通常包含 AI 贡献占比、可疑内容说明、图像可疑位置、使用建议、综合结论以及人工审核相关信息等。} \tabularnewline
 \hline
-人工审核 & 指用户在自动检测基础上，对图像、论文或 Review 提交人工复核申请，或参与他人提交的审核任务，通过人工判断提升结果可信度的流程。 \tabularnewline
+\addedtext{人工审核} & \addedtext{指用户在自动检测基础上，对图像、论文或 Review 提交人工复核申请，或参与他人提交的审核任务，通过人工判断提升结果可信度的流程。} \tabularnewline
 \hline
-高并发批量检测 & 指系统支持多线程上传和大规模任务并发处理，能够在批量提交多份学术资源时维持稳定处理能力，并实现检测状态实时同步。 \tabularnewline
+\addedtext{高并发批量检测} & \addedtext{指系统支持多线程上传和大规模任务并发处理，能够在批量提交多份学术资源时维持稳定处理能力，并实现检测状态实时同步。} \tabularnewline
 \hline
 Web端 & 指系统面向桌面浏览器提供的网页端应用，包括普通用户侧界面和管理端界面。 \tabularnewline
 \hline
 UI & User Interface 的缩写，指系统的人机交互界面设计，包括页面布局、交互逻辑、视觉呈现和操作反馈等内容。 \tabularnewline
 \hline
-日志管理 & 指对用户操作、检测任务、论文检测任务、Review 检测任务及后台管理行为进行记录、查询和追踪的功能，用于审计、排障和系统优化。 \tabularnewline
+\addedtext{日志管理} & \addedtext{指对用户操作、检测任务、论文检测任务、Review 检测任务及后台管理行为进行记录、查询和追踪的功能，用于审计、排障和系统优化。} \tabularnewline
 \hline
-模型管理与配置 & 指后台对不同检测模型进行接入、选择、参数配置和调用管理的功能，以支持不同业务场景下的检测需求。 \tabularnewline
+\addedtext{模型管理与配置} & \addedtext{指后台对不同检测模型进行接入、选择、参数配置和调用管理的功能，以支持不同业务场景下的检测需求。} \tabularnewline
 \hline
 \end{longtable}
 \end{center}
