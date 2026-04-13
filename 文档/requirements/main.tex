@@ -1,14 +1,15 @@
 \documentclass[UTF8]{ctexart}
 
 \usepackage[a4paper,margin=2.5cm]{geometry}
-\usepackage[hidelinks]{hyperref}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
 \usepackage{multirow,longtable,array}
 \usepackage{graphicx}
 \usepackage{tikz}
 \usepackage{xcolor}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart}
-\newcommand{\iternew}[1]{\textcolor{black}{#1}}
-\newcommand{\legacyold}[1]{\textcolor{black}{#1}}
+\newcommand{\iternew}[1]{\textcolor{red}{#1}}
+\newcommand{\legacyold}[1]{\textcolor{gray}{#1}}
+\setcounter{tocdepth}{3}
 
 \title{学术AI鉴伪系统需求规格说明书（迭代版）}
 \author{}
@@ -86,6 +87,10 @@ PPT制作和汇报展示 & 翟润 \\ \hline
 
 \tableofcontents
 \newpage
+
+\noindent\textbf{颜色标注说明：}\iternew{迭代新增功能}\textcolor{black}{（黑色：旧有且本次有改动）}\legacyold{（灰色：旧有且未改动）}
+\par
+\vspace{0.5em}
 
 \input{sections/01-introduction.tex}
 \input{sections/02-overview.tex}
