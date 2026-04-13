@@ -24,8 +24,8 @@
 \begin{longtable}{|p{3.8cm}|p{6.1cm}|p{4.1cm}|}
 \hline
 模块名称、标识符 & 主要职责 & 主要依赖 \\ \hline
-\shortstack[l]{用户与权限模块\\SD-YHQX-0001} & 待补充 & 待补充 \\ \hline
-\shortstack[l]{组织与成员模块\\SD-ZZCY-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{用户与权限模块\\SD-YHQX-0001} & 管理账户全生命周期、身份认证与会话、角色及细粒度业务权限判定，为管理端与普通用户端提供统一安全访问控制。 & 组织与成员模块（用户组织归属与组织内策略上下文） \\ \hline
+\shortstack[l]{组织与成员模块\\SD-ZZCY-0001} & 组织入驻申请与审批、组织档案与成员关系维护、组织级检测配额与组织内角色权限协同。 & 用户与权限模块（账户主体、管理员审批操作身份） \\ \hline
 \shortstack[l]{资源管理模块\\SD-ZYGL-0001} & 对学术资源进行统一管理、存储、预处理，为后续提供一致的数据访问接口 & 用户与权限模块 \\ \hline
 \shortstack[l]{检测任务管理模块\\SD-JCRW-0001} & 负责鉴伪任务的创建、调度、状态跟踪等全生命周期管理 & 资源管理模块 \\ \hline
 \shortstack[l]{图像检测模块\\SD-TPJC-0001} & 对学术图像进行自动检测、子方法分析和可疑区域标注。 & 资源管理模块、检测任务管理模块、报告服务模块 \\ \hline
@@ -40,137 +40,151 @@
 \subsection{用户与权限模块（SD-YHQX-0001）}
 
 \subsubsection{模块目标}
-待补充。
+落实迭代需求中管理端“用户管理”目标：区分管理员与普通用户，按角色配置可执行操作，保证系统可管可控与安全性；为用户端上传、检测、报告与人工审核等能力提供统一身份与权限判定入口。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 维护平台用户账户（注册、资料、头像、邮箱验证与密码找回等），并与 Django 认证体系对接；
+    \item 管理角色模型（如管理员、发布者、审核者等）及与业务动作绑定的细粒度权限（如上传、提交检测、发布、参与审核等），在接口层统一鉴权；
+    \item 签发与校验访问令牌与会话，向其他模块暴露当前用户身份、角色与权限摘要，支撑操作审计与资源访问边界。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 用户注册、登录、登出与令牌刷新，登录时可选择业务角色以匹配前端与权限策略；
+    \item 用户资料维护、头像上传、个人检测配额展示（与是否归属组织及组织策略相关）；
+    \item 管理端用户列表与检索、用户创建与编辑、按权限位筛选、用户删除与管理员专用账户维护；
+    \item 管理端为用户增减或调整业务权限、查看用户操作日志（与统计日志模块协同）；
+    \item 密码重置流程（邮箱验证码发放、校验与密码更新）。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 注册与登录凭证（用户名、邮箱、密码、角色选择等）及令牌刷新请求；
+    \item 用户资料变更、头像文件、密码重置邮箱与验证码；
+    \item 管理端操作用的管理员身份及目标用户标识、权限字段或筛选条件。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 认证成功后的访问令牌、刷新令牌及基础用户信息（含角色、权限摘要、组织标识等）；
+    \item 用户详情、分页用户列表、操作日志查询结果及权限变更结果提示；
+    \item 鉴权失败或无权访问时的统一错误响应，供网关与各业务视图复用。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{User}：扩展自 \texttt{AbstractUser}，承载用户名、邮箱、角色、组织外键、头像与简介等，并通过整型 \texttt{permission} 字段编码上传、提交、发布、审核等能力位；
+    \item 令牌与验证码相关状态：访问令牌与刷新令牌由认证中间层管理；密码重置验证码及过期时间可存于用户记录；
+    \item 与发布者--审核者协作相关的关联关系对象（如多对多经中间表），支撑业务侧“谁可为谁审核”的约束，仍属用户域数据。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 用户提交注册或登录请求，模块校验凭据与角色合法性，通过后签发令牌并返回用户上下文；
+    \item 业务请求到达时，从令牌解析用户身份，结合角色与 \texttt{permission} 判定是否允许访问目标接口或资源；
+    \item 管理端发起用户或权限变更时，校验操作者具备管理员或超级管理员资格，再更新 \texttt{User} 及关联字段；
+    \item 密码重置时生成限时验证码并发送邮件，校验通过后更新密码并清除验证码状态；
+    \item 登出或刷新流程使旧令牌失效或轮换刷新令牌，降低凭证泄露风险。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 对前端用户端、管理端暴露 REST 风格用户与认证接口（注册、登录、登出、资料、令牌刷新、密码重置等）；
+    \item 与组织与成员模块协作：读取用户所属 \texttt{Organization}，用于登录响应展示与后续组织级配额、策略校验；
+    \item 为资源管理、检测任务、人工审核、报告下载等模块提供统一鉴权钩子或中间件，避免各模块重复解析令牌；
+    \item 与统计日志模块协作：关键管理操作写入操作日志，便于审计与问题排查。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 密码与敏感字段必须加密存储，令牌具备有效期并优先采用短期访问令牌加长周期刷新令牌组合；
+    \item 角色默认值与权限位变更规则应集中维护，避免业务代码散落硬编码导致管理端与普通用户行为不一致；
+    \item 管理员能力与普通用户能力严格分离，超级管理员操作应单独约束并留痕；
+    \item 权限判定除用户自身字段外，需与组织归属一致考虑（无组织用户与组织成员在配额等策略上可能不同），具体组织规则由组织与成员模块实现，本模块消费其上下文；
+    \item 接口错误信息应区分认证失败与授权失败，便于前端提示与安全审计。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 引入更细 RBAC（角色--权限--资源）或策略引擎，支持按组织、按资源类型动态授权；
+    \item 支持单点登录、多因素认证与企业目录对接，满足高校或期刊规模化部署需求。
 \end{itemize}
 
 \subsection{组织与成员模块（SD-ZZCY-0001）}
 
 \subsubsection{模块目标}
-待补充。
+支撑平台以组织为单位的账户治理与资源隔离：完成组织入驻与审批、成员加入与角色约束，并在组织维度管理检测调用配额，与迭代目标中高并发、多用户协作及可运营性要求一致。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 受理组织入驻申请，支持管理员审批、拒绝与归档，并在通过后创建正式组织及初始管理员账户；
+    \item 维护组织主数据（名称、联系邮箱、描述、标识物料等）及组织与成员之间的归属关系；
+    \item 维护组织级 LLM 与非 LLM 检测剩余次数等配额信息，为检测任务调度提供扣减与查询依据，并支持管理员调整组织维度权限模板。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 组织申请提交（组织信息、管理员账号、证明材料与 Logo 等可选附件）与申请状态查询；
+    \item 管理端待审列表、检索、批准与拒绝组织申请；管理员直接创建组织等运维能力；
+    \item 组织列表、详情、更新与删除，以及组织角色权限配置（与业务权限位协同）；
+    \item 邀请码生成与消费、成员持码加入指定组织并绑定角色（如发布者、审核者）；
+    \item 组织使用情况查询（剩余非 LLM 与 LLM 调用次数等），供用户端或管理端展示。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 组织申请表单字段、证明文件与 Logo 上传流；管理员审批意见与操作类型（通过、拒绝）；
+    \item 组织维护表单、组织级权限配置值、配额调整参数；
+    \item 邀请码、用户加入组织时的身份与角色选择。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 申请单状态、组织标识、组织公开信息及管理员关联结果；
+    \item 组织成员列表或用户侧可见的组织名称、组织 ID 及配额摘要；
+    \item 配额不足或无权操作组织资源时的业务错误信息，供检测任务等模块提前拦截。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{OrganizationApplication}：记录待审申请、提交时间、状态及处理人，关联证明材料与 Logo 等附件字段；
+    \item \texttt{Organization}：正式组织实体，包含名称、邮箱、管理员用户一对一关联、描述、Logo、证明存档及组织级剩余调用次数等；
+    \item \texttt{InvitationCode}：与组织、角色绑定的一次性邀请码及有效期、使用标记，用于受控扩员。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 申请方提交 \texttt{OrganizationApplication}，系统持久化并通知管理端进入待审队列；
+    \item 管理员审核：拒绝则更新申请状态；批准则创建 \texttt{Organization}、建立管理员 \texttt{User} 与组织的关联，并视需要初始化配额；
+    \item 组织管理员或系统生成 \texttt{InvitationCode}，新用户凭码注册或绑定时写入用户的组织外键与角色；
+    \item 检测任务执行前后，由业务层调用组织配额校验与扣减（可与用户个人配额策略组合，以当前实现为准）；
+    \item 组织信息变更或删除时，级联或限制处理成员与历史资源引用，避免产生孤儿数据。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 对外提供组织申请、审批、组织 CRUD、邀请码与组织使用情况等 REST 接口，供用户端与管理端调用；
+    \item 依赖用户与权限模块：审批人、组织管理员及成员均以 \texttt{User} 为主体，认证鉴权由用户模块完成；
+    \item 与检测任务管理模块、资源管理模块协作：在创建任务或上传资源时校验组织成员身份与组织配额；
+    \item 与通知消息模块协作：申请结果、邀请相关事件可向用户推送站内通知或邮件（若已接入）。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 组织名称、联系邮箱等应保证唯一性或明确冲突处理策略，避免审批通过后无法落库；
+    \item 申请中暂存的管理员密码等敏感信息需加密存储，审批拒绝后应及时清理或脱敏；
+    \item 配额扣减与回滚应与任务状态机一致，防止任务失败仍扣次数或重复扣减；
+    \item 删除组织前须评估成员、任务与文件的引用关系，采用软删除或迁移策略以保证学术资源可追溯；
+    \item 组织级权限与用户级权限并存时，应文档化优先级（例如检测接口以组织配额为准还是以用户为准），减少前后端理解偏差。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 支持多级组织、子部门与数据隔离域，满足大学院系或出版集团结构；
+    \item 配额模型扩展为计费套餐、周期账单与弹性扩容，并与统计报表打通。
 \end{itemize}
 
 \subsection{资源管理模块（SD-ZYGL-0001）}
