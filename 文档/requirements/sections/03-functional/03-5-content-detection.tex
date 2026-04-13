@@ -496,3 +496,51 @@ TXT、DOCX、PDF、在线文本输入。
 \paragraph*{后继结果}
 
 用户能够基于可视化信息更直观地理解系统给出的检测依据，提高结果解释性和可审查性。若某类结果暂不具备可视化展示条件，系统应采用结构化列表或文字说明进行降级展示，并保持结论表达清晰一致。
+
+\subsubsection{功能点——多模态联合检测（FR-NRJC-0003）}
+
+\paragraph*{简述}
+
+在保留原有论文文本检测、图像检测及 Review 检测功能的基础上，
+系统新增多模态联合检测能力，
+对同一任务中的多类型学术内容进行统一分析。
+
+\paragraph*{检测内容包括：}
+
+\begin{enumerate}
+    \item 论文正文文本 AI 生成倾向检测；
+    \item 学术图像真实性检测；
+    \item 图像局部篡改与拼接分析；
+    \item 同行评审 Review 模板化检测；
+    \item Review AI 生成概率分析；
+    \item 跨模态一致性校验。
+\end{enumerate}
+
+\paragraph*{后继结果：}
+
+输出多维度检测子结果，
+并进入综合结果分析流程。
+
+\subsubsection{功能点——综合结果融合分析（FR-NRJC-0004）}
+
+\paragraph*{简述：}
+
+系统在完成文本、图像及 Review 各维度检测后，
+对检测结果进行统一融合分析，
+形成综合鉴伪结论。
+
+\paragraph*{分析内容包括：}
+
+\begin{enumerate}
+    \item 综合可信度评分；
+    \item 风险等级划分；
+    \item 分维度风险说明；
+    \item 可疑内容定位；
+    \item 人工复核建议；
+    \item 综合鉴伪结论生成。
+\end{enumerate}
+
+\paragraph*{后继结果：}
+
+生成统一综合检测报告，
+支持用户查看与下载。

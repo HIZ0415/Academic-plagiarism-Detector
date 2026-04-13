@@ -1,4 +1,4 @@
-\subsection{功能性需求分类}
+﻿\subsection{功能性需求分类}
 
 \begin{center}
 \renewcommand{\arraystretch}{1.5}
@@ -24,6 +24,8 @@
 用户展示模块 & \shortstack[l]{综合鉴伪报告下载与查看\\FR-YHZS-0005} & 用户可查看并下载综合鉴伪报告，报告内容包括 AI 贡献占比、图像 AI 可疑位置、使用建议、综合结论等维度。 \tabularnewline
 \hline
 用户展示模块 & \shortstack[l]{人工审核进度与结果查询\\FR-YHZS-0006} & 用户可查询人工审核任务的处理进度、参与情况与最终结果，支持对图像、论文和 Review 三类内容进行统一查询。 \tabularnewline
+\hline
+用户展示模块 & \shortstack[l]{检测模型展示与选择\\FR-YHZS-0007} & 用户可查看当前检测任务所使用的文本、图像及 Review 检测模型信息，包括模型名称、版本号及检测模式；高级用户可根据需求选择快速检测模式或精准检测模式。 \tabularnewline
 \hline
 
 用户上传模块 & \shortstack[l]{文件上传\\FR-YHSC-0001} & 用户可上传待检测的学术图像、全篇论文与同行评审 Review，支持多种格式上传，确保系统兼容性与通用性。 \tabularnewline
@@ -77,6 +79,10 @@
 学术内容检测模块 & \shortstack[l]{综合鉴伪结果生成\\FR-NRJC-0001} & 系统整合图像、论文与 Review 的检测结果，生成统一的综合鉴伪结论。 \tabularnewline
 \hline
 学术内容检测模块 & \shortstack[l]{检测结果可视化解释\\FR-NRJC-0002} & 通过图表、高亮等方式解释检测依据；用户端负责可视化渲染与交互，数据与结论字段由后端提供。 \tabularnewline
+\hline
+学术内容检测模块 & \shortstack[l]{多模态联合检测\\FR-NRJC-0003} & 在原有检测能力基础上，新增对论文文本、学术图像及同行评审 Review 的统一联合检测，支持跨模态一致性分析与风险识别。 \tabularnewline
+\hline
+学术内容检测模块 & \shortstack[l]{综合结果融合分析\\FR-NRJC-0004} & 对文本、图像及 Review 检测结果进行统一融合分析，输出综合可信度评分、风险等级及最终鉴伪结论，支持生成统一检测报告。 \tabularnewline
 \hline
 
 管理维护模块 & \shortstack[l]{实体添加\\FR-GLWH-0001} & 在管理端界面可以直接添加图像、论文、Review、用户等实体，新增实体可在用户端显示或使用。 \tabularnewline
