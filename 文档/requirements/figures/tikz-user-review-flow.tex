@@ -1,26 +1,76 @@
-% 用户审核模块整体业务流程（对应 03-4-user-review.tex 全部功能点 FR-YHSH-0001～0007）
+% 用户审核模块核心领域类图
 \begin{tikzpicture}[
-  box/.style={draw,rounded corners,align=center,minimum width=2.05cm,inner sep=1.5pt,font=\tiny},
-  arr/.style={-{Stealth[length=1.5mm]},semithick}
+  class/.style={
+    draw,
+    rectangle split,
+    rectangle split parts=3,
+    rectangle split part align={center,left,left},
+    align=left,
+    text width=2.65cm,
+    font=\scriptsize,
+    inner sep=2.5pt
+  },
+  rel/.style={-{Stealth[length=1.6mm]},semithick},
+  dep/.style={-{Stealth[length=1.6mm]},dashed,semithick}
 ]
-  \node[box] (L) at (0,0) {登录};
-  \node[box] (Y1) at (0,-1.2) {任务列表与筛选\\\textbf{YHSH-0001}};
-  \node[box] (Det) at (0,-2.55) {任务详情\\\footnotesize AI检测/审核信息};
-  \node[box] (Y2) at (-3.3,-3.95) {用户审核\\\textbf{YHSH-0002}};
-  \node[box] (Y5) at (0,-3.95) {论文人工审核\\\textbf{YHSH-0005}};
-  \node[box] (Y6) at (3.3,-3.95) {Review人工审核\\\textbf{YHSH-0006}};
-  \node[box] (Y3) at (-2.2,-5.25) {评论点赞\\\textbf{YHSH-0003}};
-  \node[box] (Y4) at (2.2,-5.25) {用户举报\\\textbf{YHSH-0004}};
-  \node[box] (Y7) at (0,-6.55) {人工审核结果汇总\\\textbf{YHSH-0007}};
-  \draw[arr] (L) -- (Y1) -- (Det);
-  \draw[arr] (Det) -- (Y2);
-  \draw[arr] (Det) -- (Y5);
-  \draw[arr] (Det) -- (Y6);
-  \draw[arr] (Det) -| (Y3);
-  \draw[arr] (Det) -| (Y4);
-  \draw[arr] (Y2) -- (Y7);
-  \draw[arr] (Y5) -- (Y7);
-  \draw[arr] (Y6) -- (Y7);
-  \draw[arr] (Y3.south) -- ++(0,-0.2) -| (Y7.north);
-  \draw[arr] (Y4.south) -- ++(0,-0.2) -| (Y7.north);
+  \node[class] (user) at (0,0) {
+    \textbf{审核用户}
+    \nodepart{second}
+    - 用户ID, 信誉
+    \nodepart{third}
+    + 参与审核()\\
+    + 举报内容()
+  };
+
+  \node[class] (task) at (4.2,0) {
+    \textbf{人工审核任务}
+    \nodepart{second}
+    - 类型, 进度
+    \nodepart{third}
+    + 发布任务()\\
+    + 汇总结论()
+  };
+
+  \node[class] (opinion) at (8.4,2.2) {
+    \textbf{审核意见}
+    \nodepart{second}
+    - 结论, 理由
+    \nodepart{third}
+    + 提交意见()\\
+    + 修改意见()
+  };
+
+  \node[class] (comment) at (8.4,0) {
+    \textbf{评论互动}
+    \nodepart{second}
+    - 内容, 点赞数
+    \nodepart{third}
+    + 发布评论()\\
+    + 点赞()
+  };
+
+  \node[class] (report) at (8.4,-2.2) {
+    \textbf{举报记录}
+    \nodepart{second}
+    - 类型, 处理状态
+    \nodepart{third}
+    + 提交举报()\\
+    + 进入管理审核()
+  };
+
+  \node[class] (summary) at (12.6,0) {
+    \textbf{人工审核结果}
+    \nodepart{second}
+    - 最终结论, 风险
+    \nodepart{third}
+    + 统计意见()\\
+    + 生成通知()
+  };
+
+  \draw[rel] (user) -- (task);
+  \draw[rel] (task) -- (opinion);
+  \draw[rel] (task) -- (comment);
+  \draw[rel] (task) -- (report);
+  \draw[rel] (opinion) -- (summary);
+  \draw[dep] (comment) -- (summary);
 \end{tikzpicture}

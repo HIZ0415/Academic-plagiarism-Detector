@@ -1,18 +1,77 @@
-% 用户展示模块整体用例图（FR-YHZS-0001～0006，与 03-2-user-display.tex 一致）
+% 用户展示模块服务协作类图
 \begin{tikzpicture}[
-  uc/.style={draw,ellipse,minimum width=2.85cm,minimum height=9mm,align=center,font=\scriptsize,inner sep=2pt},
-  arr/.style={semithick}
+  class/.style={
+    draw,
+    rectangle split,
+    rectangle split parts=3,
+    rectangle split part align={center,left,left},
+    align=left,
+    text width=2.65cm,
+    font=\scriptsize,
+    inner sep=2.5pt
+  },
+  rel/.style={-{Stealth[length=1.6mm]},semithick},
+  dep/.style={-{Stealth[length=1.6mm]},dashed,semithick}
 ]
-  \node[draw,rounded corners,minimum width=8.8cm,minimum height=5.8cm] (frame) at (5.4,3) {};
-  \node[anchor=north,yshift=-2pt] at (frame.north) {\small\textbf{用户展示模块（全部功能点）}};
-  \node (actor) at (-0.2,3) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 普通用户\\[-2pt]\tiny （已登录）}};
-  \node[uc] (u1) at (3.8,4.85) {个人信息展示\\FR-YHZS-0001};
-  \node[uc] (u2) at (7,4.85) {检测记录展示\\FR-YHZS-0002};
-  \node[uc] (u3) at (3.8,3.55) {审核任务展示\\FR-YHZS-0003};
-  \node[uc] (u4) at (7,3.55) {社区反馈展示\\FR-YHZS-0004};
-  \node[uc] (u5) at (3.8,2.25) {综合鉴伪报告\\FR-YHZS-0005};
-  \node[uc] (u6) at (7,2.25) {人工审核进度\\与结果 FR-YHZS-0006};
-  \foreach \x in {u1,u2,u3,u4,u5,u6} {
-    \draw[arr] (actor.east) -- ++(0.22,0) |- (\x.west);
-  }
+  \node[class] (controller) at (0,0) {
+    \textbf{展示控制器}
+    \nodepart{second}
+    - 用户上下文
+    \nodepart{third}
+    + 获取个人中心()\\
+    + 获取任务详情()
+  };
+
+  \node[class] (service) at (4.2,0) {
+    \textbf{展示聚合服务}
+    \nodepart{second}
+    - 查询条件
+    \nodepart{third}
+    + 聚合首页数据()\\
+    + 组装详情视图()
+  };
+
+  \node[class] (recordSvc) at (8.4,2.2) {
+    \textbf{记录查询服务}
+    \nodepart{second}
+    - 时间范围, 类型
+    \nodepart{third}
+    + 查询检测记录()\\
+    + 查询审核记录()
+  };
+
+  \node[class] (msgSvc) at (8.4,0) {
+    \textbf{消息服务}
+    \nodepart{second}
+    - 消息类型, 状态
+    \nodepart{third}
+    + 查询反馈()\\
+    + 更新已读()
+  };
+
+  \node[class] (reportSvc) at (8.4,-2.2) {
+    \textbf{报告服务}
+    \nodepart{second}
+    - 报告ID, 令牌
+    \nodepart{third}
+    + 校验权限()\\
+    + 创建下载链接()
+  };
+
+  \node[class] (repo) at (12.6,0) {
+    \textbf{展示数据仓储}
+    \nodepart{second}
+    - 用户/任务/消息表
+    \nodepart{third}
+    + 按用户查询()\\
+    + 按条件筛选()
+  };
+
+  \draw[rel] (controller) -- (service);
+  \draw[rel] (service) -- (recordSvc);
+  \draw[rel] (service) -- (msgSvc);
+  \draw[rel] (service) -- (reportSvc);
+  \draw[dep] (recordSvc) -- (repo);
+  \draw[dep] (msgSvc) -- (repo);
+  \draw[dep] (reportSvc) -- (repo);
 \end{tikzpicture}
