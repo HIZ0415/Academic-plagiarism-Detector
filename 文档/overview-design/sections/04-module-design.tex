@@ -26,8 +26,8 @@
 模块名称、标识符 & 主要职责 & 主要依赖 \\ \hline
 \shortstack[l]{用户与权限模块\\SD-YHQX-0001} & 管理账户全生命周期、身份认证与会话、角色及细粒度业务权限判定，为管理端与普通用户端提供统一安全访问控制。 & 组织与成员模块（用户组织归属与组织内策略上下文） \\ \hline
 \shortstack[l]{组织与成员模块\\SD-ZZCY-0001} & 组织入驻申请与审批、组织档案与成员关系维护、组织级检测配额与组织内角色权限协同。 & 用户与权限模块（账户主体、管理员审批操作身份） \\ \hline
-\shortstack[l]{资源管理模块\\SD-ZYGL-0001} & 待补充 & 待补充 \\ \hline
-\shortstack[l]{检测任务管理模块\\SD-JCRW-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{资源管理模块\\SD-ZYGL-0001} & 对学术资源进行统一管理、存储、预处理，为后续提供一致的数据访问接口 & 用户与权限模块 \\ \hline
+\shortstack[l]{检测任务管理模块\\SD-JCRW-0001} & 负责鉴伪任务的创建、调度、状态跟踪等全生命周期管理 & 资源管理模块 \\ \hline
 \shortstack[l]{图像检测模块\\SD-TPJC-0001} & 对学术图像进行自动检测、子方法分析和可疑区域标注。 & 资源管理模块、检测任务管理模块、报告服务模块 \\ \hline
 \shortstack[l]{论文检测模块\\SD-LWJC-0001} & 对全篇论文进行 AIGC 检测、段落级风险分析和事实性鉴伪说明。 & 资源管理模块、检测任务管理模块、报告服务模块 \\ \hline
 \shortstack[l]{评审检测模块\\SD-PSJC-0001} & 对同行评审 Review 进行 AI 生成倾向和模板化倾向检测。 & 资源管理模块、检测任务管理模块、报告服务模块 \\ \hline
@@ -190,137 +190,131 @@
 \subsection{资源管理模块（SD-ZYGL-0001）}
 
 \subsubsection{模块目标}
-待补充。
+本模块旨在建立学术资源的统一管理机制，实现对图像、论文（PDF）及评审文本（Review）的标准化存储、索引与预处理，为系统各鉴伪功能提供一致的数据访问接口。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 统一接入：处理各类学术资源的上传、校验与格式识别；
+    \item 物理存储：负责文件在存储介质（本地或云端）的持久化；
+    \item 元数据维护：记录资源指纹（MD5）、类型、归属人及引用关系；
+    \item 内容解析：执行 PDF 图像提取、文本转码等特定预处理操作。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 资源上传与校验：支持分片上传，验证文件完整性及安全性；
+    \item 自动化解析引擎：针对 Paper 类型资源，自动剥离 PDF 内嵌图像；
+    \item 资源生命周期管理：提供资源的逻辑删除、过期清理及检索功能。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 原始文件：用户上传的学术资源文件（如图像、文本等）；
+    \item 资源类别；
+    \item 所有者。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 唯一标识ID（ResourceID）：为每个资源分配的唯一标识符，用于后续检索和管理。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{AcademicResource (实体)}：包含资源 ID、类型编码、存储路径、文件哈希值、父级资源 ID（针对提取出的子图）；
+    \item \texttt{StorageConfig (配置)}：定义不同类型资源的存储策略（如存储位置、备份频率）。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 模块接收到资源请求后，首先通过指纹校验判断是否为重复资源；
+    \item 若为新资源，则进行物理写入并同步至数据库；
+    \item 针对PDF论文，系统会异步触发解析任务，将其中的图片提取并重新注册为关联资源，最后返回处理结果。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 与用户与权限模块的交互：在资源上传、下载或删除时，本模块需调用用户与权限模块验证当前操作者的身份（如Token/UID），确保资源的私密性与合规性；
+    \item 与检测任务管理模块的交互：这是最核心的交互。资源管理模块为检测任务管理模块提供唯一标识ResourceID的查询接口。当鉴伪任务启动时，检测任务管理模块通过此接口获取文件的物理路径或内存流，从而将数据传递给算法检测层；
+    \item 与图像、论文以及评审检测模块的交互：本模块为算法检测模块提供预处理后的标准化输入。例如，将PDF论文中提取出的图片序列化后，传递给图像检测模块。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 高性能存储：采用哈希目录结构存储文件，避免单目录下文件过多导致的性能下降；
+    \item 解耦设计：资源处理逻辑与具体的AI算法解耦，确保资源模块的通用性。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 资源指纹去重：引入感知哈希（pHash）技术，识别视觉相似的重复图片；
+    \item 多存储后端支持：未来可以考虑计划接入阿里云或腾讯云提高可用性。
 \end{itemize}
 
 \subsection{检测任务管理模块（SD-JCRW-0001）}
 
 \subsubsection{模块目标}
-待补充。
+实现鉴伪任务的全生命周期管理，负责任务的创建、调度、状态追踪及结果汇总，确保 AI 算法能高效、有序地处理用户提交的学术资源。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 任务编排：根据用户选择的检测类型（图像查重/论文查重/评审分析），匹配对应的检测模块；
+    \item 异步调度：管理检测队列，支持高并发下的任务排队与分发；
+    \item 状态监控：实时记录任务进度（等待中、检测中、已完成、失败）。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 任务创建中心：接收 ResourceID 和检测参数，校验任务合法性并入库；
+    \item 调度引擎：基于消息队列（如 Redis/RabbitMQ）将任务分发至空闲的算法节点；
+    \item 通过WebSocket或轮询接口向前端同步实时检测进度。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 资源标识（ResourceID）；
+    \item 检测模式；
+    \item 优先级。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 任务编号（TaskID）；
+    \item 任务状态（如“等待中”、“检测中”、“已完成”、“失败”）；。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{DetectionTask (实体)}：包含TaskID、关联ResourceID、当前状态、开始/结束时间、耗时、异常信息；
+    \item \texttt{AlgorithmRegistry (配置)}：记录系统中可用的算法插件列表及其参数约束。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 用户在界面发起检测请求后，该模块首先调用 资源管理模块 确认文件就绪；
+    \item 随后在数据库创建初始化状态的任务记录，任务进入待处理队列，由调度引擎根据算法负载情况取出并执行；
+    \item 算法执行完成后，模块更新任务状态为“已完成”，并触发报告服务模块的预处理。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 与资源管理模块交互：通过ResourceID获取物理文件路径，确保检测对象存在；
+    \item 与图像、论文以及评审检测模块交互：作为算法的“雇主”，通过接口调用具体的推理服务并接收回调；
+    \item 与报告服务模块交互：任务完成后，将TaskID传递给报告服务模块，由其生成可视化报告。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 容错处理：若算法层超时或崩溃，模块需具备自动重试（Retry）机制或超时熔断逻辑；
+    \item 解耦设计：采用“任务-算法”解耦架构，新增算法插件时无需修改任务管理的核心逻辑。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 分布式调度：支持跨服务器的算法节点调度，应对大规模学术会议的检测峰值；
+    \item 优先级体系：引入付费用户或紧急任务的优先处理通道。
 \end{itemize}
 
 \subsection{图像检测模块（SD-TPJC-0001）}
