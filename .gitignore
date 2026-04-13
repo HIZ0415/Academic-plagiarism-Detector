@@ -20,6 +20,8 @@ Thumbs.db
 *.log
 
 # LaTeX intermediate files
+# pdf文件不再推送到GitHub
+*.pdf
 *.aux
 *.bbl
 *.bcf
