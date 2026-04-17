@@ -1,31 +1,379 @@
-\section{接口设计}
+﻿\section{接口设计}
+
+\subsection{接口设计目标}
+本系统接口设计的目标，是在当前项目已有的用户端、管理端、后端业务服务、异步任务调度和实时通知基础上，形成统一、清晰、可扩展的接口体系。接口设计既要服务当前已实现的图像上传、图像检测、人工审核、通知与管理功能，也要为论文检测、Review 检测、综合鉴伪报告和模型扩展预留统一接入方式。
+
+从系统边界上看，本章接口设计主要覆盖三类接口：
+\begin{itemize}[leftmargin=2em]
+    \item 面向前端用户端和管理端的 HTTP REST 接口；
+    \item 面向前端的 WebSocket 实时推送接口；
+    \item 面向系统内部的异步任务调度接口、AI 推理调用接口和文件访问接口。
+\end{itemize}
 
 \subsection{接口设计原则}
 \begin{itemize}[leftmargin=2em]
-    \item 对前端提供统一风格的REST接口；
-    \item 对长时任务提供可轮询或可推送的状态查询能力；
-    \item 对不同资源类型采用统一任务接口与差异化结果接口结合的方式；
-    \item 对内部AI服务调用进行适配封装，避免前端或业务层直接依赖具体模型实现。
+    \item \textbf{统一入口原则}：系统外部接口统一经由后端业务服务对外暴露，前端不直接访问数据库或 AI 推理服务；
+    \item \textbf{REST 风格优先}：外部 HTTP 接口优先采用资源路径加标准方法的方式组织，便于前后端协作与后续接口治理；
+    \item \textbf{同步与异步分离}：上传、查询、审批等短时操作采用同步接口；检测任务、报告生成等长时操作通过异步任务接口和状态查询接口解耦；
+    \item \textbf{统一任务、差异结果}：接口层对不同检测对象尽量采用统一任务入口、统一状态查询接口，并通过差异化结果接口返回图像、论文和 Review 特有数据；
+    \item \textbf{权限前置}：用户认证、角色检查、组织边界和资源归属校验应在接口层或接口进入业务层前完成；
+    \item \textbf{可演进性}：接口命名和路径设计应兼顾当前实现与后续统一资源抽象，不将接口永久绑定到单一图像对象模型上。
 \end{itemize}
+
+\subsection{接口总体分层}
+从调用关系看，本系统接口可划分为四层：
+\begin{longtable}{|p{3cm}|p{10.8cm}|}
+\hline
+层次 & 说明 \\ \hline
+前端访问层 & 面向用户端与管理端提供 HTTP API 和 WebSocket 接口，负责请求接入、参数传递和结果展示。 \\ \hline
+业务接口层 & 由 Django + DRF 暴露具体接口，负责认证鉴权、参数校验、业务编排和响应封装。 \\ \hline
+系统协作层 & 负责后端与 Celery 任务、WebSocket 通道、文件系统和报告生成逻辑之间的协作。 \\ \hline
+能力适配层 & 负责后端与具体 AI 推理服务、图像检测算法、论文检测模型和 Review 检测模型之间的调用适配。 \\ \hline
+\end{longtable}
 
 \subsection{外部接口分类}
+当前项目外部接口可分为以下几类：
 \begin{itemize}[leftmargin=2em]
-    \item 用户认证接口；
-    \item 资源上传与查询接口；
-    \item 检测任务提交与状态接口；
-    \item 检测结果查询与报告下载接口；
-    \item 人工审核相关接口；
+    \item 用户认证与个人信息接口；
+    \item 组织与邀请码接口；
+    \item 资源上传、查询与资源管理接口；
+    \item 检测任务提交、状态查询、结果查询和报告下载接口；
+    \item 人工审核申请、审核执行与审核查询接口；
     \item 通知与消息接口；
-    \item 管理端治理与统计接口。
+    \item 管理端用户管理、资源治理、仪表盘统计和日志管理接口。
 \end{itemize}
+
+当前后端主路由由 \texttt{fake\_image\_detector/urls.py} 将 \texttt{core.urls} 挂载在 \texttt{/api/} 下，因此所有 HTTP 接口统一以 \texttt{/api/} 作为访问前缀；实时通知接口通过 WebSocket 路由 \texttt{/ws/notifications/} 暴露。
 
 \subsection{内部接口分类}
+系统内部接口主要包括：
 \begin{itemize}[leftmargin=2em]
-    \item 后端业务服务与异步任务系统之间的调度接口；
-    \item 后端与AI推理服务之间的检测调用接口；
-    \item 后端与文件存储之间的资源访问接口；
-    \item 后端与消息通道之间的状态推送接口。
+    \item \textbf{后端与异步任务系统接口}：由后端创建检测任务、投递 Celery 异步任务，并在任务完成后回写状态和生成通知；
+    \item \textbf{后端与 AI 推理服务接口}：由图像检测模块、后续论文检测模块和 Review 检测模块调用对应推理服务；
+    \item \textbf{后端与文件存储接口}：用于读取上传文件、提取图像、生成报告、保存中间产物和对外下载；
+    \item \textbf{后端与消息通道接口}：用于向 WebSocket 消费者发送检测完成通知、审核任务通知和系统广播消息。
 \end{itemize}
 
-\subsection{接口分层说明}
-本节后续将根据详细设计需要补充关键接口的职责、输入输出和调用关系，但不在概要设计阶段展开到字段级参数说明。
+\subsection{统一接口约定}
+为了保证接口风格一致，本系统采用如下约定：
+\begin{itemize}[leftmargin=2em]
+    \item HTTP 接口统一返回 JSON 结构，文件下载接口返回文件流；
+    \item 认证接口返回访问令牌、刷新令牌或用户上下文，业务接口通过认证信息识别当前用户；
+    \item 涉及文件上传的接口使用 \texttt{multipart/form-data}；
+    \item 涉及列表展示的接口支持分页或分页式响应结构；
+    \item 涉及任务状态的接口应明确返回 \texttt{pending}、\texttt{in\_progress}、\texttt{completed} 等状态字段；
+    \item 错误响应应区分认证失败、权限不足、资源不存在、参数错误和系统异常。
+\end{itemize}
+
+\subsection{当前项目外部接口总览}
+\begin{longtable}{|p{3.2cm}|p{2cm}|p{8.6cm}|}
+\hline
+接口类别 & 访问方式 & 说明 \\ \hline
+用户认证接口 & HTTP & 提供注册、登录、登出、令牌刷新、用户资料查询与更新、头像更新和密码重置。 \\ \hline
+组织管理接口 & HTTP & 提供组织申请、审批、组织详情、邀请码和组织权限更新。 \\ \hline
+资源上传接口 & HTTP & 提供文件上传、文件详情查询、图片提取结果查询、文件标签更新和文件删除。 \\ \hline
+检测任务接口 & HTTP & 提供图像检测提交、任务状态查询、任务结果列表、任务删除和报告下载。 \\ \hline
+人工审核接口 & HTTP & 提供审核申请创建、审核任务列表、审核详情、审核提交、人工审核报告生成等能力。 \\ \hline
+通知接口 & HTTP + WebSocket & 提供通知列表、未读数量、已读状态更新、广播通知和实时推送。 \\ \hline
+管理端治理接口 & HTTP & 提供管理员登录、用户管理、文件管理、日志查询、仪表盘统计和审核审批。 \\ \hline
+\end{longtable}
+
+\subsection{用户认证与个人信息接口}
+该类接口主要服务用户端与管理端登录态建立和基础资料维护。当前项目的关键接口如下：
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{|L{6.2cm}|L{1.4cm}|L{5.6cm}|}
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endfirsthead
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\path{/api/register/} & POST & 用户注册。 \\ \hline
+\path{/api/login/} & POST & 普通用户登录。 \\ \hline
+\path{/api/logout/} & POST & 用户登出。 \\ \hline
+\path{/api/token/refresh/} & POST & 刷新认证令牌。 \\ \hline
+\path{/api/user/details/} & GET & 获取当前用户详情。 \\ \hline
+\path{/api/user/update/} & PUT & 更新用户资料。 \\ \hline
+\path{/api/user/avatar/} & PUT & 更新用户头像。 \\ \hline
+\path{/api/password-reset/} & POST & 发送密码重置验证码。 \\ \hline
+\path{/api/password-reset/confirm/} & POST & 提交验证码并完成密码重置。 \\ \hline
+\path{/api/admin-login/} & POST & 管理员登录。 \\ \hline
+\end{longtable}
+\endgroup
+
+从设计上看，这类接口构成所有业务接口的前置条件。后续在扩展统一资源与统一任务接口时，仍然需要依赖这一层提供用户身份、角色和组织上下文。
+
+\subsection{组织与成员接口}
+组织相关接口用于支撑组织入驻、组织审批、邀请码管理和组织权限维护。当前关键接口如下：
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{|L{6.2cm}|L{1.4cm}|L{5.6cm}|}
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endfirsthead
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\path{/api/organization/create/} & POST & 提交组织申请。 \\ \hline
+\path{/api/organizations/create-directly/} & POST & 管理端直接创建组织。 \\ \hline
+\path{/api/organization/applications/get_pending/} & GET & 获取待审批的组织申请列表。 \\ \hline
+\path{/api/organization/applications/<app_id>/} & GET & 查看组织申请详情。 \\ \hline
+\path{/api/organization/<app_id>/approve/} & POST & 审批通过组织申请。 \\ \hline
+\path{/api/organization/<app_id>/reject/} & POST & 拒绝组织申请。 \\ \hline
+\path{/api/organizations/} & GET & 获取组织列表。 \\ \hline
+\path{/api/organization/<org_id>/} & GET & 获取组织详情。 \\ \hline
+\path{/api/organization/<org_id>/delete/} & DELETE & 删除组织。 \\ \hline
+\path{/api/organization/<org_id>/permission/} & POST & 更新组织角色权限。 \\ \hline
+\path{/api/organization/<org_id>/invitation_codes/} & GET & 获取邀请码列表。 \\ \hline
+\path{/api/organization/usage/} & GET & 查询组织检测次数使用情况。 \\ \hline
+\path{/api/organization/recharge-uses/} & POST & 为用户或组织补充检测次数。 \\ \hline
+\end{longtable}
+\endgroup
+
+\subsection{资源上传与资源管理接口}
+该类接口负责接收上传文件、读取文件详情、获取提取后的图像、维护文件标签和删除资源。当前实现仍以文件和图像资源为中心，后续论文与 Review 资源可在统一资源接口下复用同一接入逻辑。
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{|L{6.2cm}|L{1.4cm}|L{5.6cm}|}
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endfirsthead
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\path{/api/upload/} & POST & 上传文件，支持图片、PDF、压缩包等。 \\ \hline
+\path{/api/upload/<file_id>/} & GET & 获取单个上传文件详情。 \\ \hline
+\path{/api/upload/<file_id>/extract_images/} & GET & 获取从文件中提取出的图像集合。 \\ \hline
+\path{/api/upload/<file_id>/addTag/} & POST & 更新文件标签。 \\ \hline
+\path{/api/upload/<file_id>/delete/} & DELETE & 删除上传文件。 \\ \hline
+\path{/api/upload/get_all_file_images/<file_management_id>/} & GET & 获取某个文件下的全部图像。 \\ \hline
+\path{/api/get_files/} & GET & 管理端获取文件列表。 \\ \hline
+\path{/api/delete_image_upload/<image_id>/} & DELETE & 管理端删除单张图像资源。 \\ \hline
+\end{longtable}
+\endgroup
+
+\subsection{检测任务与检测结果接口}
+检测接口是当前项目接口体系的核心。现有实现已经形成图像检测任务的完整闭环，包括任务提交、状态查询、结果列表、详情查询和报告下载。后续论文检测与 Review 检测建议继续沿用统一任务接口设计。
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{|L{6.2cm}|L{1.4cm}|L{5.6cm}|}
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endfirsthead
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\path{/api/detection/submit/} & POST & 提交图像检测任务。 \\ \hline
+\path{/api/detection/<image_id>/} & GET & 获取单张图像的检测结果。 \\ \hline
+\path{/api/detection-task/<task_id>/status/} & GET & 用户端查询检测任务状态。 \\ \hline
+\path{/api/get_detection_task_status/<task_id>/} & GET & 管理端查询检测任务状态。 \\ \hline
+\path{/api/tasks/<task_id>/results/} & GET & 获取任务全部结果。 \\ \hline
+\path{/api/tasks/<task_id>/fake_results/} & GET & 获取任务中判定为可疑的结果。 \\ \hline
+\path{/api/tasks/<task_id>/normal_results/} & GET & 获取任务中判定为正常的结果。 \\ \hline
+\path{/api/results/<result_id>/} & GET & 获取单条检测结果详情。 \\ \hline
+\path{/api/results_image/<image_id>/} & GET & 通过图像查询检测结果。 \\ \hline
+\path{/api/tasks_image/<image_id>/getdr/} & GET & 通过图像获取检测结果映射。 \\ \hline
+\path{/api/tasks/<task_id>/report/} & GET & 下载任务级检测报告。 \\ \hline
+\path{/api/tasks_image/<image_id>/report/} & GET & 下载图像级检测报告。 \\ \hline
+\path{/api/detection-task-delete/<task_id>/} & DELETE & 删除检测任务。 \\ \hline
+\path{/api/user-tasks/} & GET & 获取当前用户检测任务列表。 \\ \hline
+\path{/api/task-summary/} & GET & 获取当前用户任务摘要。 \\ \hline
+\path{/api/get-task-summary/} & GET & 获取任务汇总信息。 \\ \hline
+\end{longtable}
+\endgroup
+
+\subsection{人工审核接口}
+人工审核接口构成自动检测之后的复核链路。该类接口覆盖审核申请、审核任务查看、审核结果查看、审核提交和人工审核报告生成。
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{|L{6.2cm}|L{1.4cm}|L{5.6cm}|}
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endfirsthead
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\path{/api/create_review_task_with_admin_check/} & POST & 创建人工审核申请，等待管理员审批。 \\ \hline
+\path{/api/get_request_completion_status/<task_id>/} & GET & 查询某检测任务对应审核申请的完成情况。 \\ \hline
+\path{/api/get_request_detail/<reviewRequest_id>/} & GET & 获取审核申请详情。 \\ \hline
+\path{/api/get_publisher_review_tasks/} & GET & 发布者查看本人发起的审核任务。 \\ \hline
+\path{/api/get_reviewer_tasks/} & GET & 审核人员获取待处理审核任务列表。 \\ \hline
+\path{/api/get-reviewer-request-detail/<reviewRequest_id>/} & GET & 审核人员查看审核申请详情。 \\ \hline
+\path{/api/get_review_detail/<manual_review_id>/} & GET & 获取单个审核任务详情。 \\ \hline
+\path{/api/post_review/<manual_review_id>/} & POST & 提交人工审核结果。 \\ \hline
+\path{/api/get_img_review_all/} & GET & 获取审核任务下所有图像审核结果。 \\ \hline
+\path{/api/get_image_review/} & GET & 获取指定图像的人工审核结果。 \\ \hline
+\path{/api/manual-review/<review_id>/report/} & GET & 生成或下载人工审核报告。 \\ \hline
+\path{/api/manual-review/<review_request_id>/} & GET & 通过审核申请获取关联人工审核记录。 \\ \hline
+\path{/api/publisher-dectectiontask-access/} & GET & 检查发布者是否有权访问某检测任务。 \\ \hline
+\path{/api/reviewer-manualreview-access/} & GET & 检查审核人员是否有权访问某人工审核记录。 \\ \hline
+\path{/api/publishers/<publisher_id>/reviewers/} & GET & 获取发布者可关联审核人员。 \\ \hline
+\path{/api/get_all_reviewers/} & GET & 获取组织内审核人员列表。 \\ \hline
+\end{longtable}
+\endgroup
+
+\subsection{通知与实时消息接口}
+通知接口分为持久化通知接口和实时推送接口两类。持久化通知负责通知列表和已读状态维护，实时推送接口负责检测完成等事件的在线通知。
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{|L{6.2cm}|L{1.4cm}|L{5.6cm}|}
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endfirsthead
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\path{/api/notification/get/} & GET & 获取当前用户通知列表。 \\ \hline
+\path{/api/notification/notify/} & GET & 获取当前用户未读通知数量。 \\ \hline
+\path{/api/notification/set_as_read/} & POST & 将当前用户全部通知设为已读。 \\ \hline
+\path{/api/notification/set_as_read/<notification_id>/} & POST & 将单条通知设为已读。 \\ \hline
+\path{/api/notification/broadcast/} & POST & 管理端发送广播通知。 \\ \hline
+\path{/ws/notifications/} & WebSocket & 实时推送通知与任务状态更新。 \\ \hline
+\end{longtable}
+\endgroup
+
+\subsection{管理端治理与统计接口}
+管理端接口覆盖管理员资料、仪表盘统计、用户管理、文件管理、审核审批和日志查询等能力。该类接口支撑当前项目的治理能力，也是后续扩展论文检测日志、Review 检测日志和模型配置管理的入口。
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{|L{6.2cm}|L{1.4cm}|L{5.6cm}|}
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endfirsthead
+\hline
+接口路径 & 方法 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\path{/api/admin/details/} & GET & 获取当前管理员详情。 \\ \hline
+\path{/api/admin/details/<user_id>} & GET & 获取指定用户详情。 \\ \hline
+\path{/api/admin_dashboard/} & GET & 获取管理端仪表盘汇总数据。 \\ \hline
+\path{/api/dashboard/img_tag/} & GET & 图像标签统计。 \\ \hline
+\path{/api/dashboard/top_publishers/} & GET & 发布者排行统计。 \\ \hline
+\path{/api/dashboard/top_organizations/} & GET & 组织排行统计。 \\ \hline
+\path{/api/dashboard/daily_active_users/} & GET & 日活用户统计。 \\ \hline
+\path{/api/dashboard/daily_active_organizations/} & GET & 日活组织统计。 \\ \hline
+\path{/api/dashboard/daily_task_count/} & GET & 每日检测任务统计。 \\ \hline
+\path{/api/dashboard/daily_review_request_count/} & GET & 每日审核申请统计。 \\ \hline
+\path{/api/dashboard/daily_completed_manual_review_count/} & GET & 每日完成审核统计。 \\ \hline
+\path{/api/dashboard/get_sub_method_distribution_by_tag/} & GET & 子检测方法分布统计。 \\ \hline
+\path{/api/get_users/} & GET & 获取用户列表。 \\ \hline
+\path{/api/create_user/} & POST & 管理端创建用户。 \\ \hline
+\path{/api/update_user/<user_id>/} & PUT & 更新用户。 \\ \hline
+\path{/api/delete_user/<user_id>/} & DELETE & 删除用户。 \\ \hline
+\path{/api/create-admin/} & POST & 创建管理员。 \\ \hline
+\path{/api/user_permission/<user_id>/} & POST & 更新用户权限。 \\ \hline
+\path{/api/manage-associations/} & POST & 建立发布者与审核者关联。 \\ \hline
+\path{/api/user_action_log/} & GET & 查询用户操作日志。 \\ \hline
+\path{/api/user_action_log/<log_id>/} & DELETE & 删除日志。 \\ \hline
+\path{/api/user_action_log/download/} & GET & 导出日志。 \\ \hline
+\path{/api/get_reviewRequest/all/} & GET & 获取全部审核申请。 \\ \hline
+\path{/api/get_reviewRequest/<reviewRequest_id>/} & GET & 获取审核申请详情。 \\ \hline
+\path{/api/handle_reviewRequest/<reviewRequest_id>/} & POST & 管理员处理审核申请。 \\ \hline
+\path{/api/get_review_request_detail/<manual_review_id>/} & GET & 查看人工审核执行详情。 \\ \hline
+\path{/api/post_report/<post_id>/} & POST & 处理帖子举报。 \\ \hline
+\path{/api//review-requests/<review_request_id>/delete/} & DELETE & 删除审核申请；当前代码路径定义带前导斜杠，建议后续修正。 \\ \hline
+\end{longtable}
+\endgroup
+
+\subsection{内部接口设计}
+\subsubsection{后端与异步任务系统接口}
+当前系统通过检测提交接口创建任务后，调用 Celery 执行异步检测。该类内部接口主要承担以下职责：
+\begin{itemize}[leftmargin=2em]
+    \item 接收检测任务 ID、图像 ID 集合、检测参数和用户上下文；
+    \item 在异步执行中更新任务状态、检测结果、报告生成状态和通知状态；
+    \item 在任务完成后通过消息通道向 WebSocket 消费者推送结果。
+\end{itemize}
+
+\subsubsection{后端与 AI 推理服务接口}
+当前项目的图像检测能力通过后端调用图像推理逻辑实现。后续论文检测和 Review 检测建议采用与图像检测一致的适配方式：
+\begin{itemize}[leftmargin=2em]
+    \item 后端传入资源路径、文本内容或结构化输入；
+    \item 推理层返回风险评分、分类结论、可视化结果或结构化分析结果；
+    \item 后端统一完成结果落库、状态更新、报告生成和通知触发。
+\end{itemize}
+
+\subsubsection{后端与文件存储接口}
+文件存储接口不直接对前端暴露，而由业务服务封装。主要职责包括：
+\begin{itemize}[leftmargin=2em]
+    \item 保存上传文件、提取图像、检测中间产物和报告文件；
+    \item 提供受控读取能力，供结果查询和报告下载接口调用；
+    \item 在删除任务或删除资源时执行对应文件清理。
+\end{itemize}
+
+\subsubsection{后端与消息通道接口}
+后端通过 Django Channels 将状态变化推送到 WebSocket 通道。内部消息接口应保证：
+\begin{itemize}[leftmargin=2em]
+    \item 推送事件与数据库通知记录保持一致；
+    \item 用户上线和离线不影响通知持久化；
+    \item 前端可基于同一消息体刷新未读数、任务状态或详情页数据。
+\end{itemize}
+
+\subsection{接口安全设计}
+接口安全主要包括以下方面：
+\begin{itemize}[leftmargin=2em]
+    \item 需要登录的接口必须通过认证令牌识别当前用户；
+    \item 用户只能访问本人资源、本人检测任务、本人通知和权限范围内的审核记录；
+    \item 管理端接口必须校验管理员身份和管理权限；
+    \item 文件下载接口必须校验资源归属和访问权限，避免直接暴露物理路径；
+    \item 审核、权限调整、组织审批、日志导出等高风险接口必须记录审计日志。
+\end{itemize}
+
+\subsection{接口演进方向}
+从当前项目代码看，接口仍然明显偏向图像检测场景。后续接口演进建议如下：
+\begin{itemize}[leftmargin=2em]
+    \item 引入统一资源接口，将图像、论文和 Review 统一纳入资源上传和资源查询入口；
+    \item 引入统一检测任务接口，使图像检测、论文检测和 Review 检测共用任务提交和状态查询协议；
+    \item 保留差异化结果接口，分别承载图像可疑区域、论文段落概率和 Review 模板化倾向等差异结果；
+    \item 将论文检测日志、Review 检测日志和模型配置接口纳入管理端统一治理接口空间；
+    \item 对现有路径命名、重复路由和个别异常路径进行收敛，提升整体接口规范性。
+\end{itemize}
+
+\subsection{本章小结}
+本章从概要设计角度给出了系统接口体系的总体设计。当前项目已经形成以用户认证、资源上传、图像检测、人工审核、通知和管理端治理为主体的接口闭环；后续论文检测与 Review 检测能力可在统一资源、统一任务和差异化结果接口框架下继续扩展。接口设计的核心目标不是增加更多零散接口，而是在现有工程基础上形成可持续演进的统一接口体系。

@@ -1,22 +1,203 @@
 \section{关键流程设计}
 
+本章从系统运行角度说明用户提交资源后，平台如何完成资源登记、任务创建、异步检测、人工审核、报告输出与状态通知。与前几章的静态模块和数据设计不同，本章强调对象在时间维度上的流转顺序，以及不同模块之间的协作边界。
+
+需要说明的是：当前代码主干已经完整实现图像上传、图像检测、人工审核和通知闭环；论文检测与 Review 检测尚未形成独立生产链路，因此本章对这两部分采用“迭代目标流程”的方式描述，并明确其与现有图像检测流程的衔接点。
+
 \subsection{资源上传与检测流程}
-本流程描述用户上传资源、后端创建任务、异步系统调度检测、AI服务返回结果以及系统回写状态和结果的全过程。
+资源上传与检测发起流程是整个平台的入口流程。当前实现中，系统支持用户上传单张图像、PDF 文档以及压缩包三类输入，其中 PDF 和压缩包会在上传阶段被解析为可检测的图像集合。随后用户从已登记资源中选择图像发起检测，系统完成任务创建、额度校验和异步调度。
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-upload-detection-flow.tex}}
+    \caption{资源上传与检测发起流程图}
+\end{figure}
+
+\subsubsection{流程输入}
+\begin{itemize}[leftmargin=2em]
+    \item 用户登录态、用户角色和权限信息；
+    \item 原始上传资源，包括图像文件、PDF 文件或压缩包；
+    \item 用户选择的检测图片集合、任务名称和检测参数。
+\end{itemize}
+
+\subsubsection{处理步骤}
+\begin{enumerate}[leftmargin=2em]
+    \item 用户上传文件后，后端首先校验其上传权限，随后在 \texttt{FileManagement} 中登记文件元数据；
+    \item 系统将原始文件写入媒体存储目录，并根据文件类型进入不同的预处理分支；
+    \item 若上传对象为单张图像，则直接创建对应的 \texttt{ImageUpload} 记录；若为 PDF，则提取其中图像页并批量生成 \texttt{ImageUpload}；若为压缩包，则依次处理其中的图像和 PDF；
+    \item 上传完成后，系统写入上传日志，前端通过文件详情接口或图像列表接口获取当前可检测图像集合；
+    \item 用户在前端选择待检测图像并提交任务，后端校验提交权限、组织配额和检测参数；
+    \item 系统创建 \texttt{DetectionTask}，并为选中图像逐一建立 \texttt{DetectionResult} 初始记录，状态置为处理中；
+    \item 后端按批次将图像打包为临时压缩文件和参数文件，并将批次任务提交给 Celery 队列等待异步执行。
+\end{enumerate}
+
+\subsubsection{流程输出}
+\begin{itemize}[leftmargin=2em]
+    \item 已登记的文件记录和图像记录；
+    \item 处于待处理或处理中状态的检测任务；
+    \item 后续异步检测阶段所需的批处理上下文。
+\end{itemize}
+
+\subsubsection{关键控制点}
+\begin{itemize}[leftmargin=2em]
+    \item 上传阶段必须先进行权限判定，避免无上传权限用户占用存储空间；
+    \item 检测提交前需完成组织额度校验，并在校验通过后立即扣减，防止并发下超额提交；
+    \item 资源预处理和任务提交之间通过数据库对象衔接，避免前端直接依赖临时文件路径。
+\end{itemize}
 
 \subsection{图像检测流程}
-本流程重点描述图像提取、图像批处理、图像检测、可疑区域标注、结果聚合和图像报告生成。
+图像检测流程描述的是异步任务真正执行的主链路。当前项目采用“批量发送到 AI 服务，再按单图并行后处理，最后任务级汇总收尾”的三阶段模式，兼顾了远程推理服务的调用效率和结果落库的并发能力。
+
+\subsubsection{流程阶段划分}
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{批量获取阶段：} Celery 的 \texttt{fetch\_batch} 任务读取批次目录中的 \texttt{img.zip} 和参数文件，向远程 AI 推理服务发起整批请求；
+    \item \textbf{单图后处理阶段：} 对每个 \texttt{DetectionResult} 调用 \texttt{process\_single\_result}，完成可视化图片保存、主结果更新、子方法结果写入和图像状态更新；
+    \item \textbf{任务收尾阶段：} 当同一检测任务下所有图片的结果均完成后，执行 \texttt{finalize\_task}，统一回写任务完成时间、生成检测报告并向用户推送完成通知。
+\end{enumerate}
+
+\subsubsection{详细处理步骤}
+\begin{enumerate}[leftmargin=2em]
+    \item 异步任务启动后，将 \texttt{DetectionTask} 状态更新为进行中，并将本批次对应的 \texttt{DetectionResult} 状态标记为处理中；
+    \item 系统调用远程 AI 推理服务获取整批检测结果，必要时执行重连与重试；
+    \item 对批次中的每张图，系统分别解析总体真假判定、置信度、LLM 文本说明、ELA 可视化、EXIF 判定和各子方法掩码结果；
+    \item 后处理任务将可视化图像保存到媒体目录，并更新 \texttt{DetectionResult}、\texttt{SubDetectionResult} 与 \texttt{ImageUpload}；
+    \item 系统统计同一任务下已完成结果数量，若全部完成，则将任务状态更新为已完成并生成任务级 PDF 报告；
+    \item 任务完成后，通过 WebSocket 群组向用户发送检测完成通知，前端据此刷新任务状态或提示用户查看结果。
+\end{enumerate}
+
+\subsubsection{流程输出}
+\begin{itemize}[leftmargin=2em]
+    \item 图像级检测结论、可视化结果和子方法输出；
+    \item 已完成状态的检测任务和可下载的任务级报告；
+    \item 面向用户端的任务完成通知。
+\end{itemize}
+
+\subsubsection{异常与恢复}
+\begin{itemize}[leftmargin=2em]
+    \item 当 AI 推理服务不可达或返回数量异常时，批处理任务执行重试与重连逻辑；
+    \item 若个别图片后处理失败，不应提前将整个任务置为完成状态；
+    \item 若报告文件尚未生成，则报告下载接口返回“正在生成”而不是直接报错。
+\end{itemize}
 
 \subsection{论文检测流程}
-本流程重点描述论文解析、文本切分、段落级分析、事实性说明生成和论文检测结果整合。
+论文检测属于本轮迭代的目标能力。当前代码尚未形成独立的论文解析、段落切分和论文级结果实体，但根据需求文档和现有图像链路，可以将论文检测流程设计为“论文资源登记 -> 文本/图像双通道解析 -> 段落级分析 -> 论文级结果聚合”的模式。
+
+\subsubsection{目标流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 用户上传论文文件后，系统先完成文件登记和基础格式校验；
+    \item 解析模块提取论文正文、章节结构、元信息和内嵌图像，并建立论文资源与图像资源的关联；
+    \item 文本分析模块对论文进行段落切分，执行 AIGC 倾向分析、事实性说明生成和异常段落标记；
+    \item 若论文中包含图像资源，则可选择复用现有图像检测链路，对论文插图执行独立鉴伪；
+    \item 聚合模块将文本检测结果、插图检测结果和整体风险评分整合为论文级结论；
+    \item 报告模块输出论文检测报告，并在用户端展示高风险段落、对应说明和插图结果摘要。
+\end{enumerate}
+
+\subsubsection{与当前实现的衔接点}
+\begin{itemize}[leftmargin=2em]
+    \item 资源登记仍可复用现有文件上传和媒体存储机制；
+    \item 任务状态流转、异步调度、报告生成和通知机制可复用当前图像检测任务框架；
+    \item 需要新增的主要能力集中在论文解析、段落级结果建模和论文报告聚合。
+\end{itemize}
+
+\subsubsection{设计关注点}
+\begin{itemize}[leftmargin=2em]
+    \item 论文检测输出不应只有单一真假结论，而应保留段落级风险与解释信息；
+    \item 论文文本链路和论文插图链路需要统一汇总口径，避免生成两套割裂的报告；
+    \item 论文检测属于迭代能力，本阶段流程设计应强调扩展接口和复用现有基础设施。
+\end{itemize}
 
 \subsection{Review检测流程}
-本流程重点描述Review文本输入、模板化倾向分析、AI生成倾向分析与结果展示。
+Review 检测同样属于迭代目标能力。该流程面向期刊审稿意见、同行评审文本或内部评阅意见，目标是识别模板化倾向、AI 生成倾向和文本表达异常。
+
+\subsubsection{目标流程}
+\begin{enumerate}[leftmargin=2em]
+    \item 用户提交 Review 文本或上传包含 Review 内容的文件；
+    \item 系统完成文本清洗、编码统一、结构化分段和长度校验；
+    \item 检测模块分别执行模板化相似性分析、AI 生成倾向分析、术语密度与意见覆盖度分析；
+    \item 聚合模块根据多项指标生成 Review 风险评分与判定说明；
+    \item 结果层向前端返回总体结论、风险证据和可疑片段高亮信息；
+    \item 报告层生成可归档的 Review 检测结果摘要，供期刊管理或后续人工复核使用。
+\end{enumerate}
+
+\subsubsection{与当前实现的衔接点}
+\begin{itemize}[leftmargin=2em]
+    \item 任务创建、异步执行、通知和日志记录可沿用现有检测任务框架；
+    \item 需要新增 Review 资源表示、文本分析器和 Review 结果展示组件；
+    \item 若 Review 检测结论需要人工复核，可复用当前人工审核模块的审批与指派思想。
+\end{itemize}
+
+\subsubsection{设计关注点}
+\begin{itemize}[leftmargin=2em]
+    \item Review 检测更强调“风险提示”而非简单真假二分，需要保留证据型输出；
+    \item 结果展示应适配文本高亮和说明片段，不宜直接套用图像检测结果页；
+    \item 后续若引入模型管理，应记录 Review 检测所用模型版本与规则版本。
+\end{itemize}
 
 \subsection{人工审核流程}
-本流程重点描述人工审核申请、管理员审批、审核任务下发、审核执行、审核结果汇总和人工审核报告生成。
+人工审核流程用于处理用户对自动检测结果存在异议、或者系统要求进一步专家复核的场景。当前代码已经形成“发布者申请 -> 管理员审批 -> 审核员执行 -> 审核结果回传”的完整链路。
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-manual-review-flow.tex}}
+    \caption{人工审核流程图}
+\end{figure}
+
+\subsubsection{处理步骤}
+\begin{enumerate}[leftmargin=2em]
+    \item 发布者在检测结果页选择若干图片并提交人工审核申请，系统创建 \texttt{ReviewRequest}，记录申请理由、关联图片和指定审核员；
+    \item 系统向组织管理员发送待审批提醒，当前实现中该提醒通过邮件发送；
+    \item 管理员审核申请后，若拒绝，则更新审核请求状态并结束流程；若通过，则为每个审核员创建一条 \texttt{ManualReview}，并为每张图初始化 \texttt{ImageReview}；
+    \item 系统向被分派审核员发送站内通知，审核员在前端查看待办任务并逐图填写评分、理由、标注点和人工结论；
+    \item 审核员提交后，系统保存逐图审核数据并更新人工审核状态；
+    \item 当发布者或管理端查看审核结果时，系统聚合所有已完成审核记录，展示不同审核员的判定结果，并在需要时生成人工审核报告。
+\end{enumerate}
+
+\subsubsection{流程输出}
+\begin{itemize}[leftmargin=2em]
+    \item 审核申请记录、审核执行记录和逐图审核结果；
+    \item 审核员侧待办通知和发布者侧审核完成结果；
+    \item 可下载的人工审核 PDF 报告。
+\end{itemize}
+
+\subsubsection{关键控制点}
+\begin{itemize}[leftmargin=2em]
+    \item 审核申请仅允许具备发布权限且角色为发布者的用户发起；
+    \item 审核员范围需要受组织和角色约束，避免跨组织指派；
+    \item 管理员审批和审核员执行属于两个独立状态层，流程设计中必须分开建模；
+    \item 审核记录应保留逐图评分与理由，保证人工结论具备复核依据。
+\end{itemize}
 
 \subsection{通知与状态同步流程}
-本流程重点描述检测状态、审核状态和系统公告在前端与后端之间的同步机制。
+通知与状态同步流程用于保证用户在检测和审核过程中能够及时获取任务变化。当前实现采用“数据库持久化通知 + WebSocket 实时推送 + REST 查询补偿”的组合方案。
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-notification-sync-flow.tex}}
+    \caption{通知与状态同步流程图}
+\end{figure}
+
+\subsubsection{处理步骤}
+\begin{enumerate}[leftmargin=2em]
+    \item 业务模块在任务完成、人工审核分派、管理员审批或公告发送时创建 \texttt{Notification} 记录；
+    \item 在线用户通过带令牌参数的 WebSocket 连接加入对应的用户通知组；
+    \item 当检测任务收尾阶段完成后，系统向用户对应的通知组推送实时消息，前端接收后刷新任务状态提示；
+    \item 若用户不在线，则通知记录保留在数据库中，用户下次进入系统后可通过通知接口拉取未读消息；
+    \item 用户可通过接口将全部通知或单条通知标记为已读，管理端则可以通过广播接口向所有普通用户发布系统公告。
+\end{enumerate}
+
+\subsubsection{流程特点}
+\begin{itemize}[leftmargin=2em]
+    \item WebSocket 负责降低用户等待期间的轮询压力，但系统不依赖 WebSocket 作为唯一通知通路；
+    \item 通知记录落库后，即使实时推送失败，用户仍可通过接口补拉消息；
+    \item 当前实现的检测完成通知主要面向用户级群组，而不是面向单任务群组统一广播。
+\end{itemize}
 
 \subsection{流程图说明}
-本节后续补充活动图或时序图，建议至少覆盖上传检测、人工审核和报告生成三条主流程。
+本章流程图采用“业务主线优先、异常分支从简”的表达策略。图中保留了对概要设计最关键的角色、模块和状态转换，不展开到接口参数或数据库字段级别。各图与正文的对应关系如下：
+\begin{itemize}[leftmargin=2em]
+    \item 图 7-1 对应资源上传与检测发起流程，体现资源登记、任务创建和异步调度的衔接；
+    \item 图 7-2 对应人工审核流程，体现发布者、管理员和审核员三方协作关系；
+    \item 图 7-3 对应通知与状态同步流程，体现数据库通知、实时推送和接口补偿三者的协同。
+\end{itemize}
+
+后续进入详细设计阶段时，可在本章基础上继续细化为接口时序图、状态机图和异常处理分支图，从而为实现与测试提供更直接的依据。
