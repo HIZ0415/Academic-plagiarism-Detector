@@ -51,9 +51,11 @@ tmp/
 .env
 .env.*
 !.env.example
+local_settings.py
 
 # Node / Vue / Vite
 node_modules/
+.tools/
 .vite/
 .vite-inspect/
 coverage/
