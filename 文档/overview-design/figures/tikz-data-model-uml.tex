@@ -1,90 +1,93 @@
 \begin{tikzpicture}[
-  font=\footnotesize,
+  font=\scriptsize,
   every node/.style={align=center},
   class/.style={
     rectangle split,
     rectangle split parts=3,
     draw,
     rounded corners=2pt,
-    minimum width=4.1cm,
-    text width=3.7cm,
-    inner xsep=5pt,
-    inner ysep=4pt,
+    minimum width=3.45cm,
+    text width=3.05cm,
+    inner xsep=4pt,
+    inner ysep=3pt,
     fill=blue!5
   },
-  line/.style={-{Latex[length=2.2mm]}, thick},
-  rel/.style={thick},
-  note/.style={font=\scriptsize}
+  rel/.style={-{Latex[length=2mm]}, thick},
+  evt/.style={-{Latex[length=2mm]}, thick, dashed},
+  legend/.style={draw, rounded corners=2pt, fill=gray!8, align=left, text width=5.2cm, inner sep=5pt}
 ]
 
 \node[class, fill=blue!8] (org) at (0,0) {组织\nodepart{second}
-+组织名称\\+管理员\\+剩余配额
+组织名称\\管理员\\剩余配额
 \nodepart{third}
-+重置配额()\\+查询剩余次数()};
+重置配额\\查询额度};
 
-\node[class, fill=green!8] (user) at (5.8,0) {用户\nodepart{second}
-+用户名\\+角色\\+权限位\\+组织ID
+\node[class, fill=green!8] (user) at (4.8,0) {用户\nodepart{second}
+用户名\\角色\\权限位\\组织ID
 \nodepart{third}
-+鉴权()\\+校验配额()};
+鉴权\\校验权限};
 
-\node[class, fill=yellow!10] (file) at (11.6,0) {文件资源\nodepart{second}
-+文件名\\+文件类型\\+标签\\+上传时间
+\node[class, fill=yellow!10] (file) at (9.6,0) {文件资源\nodepart{second}
+文件名\\文件类型\\标签
 \nodepart{third}
-+登记文件()\\+查询文件()};
+登记文件\\查询文件};
 
-\node[class, fill=yellow!10] (task) at (0,-4.8) {检测任务\nodepart{second}
-+任务名\\+状态\\+参数\\+报告文件
+\node[class, fill=yellow!10] (task) at (0,-3.9) {检测任务\nodepart{second}
+任务名\\状态\\检测参数
 \nodepart{third}
-+创建任务()\\+更新状态()};
+创建任务\\更新状态};
 
-\node[class, fill=orange!10] (image) at (5.8,-4.8) {图像资源\nodepart{second}
-+来源文件ID\\+页码\\+是否已检
+\node[class, fill=orange!10] (image) at (4.8,-3.9) {图像资源\nodepart{second}
+来源文件\\页码\\检测标记
 \nodepart{third}
-+登记提取图像()\\+标记检测状态()};
+登记图像\\标记状态};
 
-\node[class, fill=orange!12] (result) at (11.6,-4.8) {检测结果\nodepart{second}
-+真假判定\\+置信度\\+检测时间\\+状态
+\node[class, fill=orange!12] (result) at (9.6,-3.9) {检测结果\nodepart{second}
+真假判定\\置信度\\检测时间
 \nodepart{third}
-+保存结果()\\+汇总结果()};
+保存结果\\汇总结果};
 
-\node[class, fill=red!10] (request) at (0,-9.6) {审核请求\nodepart{second}
-+申请时间\\+发布者状态\\+管理员状态
+\node[class, fill=orange!12] (sub) at (12.2,-7.8) {子检测结果\nodepart{second}
+方法名\\概率\\掩码数据
 \nodepart{third}
-+提交申请()\\+分派审核人()};
+记录子方法};
 
-\node[class, fill=red!10] (manual) at (5.8,-9.6) {人工审核\nodepart{second}
-+审核人\\+审核状态\\+审核时间\\+报告文件
+\node[class, fill=red!10] (request) at (0,-7.8) {审核请求\nodepart{second}
+申请时间\\发布者状态\\管理员状态
 \nodepart{third}
-+提交审核()\\+生成审核报告()};
+提交申请\\分派审核人};
 
-\node[class, fill=orange!12] (sub) at (11.6,-9.6) {子检测结果\nodepart{second}
-+方法名\\+概率\\+掩码图\\+掩码矩阵
+\node[class, fill=red!10] (manual) at (4.8,-7.8) {人工审核\nodepart{second}
+审核人\\审核状态\\报告文件
 \nodepart{third}
-+记录子方法() };
+提交审核\\生成报告};
 
-\node[class, fill=red!10] (imgreview) at (2.9,-14.4) {图像审核项\nodepart{second}
-+七项分值\\+理由\\+标注点集\\+最终结论
+\node[class, fill=red!10] (imgreview) at (9.6,-7.8) {图像审核项\nodepart{second}
+分值\\理由\\标注点\\结论
 \nodepart{third}
-+记录人工评分()};
+记录人工评分};
 
-\node[class, fill=purple!10] (log) at (8.7,-14.4) {日志与通知\nodepart{second}
-+操作类型\\+关联对象\\+消息状态\\+通知时间
+\node[class, fill=purple!10] (log) at (4.8,-11.6) {日志与通知\nodepart{second}
+操作类型\\关联对象\\消息状态
 \nodepart{third}
-+记录日志()\\+发送通知()};
+记录日志\\发送通知};
 
-\draw[rel] (org) -- node[above, note]{1 对多} (user);
-\draw[rel] (org) -- node[above, note]{1 对多} (file);
-\draw[rel] (user) -- node[left, note]{1 对多} (task);
-\draw[rel] (file) -- node[above, note]{1 对多} (image);
-\draw[rel] (task) -- node[above, note]{1 对多} (image);
-\draw[rel] (image) -- node[above, note]{1 对多} (result);
-\draw[rel] (task) -- node[sloped, above, note]{1 对多} (result);
-\draw[rel] (result) -- node[right, note]{1 对多} (sub);
-\draw[rel] (result) -- node[sloped, above, note]{1 对多} (request);
-\draw[rel] (request) -- node[above, note]{1 对多} (manual);
-\draw[rel] (manual) -- node[left, note]{1 对多} (imgreview);
-\draw[rel] (user) -- node[sloped, above, note]{1 对多} (log);
-\draw[rel] (task) -- node[sloped, below, note]{状态写日志} (log);
-\draw[rel] (request) -- node[sloped, below, note]{审核通知} (log);
+\node[legend] (legend) at (10.6,-11.6) {图例：\\
+实线表示主业务数据关联；\\
+虚线表示日志或通知等事件记录关系。};
+
+\draw[rel] (org) -- (user);
+\draw[rel] (user) -- (file);
+\draw[rel] (file) -- (image);
+\draw[rel] (user) -- (task);
+\draw[rel] (task) -- (image);
+\draw[rel] (image) -- (result);
+\draw[rel] (result) -- (sub);
+\draw[rel] (result) -- (request);
+\draw[rel] (request) -- (manual);
+\draw[rel] (manual) -- (imgreview);
+\draw[evt] (task) -- (log);
+\draw[evt] (request) -- (log);
+\draw[evt] (manual) -- (log);
 
 \end{tikzpicture}

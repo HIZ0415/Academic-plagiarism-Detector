@@ -1,0 +1,28 @@
+\begin{tikzpicture}[
+  node distance=8mm and 8mm,
+  font=\small,
+  proc/.style={draw, rounded corners=2pt, fill=blue!6, align=center, minimum width=3.1cm, minimum height=0.9cm},
+  store/.style={draw, rounded corners=2pt, fill=yellow!10, align=center, minimum width=3.1cm, minimum height=0.9cm},
+  ext/.style={draw, rounded corners=2pt, fill=green!8, align=center, minimum width=3.1cm, minimum height=0.9cm},
+  flow/.style={-{Latex[length=2.2mm]}, thick}
+]
+
+\node[store] (task) {检测任务\\DetectionTask};
+\node[proc, right=of task] (batch) {批次任务\\fetch\_batch};
+\node[ext, right=of batch] (ai) {AI 推理服务\\批量返回};
+\node[proc, right=of ai] (single) {单图后处理\\process\_single\_result};
+\node[store, right=of single] (result) {结果落库\\DetectionResult\\SubDetectionResult};
+
+\node[proc, below=of single] (final) {任务收尾\\finalize\_task};
+\node[store, left=of final] (report) {生成检测报告};
+\node[ext, right=of final] (notify) {通知用户\\WebSocket};
+
+\draw[flow] (task) -- (batch);
+\draw[flow] (batch) -- (ai);
+\draw[flow] (ai) -- (single);
+\draw[flow] (single) -- (result);
+\draw[flow] (result) |- (final);
+\draw[flow] (final) -- (report);
+\draw[flow] (final) -- (notify);
+
+\end{tikzpicture}

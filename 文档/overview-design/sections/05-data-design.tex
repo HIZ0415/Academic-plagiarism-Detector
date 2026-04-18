@@ -19,19 +19,32 @@
 \end{figure}
 
 \subsection{核心实体总览}
-\begin{longtable}{|p{3.6cm}|p{4.2cm}|p{6.2cm}|}
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{longtable}{|L{2.9cm}|L{4.7cm}|L{6.2cm}|}
 \hline
 实体名称 & 当前实现映射 & 说明 \\ \hline
+\endfirsthead
+\hline
+实体名称 & 当前实现映射 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
 用户 & \texttt{User} & 系统基础身份实体，包含角色、权限位、组织归属、头像、简介、密码重置与个人配额信息。 \\ \hline
-组织与申请 & \texttt{OrganizationApplication}、\texttt{Organization}、\texttt{InvitationCode} & 支撑组织入驻审批、正式组织管理、成员邀请与组织级配额控制。 \\ \hline
-发布者-审核者关系 & \texttt{PublisherReviewerRelationship} & 用于限定发布者和审核者之间的协作关系，支持人工审核分派。 \\ \hline
+组织与申请 & \begin{tabular}[t]{@{}l@{}}\texttt{OrganizationApplication}\\\texttt{Organization}\\\texttt{InvitationCode}\end{tabular} & 支撑组织入驻审批、正式组织管理、成员邀请与组织级配额控制。 \\ \hline
+发布者-审核者关系 & \begin{tabular}[t]{@{}l@{}}\texttt{PublisherReviewer}\\\texttt{Relationship}\end{tabular} & 用于限定发布者和审核者之间的协作关系，支持人工审核分派。 \\ \hline
 文件资源 & \texttt{FileManagement} & 当前项目中的一级资源登记实体，记录原始文件名、大小、类型、标签、上传者与组织。 \\ \hline
 检测任务 & \texttt{DetectionTask} & 记录一次检测提交的任务名称、状态、检测参数、报告文件和归属用户。 \\ \hline
 图像资源 & \texttt{ImageUpload} & 当前项目中的二级资源实体，既可表示用户上传的单张图像，也可表示从 PDF 中提取出的页面图像。 \\ \hline
-检测结果 & \texttt{DetectionResult}、\texttt{SubDetectionResult} & 存储图像级结论、置信度、ELA/LLM/EXIF 结果以及各子方法的细粒度输出。 \\ \hline
-审核流程 & \texttt{ReviewRequest}、\texttt{ManualReview}、\texttt{ImageReview}、\texttt{Feedback} & 承载人工审核申请、审核执行、逐图评分与审核反馈。 \\ \hline
-日志与通知 & \texttt{Log}、\texttt{Notification} & 支撑系统审计、管理统计和用户消息触达。 \\ \hline
+检测结果 & \begin{tabular}[t]{@{}l@{}}\texttt{DetectionResult}\\\texttt{SubDetectionResult}\end{tabular} & 存储图像级结论、置信度、ELA/LLM/EXIF 结果以及各子方法的细粒度输出。 \\ \hline
+审核流程 & \begin{tabular}[t]{@{}l@{}}\texttt{ReviewRequest}\\\texttt{ManualReview}\\\texttt{ImageReview}\\\texttt{Feedback}\end{tabular} & 承载人工审核申请、审核执行、逐图评分与审核反馈。 \\ \hline
+日志与通知 & \begin{tabular}[t]{@{}l@{}}\texttt{Log}\\\texttt{Notification}\end{tabular} & 支撑系统审计、管理统计和用户消息触达。 \\ \hline
 \end{longtable}
+\endgroup
 
 \subsection{核心实体说明}
 \subsubsection{用户与组织域}

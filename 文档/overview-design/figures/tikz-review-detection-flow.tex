@@ -1,0 +1,26 @@
+\begin{tikzpicture}[
+  node distance=8mm and 8mm,
+  font=\small,
+  proc/.style={draw, rounded corners=2pt, fill=blue!6, align=center, minimum width=3.0cm, minimum height=0.9cm},
+  store/.style={draw, rounded corners=2pt, fill=yellow!10, align=center, minimum width=3.0cm, minimum height=0.9cm},
+  ext/.style={draw, rounded corners=2pt, fill=green!8, align=center, minimum width=3.0cm, minimum height=0.9cm},
+  flow/.style={-{Latex[length=2.2mm]}, thick}
+]
+
+\node[ext] (input) {Review 文本\\或文件输入};
+\node[proc, right=of input] (clean) {文本清洗\\分段与校验};
+\node[proc, right=of clean] (template) {模板化倾向\\相似性分析};
+\node[proc, right=of template] (ai) {AI 生成倾向\\文本特征分析};
+
+\node[proc, below=of ai] (evidence) {证据提取\\可疑片段高亮};
+\node[store, left=of evidence] (risk) {风险评分\\结论说明};
+\node[ext, left=of risk] (output) {结果展示\\报告摘要};
+
+\draw[flow] (input) -- (clean);
+\draw[flow] (clean) -- (template);
+\draw[flow] (template) -- (ai);
+\draw[flow] (ai) -- (evidence);
+\draw[flow] (evidence) -- (risk);
+\draw[flow] (risk) -- (output);
+
+\end{tikzpicture}
