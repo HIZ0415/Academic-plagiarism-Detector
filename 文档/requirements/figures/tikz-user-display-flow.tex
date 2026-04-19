@@ -1,31 +1,75 @@
-
+% 用户展示模块核心领域类图
 \begin{tikzpicture}[
-  box/.style={draw,rounded corners,align=center,minimum width=2.35cm,inner sep=2pt,font=\tiny},
-  arr/.style={-{Stealth[length=1.6mm]},semithick}
+  class/.style={
+    draw,
+    rectangle split,
+    rectangle split parts=3,
+    rectangle split part align={center,left,left},
+    align=left,
+    text width=2.65cm,
+    font=\scriptsize,
+    inner sep=2.5pt
+  },
+  rel/.style={-{Stealth[length=1.6mm]},semithick}
 ]
-  \node[box] (login) at (0,0) {登录};
-  \node[box] (n1) at (0,-1.25) {个人中心\\\textbf{YHZS-0001}};
-  \node[box] (n2) at (-3.5,-2.85) {检测记录\\\textbf{YHZS-0002}};
-  \node[box] (n3) at (0,-2.85) {审核任务展示\\\textbf{YHZS-0003}};
-  \node[box] (n4) at (3.5,-2.85) {社区反馈\\\textbf{YHZS-0004}};
-  
-  \node[box] (d2) at (-3.5,-4.35) {检测任务详情};
-  \node[box] (d3) at (0,-4.35) {审核任务详情\\\footnotesize 进度/报告/终止};
-  
-  \node[box] (n5) at (-5.2,-5.85) {综合鉴伪报告\\\textbf{YHZS-0005}};
-  \node[box] (n7) at (-1.8,-5.85) {模型展示与选择\\\textbf{YHZS-0007}};
-  \node[box] (n6) at (1.8,-5.85) {人工审核进度\\与结果 \textbf{YHZS-0006}};
-  
-  \draw[arr] (login) -- (n1);
-  \draw[arr] (n1) -| (n2);
-  \draw[arr] (n1) -- (n3);
-  \draw[arr] (n1) -| (n4);
+  \node[class] (user) at (0,0) {
+    \textbf{用户}
+    \nodepart{second}
+    - 用户ID, 状态
+    \nodepart{third}
+    + 查看资料()\\
+    + 查看消息()
+  };
 
-  \draw[arr] (n2) -- (d2);
-  \draw[arr] (n3) -- (d3);
+  \node[class] (profile) at (4.2,1.6) {
+    \textbf{个人资料}
+    \nodepart{second}
+    - 头像, 等级
+    \nodepart{third}
+    + 展示信息()\\
+    + 同步资料()
+  };
 
-  \draw[arr] (d2) -- (n5);
-  \draw[arr] (d2) -- (n7);
+  \node[class] (record) at (4.2,0) {
+    \textbf{检测记录}
+    \nodepart{second}
+    - 类型, 状态
+    \nodepart{third}
+    + 筛选记录()\\
+    + 查看详情()
+  };
 
-  \draw[arr] (d3) -- (n6);
+  \node[class] (review) at (4.2,-1.6) {
+    \textbf{审核记录}
+    \nodepart{second}
+    - 进度, 结论
+    \nodepart{third}
+    + 查看进度()\\
+    + 终止任务()
+  };
+
+  \node[class] (feedback) at (8.4,0.8) {
+    \textbf{反馈消息}
+    \nodepart{second}
+    - 类型, 已读状态
+    \nodepart{third}
+    + 展示反馈()\\
+    + 标记已读()
+  };
+
+  \node[class] (report) at (8.4,-0.8) {
+    \textbf{报告文件}
+    \nodepart{second}
+    - 格式, 下载地址
+    \nodepart{third}
+    + 校验权限()\\
+    + 生成链接()
+  };
+
+  \draw[rel] (user) -- (profile);
+  \draw[rel] (user) -- (record);
+  \draw[rel] (user) -- (review);
+  \draw[rel] (record) -- (feedback);
+  \draw[rel] (record) -- (report);
+  \draw[rel] (review) -- (report);
 \end{tikzpicture}

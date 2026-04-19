@@ -1,28 +1,77 @@
-% 用户上传模块整体业务流程（对应 03-3-user-upload.tex 全部功能点 FR-YHSC-0001～0006）
+% 用户上传模块核心领域类图
 \begin{tikzpicture}[
-  box/.style={draw,rounded corners,align=center,minimum width=2.15cm,inner sep=1.8pt,font=\tiny},
-  arr/.style={-{Stealth[length=1.5mm]},semithick}
+  class/.style={
+    draw,
+    rectangle split,
+    rectangle split parts=3,
+    rectangle split part align={center,left,left},
+    align=left,
+    text width=2.65cm,
+    font=\scriptsize,
+    inner sep=2.5pt
+  },
+  rel/.style={-{Stealth[length=1.6mm]},semithick},
+  dep/.style={-{Stealth[length=1.6mm]},dashed,semithick}
 ]
-  \node[box] (L) at (0,0) {登录};
-  \node[box] (P) at (0,-1.2) {学术检测页面};
-  \node[box] (U1) at (-2.8,-2.6) {文件上传\\\textbf{YHSC-0001}};
-  \node[box] (U4) at (2.8,-2.6) {批量上传\\\textbf{YHSC-0004}};
-  \node[box] (Q) at (0,-3.95) {任务创建/校验\\\footnotesize 类型识别与入队};
-  \node[box] (U5) at (2.8,-5.2) {高并发批量检测\\\textbf{YHSC-0005}};
-  \node[box] (U2) at (0,-5.2) {AI检测\\\textbf{YHSC-0002}};
-  \node[box] (U6) at (-2.8,-5.2) {状态实时同步\\\textbf{YHSC-0006}};
-  \node[box] (R) at (0,-6.55) {检测结果/报告查看};
-  \node[box] (U3) at (0,-7.9) {人工审核请求\\\textbf{YHSC-0003}};
-  \draw[arr] (L) -- (P);
-  \draw[arr] (P) -- (U1);
-  \draw[arr] (P) -- (U4);
-  \draw[arr] (U1) -- (Q);
-  \draw[arr] (U4) -- (Q);
-  \draw[arr] (Q) -- (U2);
-  \draw[arr] (Q) -- (U5);
-  \draw[arr] (Q) -- (U6);
-  \draw[arr] (U2) -- (R);
-  \draw[arr] (U5.south) -- ++(0,-0.18) -| (R.east);
-  \draw[arr] (U6.south) -- ++(0,-0.18) -| (R.west);
-  \draw[arr] (R) -- (U3);
+  \node[class] (user) at (0,0) {
+    \textbf{用户}
+    \nodepart{second}
+    - 用户ID, 登录状态
+    \nodepart{third}
+    + 上传文件()\\
+    + 申请审核()
+  };
+
+  \node[class] (file) at (4.2,1.4) {
+    \textbf{上传文件}
+    \nodepart{second}
+    - 类型, 大小
+    \nodepart{third}
+    + 校验格式()\\
+    + 保存文件()
+  };
+
+  \node[class] (batch) at (4.2,-1.4) {
+    \textbf{批量上传包}
+    \nodepart{second}
+    - 文件数量, 状态
+    \nodepart{third}
+    + 拆分文件()\\
+    + 批量校验()
+  };
+
+  \node[class] (task) at (8.4,0) {
+    \textbf{检测任务}
+    \nodepart{second}
+    - 类型, 当前状态
+    \nodepart{third}
+    + 创建任务()\\
+    + 更新状态()
+  };
+
+  \node[class] (job) at (12.6,1.4) {
+    \textbf{AI检测作业}
+    \nodepart{second}
+    - 模型类型, 进度
+    \nodepart{third}
+    + 执行检测()\\
+    + 同步进度()
+  };
+
+  \node[class] (result) at (12.6,-1.4) {
+    \textbf{检测结果}
+    \nodepart{second}
+    - 风险等级, 报告
+    \nodepart{third}
+    + 生成报告()\\
+    + 提交复核()
+  };
+
+  \draw[rel] (user) -- (file);
+  \draw[rel] (user) -- (batch);
+  \draw[rel] (file) -- (task);
+  \draw[rel] (batch) -- (task);
+  \draw[rel] (task) -- (job);
+  \draw[rel] (job) -- (result);
+  \draw[dep] (task) -- (result);
 \end{tikzpicture}

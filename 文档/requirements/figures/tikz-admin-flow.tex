@@ -1,49 +1,86 @@
-% 管理维护模块整体业务流程（对应 03-6-admin.tex 全部功能点 FR-GLWH-0001～0013）
+% 管理维护模块核心领域类图
 \begin{tikzpicture}[
-  box/.style={draw,rounded corners,align=center,minimum width=2.35cm,inner sep=1.6pt,font=\tiny},
-  arr/.style={-{Stealth[length=1.5mm]},semithick}
+  class/.style={
+    draw,
+    rectangle split,
+    rectangle split parts=3,
+    rectangle split part align={center,left,left},
+    align=left,
+    text width=2.65cm,
+    font=\scriptsize,
+    inner sep=2.5pt
+  },
+  rel/.style={-{Stealth[length=1.6mm]},semithick},
+  dep/.style={-{Stealth[length=1.6mm]},dashed,semithick}
 ]
-  \node[box] (L) at (0,0) {管理员登录};
-  \node[box] (Home) at (0,-1.15) {管理端首页};
+  \node[class] (admin) at (0,0) {
+    \textbf{管理员}
+    \nodepart{second}
+    - 角色, 权限
+    \nodepart{third}
+    + 维护实体()\\
+    + 查看统计()
+  };
 
-  \node[box] (E) at (-5.4,-2.7) {实体管理入口};
-  \node[box] (S) at (0,-2.6) {统计与日志入口};
-  \node[box] (R) at (5.4,-2.7) {治理与配置入口};
+  \node[class] (account) at (4.2,1.6) {
+    \textbf{用户账号}
+    \nodepart{second}
+    - 状态, 权限级别
+    \nodepart{third}
+    + 更新状态()\\
+    + 分配权限()
+  };
 
-  \node[box] (E1) at (-7.2,-4.25) {实体添加\\\textbf{GLWH-0001}};
-  \node[box] (E2) at (-7.2,-5.65) {实体修改\\\textbf{GLWH-0002}};
-  \node[box] (E3) at (-7.2,-7.05) {实体删除\\\textbf{GLWH-0003}};
-  \node[box] (E4) at (-4.2,-4.25) {实体检索\\\textbf{GLWH-0004}};
-  \node[box] (E5) at (-4.2,-5.65) {实体分类\\\textbf{GLWH-0005}};
-  \node[box] (E10) at (-4.2,-7.05) {学术资源管理\\\textbf{GLWH-0010}};
+  \node[class] (resource) at (4.2,0) {
+    \textbf{学术资源}
+    \nodepart{second}
+    - 类型, 分类标签
+    \nodepart{third}
+    + 添加资源()\\
+    + 分类资源()
+  };
 
-  \node[box] (S6) at (-1.2,-4.25) {数据信息统计\\\textbf{GLWH-0006}};
-  \node[box] (S7) at (-1.2,-5.65) {操作记录统计\\\textbf{GLWH-0007}};
-  \node[box] (S11) at (1.8,-4.25) {论文检测日志\\\textbf{GLWH-0011}};
-  \node[box] (S12) at (1.8,-5.65) {Review检测日志\\\textbf{GLWH-0012}};
+  \node[class] (model) at (4.2,-1.6) {
+    \textbf{模型配置}
+    \nodepart{second}
+    - 模型类型, 状态
+    \nodepart{third}
+    + 更新配置()\\
+    + 切换模型()
+  };
 
-  \node[box] (R8) at (5.4,-4.25) {超级管理员\\\textbf{GLWH-0008}};
-  \node[box] (R9) at (5.4,-5.65) {用户举报审核\\\textbf{GLWH-0009}};
-  \node[box] (R13) at (5.4,-7.05) {模型管理与配置\\\textbf{GLWH-0013}};
+  \node[class] (log) at (8.4,1.6) {
+    \textbf{系统日志}
+    \nodepart{second}
+    - 类型, 时间
+    \nodepart{third}
+    + 记录操作()\\
+    + 审计追踪()
+  };
 
-  \draw[arr] (L) -- (Home);
-  \draw[arr] (Home) -- (E);
-  \draw[arr] (Home) -- (S);
-  \draw[arr] (Home) -- (R);
+  \node[class] (stat) at (8.4,0) {
+    \textbf{统计报表}
+    \nodepart{second}
+    - 维度, 格式
+    \nodepart{third}
+    + 生成图表()\\
+    + 导出报表()
+  };
 
-  \draw[arr] (E) -- (E1);
-  \draw[arr] (E) -- (E2);
-  \draw[arr] (E) -- (E3);
-  \draw[arr] (E) -- (E4);
-  \draw[arr] (E) -- (E5);
-  \draw[arr] (E) -- (E10);
+  \node[class] (complaint) at (12.6,1.6) {
+    \textbf{举报处理记录}
+    \nodepart{second}
+    - 方式, 结论
+    \nodepart{third}
+    + 审核举报()\\
+    + 通知用户()
+  };
 
-  \draw[arr] (S) -- (S6);
-  \draw[arr] (S) -- (S7);
-  \draw[arr] (S) -- (S11);
-  \draw[arr] (S) -- (S12);
-
-  \draw[arr] (R) -- (R8);
-  \draw[arr] (R) -- (R9);
-  \draw[arr] (R) -- (R13);
+  \draw[rel] (admin) -- (account);
+  \draw[rel] (admin) -- (resource);
+  \draw[rel] (admin) -- (model);
+  \draw[rel] (account) -- (log);
+  \draw[rel] (resource) -- (stat);
+  \draw[rel] (model.east) -- ++(0.8,0) |- (stat.south);
+  \draw[dep] (complaint) -- (log);
 \end{tikzpicture}

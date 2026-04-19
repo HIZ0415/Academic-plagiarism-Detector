@@ -33,8 +33,8 @@
 \shortstack[l]{评审检测模块\\SD-PSJC-0001} & 对同行评审 Review 进行 AI 生成倾向和模板化倾向检测。 & 资源管理模块、检测任务管理模块、报告服务模块 \\ \hline
 \shortstack[l]{人工审核模块\\SD-RGSH-0001} & 待补充 & 待补充 \\ \hline
 \shortstack[l]{报告服务模块\\SD-BGFW-0001} & 待补充 & 待补充 \\ \hline
-\shortstack[l]{通知消息模块\\SD-TZXX-0001} & 待补充 & 待补充 \\ \hline
-\shortstack[l]{统计日志模块\\SD-TJRZ-0001} & 待补充 & 待补充 \\ \hline
+\shortstack[l]{通知消息模块\\SD-TZXX-0001} & 统一承载任务状态、审核进展、组织审批和系统消息通知，并提供站内消息与实时推送能力 & 用户与权限模块、检测任务管理模块、人工审核模块、组织与成员模块 \\ \hline
+\shortstack[l]{统计日志模块\\SD-TJRZ-0001} & 记录关键业务操作与审计轨迹，并为管理端提供统计分析、趋势汇总和日志检索能力 & 用户与权限模块、组织与成员模块、检测任务管理模块、人工审核模块、通知消息模块 \\ \hline
 \end{longtable}
 
 \subsection{用户与权限模块（SD-YHQX-0001）}
@@ -698,138 +698,140 @@
 \subsection{通知消息模块（SD-TZXX-0001）}
 
 \subsubsection{模块目标}
-待补充。
+本模块用于承载系统内与检测任务、人工审核、组织审批和管理操作相关的消息通知能力，保证用户能够及时获知任务状态变化、审核进展和系统事件，从而支撑平台的可用性与协作效率。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 统一接收业务模块产生的通知事件，并将其转换为站内消息记录；
+    \item 为用户端和管理端提供通知列表、未读数量、标记已读与消息跳转能力；
+    \item 通过 WebSocket 与轮询接口向前端同步关键业务状态变化，降低用户等待过程中的信息不透明问题。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 消息生成：根据检测完成、人工审核申请、组织审批结果、管理员操作等事件生成通知；
+    \item 消息消费：提供通知列表查询、未读数统计、消息详情查看和已读标记能力；
+    \item 实时推送：通过 WebSocket 向在线用户主动推送状态更新，离线场景下由前端通过接口补拉消息。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 来自检测任务、人工审核、组织审批、后台管理等模块的业务事件；
+    \item 当前用户身份、目标接收者、消息类别、消息标题、消息正文和跳转链接等消息元数据。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 持久化后的通知记录、未读状态统计结果和消息查询结果；
+    \item 面向前端的实时推送事件或标准 REST 响应，供页面更新通知中心与状态提示。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{Notification}：系统通知实体，记录收发双方、消息类别、标题、正文、已读状态、发送时间与跳转地址；
+    \item 业务事件上下文：由其他模块传入的任务编号、审核请求编号、组织申请编号等引用信息，用于拼装通知内容；
+    \item WebSocket 连接上下文：用于识别在线用户、定位推送目标并维护消息到达的实时性。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 业务模块在状态变化或关键操作完成后发出通知事件，并传入接收者、类别和业务上下文；
+    \item 本模块根据事件类型组装通知标题、正文与跳转链接，生成 \texttt{Notification} 记录；
+    \item 若接收者在线，则通过 WebSocket 向对应会话推送消息摘要；若接收者离线，则等待其下次登录后通过查询接口获取；
+    \item 用户端或管理端读取通知中心数据，并可将消息标记为已读或跳转至对应业务页面。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 接收检测任务管理模块、人工审核模块、组织与成员模块和管理端治理接口发出的消息事件；
+    \item 对前端提供通知列表、未读消息数量、消息状态更新和 WebSocket 推送接口；
+    \item 与用户与权限模块协同，校验当前访问者身份，确保通知只能被对应接收者或管理员读取。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 通知内容应避免直接复制大段业务数据，正文只保留必要摘要，详细信息由跳转页面展示；
+    \item 同一业务事件的重复触发需有幂等控制，避免因任务重试或状态重复回写产生通知风暴；
+    \item 实时推送与持久化消息应解耦，推送失败不影响消息记录落库；
+    \item 通知分类需要兼顾当前实现与后续扩展，至少支持系统消息、全局公告、发布者到审核者和审核者到发布者等类型。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 扩展邮件、短信或企业微信等多渠道通知，以适配组织级部署场景；
+    \item 引入通知模板中心与用户通知偏好配置，实现按事件类型的订阅与静默策略。
 \end{itemize}
 
 \subsection{统计日志模块（SD-TJRZ-0001）}
 
 \subsubsection{模块目标}
-待补充。
+本模块用于记录系统关键操作、检测过程和人工审核过程中的审计信息，并向管理端提供统计分析能力，为运行监控、问题追踪和后续治理决策提供数据支撑。
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 统一记录上传、检测、人工审核、组织审批和后台治理等关键操作日志；
+    \item 对任务数量、检测结果、审核分布、用户活跃度等业务指标进行汇总统计；
+    \item 为管理员提供可检索、可筛选、可追溯的日志与统计数据访问入口。
 \end{itemize}
 
 \subsubsection{功能组成}
 \begin{itemize}[leftmargin=2em]
-    \item 功能点 1：待补充；
-    \item 功能点 2：待补充；
-    \item 功能点 3：待补充。
+    \item 日志采集：采集用户上传、检测提交、审核处理、组织审批、管理操作等事件；
+    \item 统计分析：对用户数、检测数、审核数、检测结论分布和时间趋势进行聚合计算；
+    \item 管理查询：支持管理端按时间、用户、组织、操作类型和业务对象进行筛选查询。
 \end{itemize}
 
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 各业务模块产生的操作事件、状态变更事件和业务主键引用；
+    \item 管理端提交的统计维度、时间范围、筛选条件和排序参数。
 \end{itemize}
 
 输出：
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 持久化日志记录、审计轨迹和按条件检索后的日志列表；
+    \item 面向管理端仪表盘的统计汇总结果，如趋势数据、分布数据和总量数据。
 \end{itemize}
 
 \subsubsection{核心数据对象}
 \begin{itemize}[leftmargin=2em]
-    \item 对象 1：待补充；
-    \item 对象 2：待补充；
-    \item 对象 3：待补充。
+    \item \texttt{Log}：操作日志实体，记录操作时间、用户、操作类型、关联模型名称和关联对象编号；
+    \item 业务统计聚合结果：由检测任务、检测结果、人工审核、用户与组织等实体汇总得到的统计数据；
+    \item 管理端查询条件对象：封装筛选范围、排序方式、分页参数和维度组合。
 \end{itemize}
 
 \subsubsection{处理流程}
 \begin{enumerate}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 用户或管理员完成上传、检测、审核、组织审批等操作后，业务模块生成对应日志事件；
+    \item 本模块将事件映射为统一的 \texttt{Log} 记录并写入数据库，必要时补充关联对象信息；
+    \item 管理端根据时间、组织、用户或事件类型查询日志或调用统计接口；
+    \item 本模块执行聚合分析后返回仪表盘数据、列表数据或导出所需的数据集。
 \end{enumerate}
 
 \subsubsection{模块接口与交互关系}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 接收用户与权限、组织管理、资源管理、检测任务、人工审核和通知模块写入的操作事件；
+    \item 向管理端提供日志查询接口、统计接口和数据概览接口；
+    \item 与报告服务模块和后续运维模块协同，为阶段性汇总报告和系统运行分析提供原始数据。
 \end{itemize}
 
 \subsubsection{设计要点}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充；
-    \item 待补充；
-    \item 待补充。
+    \item 日志字段设计应突出“谁在何时对什么做了什么”，优先保证可追溯性而不是过度冗余；
+    \item 高频统计查询应与原始日志写入解耦，避免管理端分析请求影响主业务接口性能；
+    \item 统计口径需在文档中固定，如检测次数按任务计还是按图片计，以免前后端和报告口径不一致；
+    \item 涉及个人信息和敏感业务数据时，日志展示需做脱敏或按角色限制访问范围。
 \end{itemize}
 
 \subsubsection{后续扩展方向}
 \begin{itemize}[leftmargin=2em]
-    \item 待补充；
-    \item 待补充。
+    \item 增加按组织、学科标签、模型版本和检测类型的多维统计分析能力；
+    \item 支持日志归档、离线分析和异常行为告警，为后续运维监控与审计合规提供基础。
 \end{itemize}
 
 \subsection{本章小结}
-本章给出了统一的模块写作模板。后续填充正文时，可按“模块目标、模块职责、功能组成、输入与输出、核心数据对象、处理流程、模块接口与交互关系、设计要点、后续扩展方向”的顺序逐项补全，以保证整章结构一致。
+本章在总体架构基础上，将系统划分为用户与权限、组织与成员、资源管理、检测任务、图像检测、论文检测、评审检测、人工审核、报告服务、通知消息和统计日志等核心模块，并统一说明了各模块的职责边界、输入输出、核心对象和协作关系。通过该划分，当前项目中已经落地的图像检测能力可以继续稳定运行，而论文检测、评审检测、统一报告和治理统计等迭代需求也具备了清晰的落点。
+
+后续详细设计阶段，可在本章模块边界基础上继续细化数据库表结构、接口参数、状态机和异常处理策略，并按模块逐步推进开发与联调，以降低后续迭代时的耦合风险。

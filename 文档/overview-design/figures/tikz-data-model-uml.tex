@@ -1,0 +1,93 @@
+\begin{tikzpicture}[
+  font=\scriptsize,
+  every node/.style={align=center},
+  class/.style={
+    rectangle split,
+    rectangle split parts=3,
+    draw,
+    rounded corners=2pt,
+    minimum width=3.45cm,
+    text width=3.05cm,
+    inner xsep=4pt,
+    inner ysep=3pt,
+    fill=blue!5
+  },
+  rel/.style={-{Latex[length=2mm]}, thick},
+  evt/.style={-{Latex[length=2mm]}, thick, dashed},
+  legend/.style={draw, rounded corners=2pt, fill=gray!8, align=left, text width=5.2cm, inner sep=5pt}
+]
+
+\node[class, fill=blue!8] (org) at (0,0) {组织\nodepart{second}
+组织名称\\管理员\\剩余配额
+\nodepart{third}
+重置配额\\查询额度};
+
+\node[class, fill=green!8] (user) at (4.8,0) {用户\nodepart{second}
+用户名\\角色\\权限位\\组织ID
+\nodepart{third}
+鉴权\\校验权限};
+
+\node[class, fill=yellow!10] (file) at (9.6,0) {文件资源\nodepart{second}
+文件名\\文件类型\\标签
+\nodepart{third}
+登记文件\\查询文件};
+
+\node[class, fill=yellow!10] (task) at (0,-3.9) {检测任务\nodepart{second}
+任务名\\状态\\检测参数
+\nodepart{third}
+创建任务\\更新状态};
+
+\node[class, fill=orange!10] (image) at (4.8,-3.9) {图像资源\nodepart{second}
+来源文件\\页码\\检测标记
+\nodepart{third}
+登记图像\\标记状态};
+
+\node[class, fill=orange!12] (result) at (9.6,-3.9) {检测结果\nodepart{second}
+真假判定\\置信度\\检测时间
+\nodepart{third}
+保存结果\\汇总结果};
+
+\node[class, fill=orange!12] (sub) at (12.2,-7.8) {子检测结果\nodepart{second}
+方法名\\概率\\掩码数据
+\nodepart{third}
+记录子方法};
+
+\node[class, fill=red!10] (request) at (0,-7.8) {审核请求\nodepart{second}
+申请时间\\发布者状态\\管理员状态
+\nodepart{third}
+提交申请\\分派审核人};
+
+\node[class, fill=red!10] (manual) at (4.8,-7.8) {人工审核\nodepart{second}
+审核人\\审核状态\\报告文件
+\nodepart{third}
+提交审核\\生成报告};
+
+\node[class, fill=red!10] (imgreview) at (9.6,-7.8) {图像审核项\nodepart{second}
+分值\\理由\\标注点\\结论
+\nodepart{third}
+记录人工评分};
+
+\node[class, fill=purple!10] (log) at (4.8,-11.6) {日志与通知\nodepart{second}
+操作类型\\关联对象\\消息状态
+\nodepart{third}
+记录日志\\发送通知};
+
+\node[legend] (legend) at (10.6,-11.6) {图例：\\
+实线表示主业务数据关联；\\
+虚线表示日志或通知等事件记录关系。};
+
+\draw[rel] (org) -- (user);
+\draw[rel] (user) -- (file);
+\draw[rel] (file) -- (image);
+\draw[rel] (user) -- (task);
+\draw[rel] (task) -- (image);
+\draw[rel] (image) -- (result);
+\draw[rel] (result) -- (sub);
+\draw[rel] (result) -- (request);
+\draw[rel] (request) -- (manual);
+\draw[rel] (manual) -- (imgreview);
+\draw[evt] (task) -- (log);
+\draw[evt] (request) -- (log);
+\draw[evt] (manual) -- (log);
+
+\end{tikzpicture}

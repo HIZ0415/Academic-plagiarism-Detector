@@ -1,0 +1,38 @@
+\begin{tikzpicture}[
+  node distance=8mm and 8mm,
+  font=\small,
+  proc/.style={draw, rounded corners=2pt, fill=blue!6, align=center, minimum width=2.8cm, minimum height=0.9cm},
+  store/.style={draw, rounded corners=2pt, fill=yellow!10, align=center, minimum width=2.8cm, minimum height=0.9cm},
+  ext/.style={draw, rounded corners=2pt, fill=green!8, align=center, minimum width=2.8cm, minimum height=0.9cm},
+  flow/.style={-{Latex[length=2.2mm]}, thick}
+]
+
+\node[ext] (user) {用户端};
+\node[proc, right=of user] (upload) {上传文件\\权限校验};
+\node[store, right=of upload] (file) {登记文件\\FileManagement};
+\node[proc, right=of file] (parse) {按类型预处理\\图像/PDF/压缩包};
+\node[store, right=of parse] (image) {生成图像资源\\ImageUpload};
+
+\node[proc, below=of file] (select) {选择图像并提交\\任务参数};
+\node[proc, right=of select] (quota) {校验提交权限\\与组织配额};
+\node[store, right=of quota] (task) {创建 DetectionTask\\DetectionResult};
+\node[proc, right=of task] (batch) {批量打包 img.zip\\和 data.json};
+\node[ext, right=of batch] (celery) {Celery 队列};
+
+\node[ext, below=of batch] (ai) {AI 推理服务};
+\node[proc, left=of ai] (finalize) {结果回写\\报告生成\\任务完成通知};
+
+\draw[flow] (user) -- (upload);
+\draw[flow] (upload) -- (file);
+\draw[flow] (file) -- (parse);
+\draw[flow] (parse) -- (image);
+\draw[flow] (image) |- (select);
+\draw[flow] (select) -- (quota);
+\draw[flow] (quota) -- (task);
+\draw[flow] (task) -- (batch);
+\draw[flow] (batch) -- (celery);
+\draw[flow] (celery) -- (ai);
+\draw[flow] (ai) -- (finalize);
+\draw[flow] (finalize) |- (user);
+
+\end{tikzpicture}

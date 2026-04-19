@@ -1,33 +1,146 @@
 \section{数据设计}
 
 \subsection{数据设计目标}
-数据设计需要同时满足统一资源抽象、现有图像业务兼容、异步任务追踪和后续扩展支持等要求。
+数据设计需要同时满足以下目标：一是支撑当前已经实现的图像上传、图像检测、人工审核、通知与管理统计能力；二是为后续论文检测、评审文本检测和统一报告生成预留稳定的数据抽象；三是保证异步任务处理过程中的状态可追踪、结果可回溯和日志可审计；四是在后续详细设计阶段能够平滑从当前图像中心化模型演进到更统一的学术资源模型。
 
-\subsection{核心实体}
-\begin{longtable}{|p{4cm}|p{10cm}|}
+\subsection{数据设计原则}
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{兼容现有实现。} 当前后端已经围绕图像检测链路建立了较完整的数据模型，第五章设计需要以现有模型为基础，而不是完全脱离代码重新定义；
+    \item \textbf{抽象统一资源。} 在保留 \texttt{FileManagement}、\texttt{ImageUpload} 等现有实体的同时，逐步抽象出统一的学术资源概念，以便后续纳入论文与评审文本；
+    \item \textbf{状态可追踪。} 对文件、任务、检测结果、审核请求和通知状态进行显式建模，保证任务流转、回滚和异常排查都有数据依据；
+    \item \textbf{便于扩展。} 新增检测类型、模型版本、报告格式或组织级治理能力时，应尽量通过增加关联实体或扩展字段完成，而不是破坏已有主链路。
+\end{itemize}
+
+\subsection{核心数据模型类图}
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-data-model-uml.tex}}
+    \caption{核心数据模型 UML 类图}
+\end{figure}
+
+\subsection{核心实体总览}
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{longtable}{|L{2.9cm}|L{4.7cm}|L{6.2cm}|}
 \hline
-实体名称 & 说明 \\ \hline
-User & 系统用户，包含普通用户、审核者、组织管理员和超级管理员。 \\ \hline
-Organization & 用户所属组织及其资源配额、管理关系和邀请关系。 \\ \hline
-Resource & 统一学术资源抽象，用于表示图像、论文和Review。 \\ \hline
-DetectionTask & 检测任务主体，用于关联用户、资源集合、状态与任务参数。 \\ \hline
-DetectionResult & 检测结果主体，用于承载自动检测输出及其状态。 \\ \hline
-ManualReview & 人工审核任务与审核执行记录。 \\ \hline
-Report & 检测或审核报告文件及其元数据。 \\ \hline
-Log & 操作日志、检测日志、审核日志及管理日志。 \\ \hline
-Notification & 系统消息与状态通知。 \\ \hline
+实体名称 & 当前实现映射 & 说明 \\ \hline
+\endfirsthead
+\hline
+实体名称 & 当前实现映射 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+用户 & \texttt{User} & 系统基础身份实体，包含角色、权限位、组织归属、头像、简介、密码重置与个人配额信息。 \\ \hline
+组织与申请 & \begin{tabular}[t]{@{}l@{}}\texttt{OrganizationApplication}\\\texttt{Organization}\\\texttt{InvitationCode}\end{tabular} & 支撑组织入驻审批、正式组织管理、成员邀请与组织级配额控制。 \\ \hline
+发布者-审核者关系 & \begin{tabular}[t]{@{}l@{}}\texttt{PublisherReviewer}\\\texttt{Relationship}\end{tabular} & 用于限定发布者和审核者之间的协作关系，支持人工审核分派。 \\ \hline
+文件资源 & \texttt{FileManagement} & 当前项目中的一级资源登记实体，记录原始文件名、大小、类型、标签、上传者与组织。 \\ \hline
+检测任务 & \texttt{DetectionTask} & 记录一次检测提交的任务名称、状态、检测参数、报告文件和归属用户。 \\ \hline
+图像资源 & \texttt{ImageUpload} & 当前项目中的二级资源实体，既可表示用户上传的单张图像，也可表示从 PDF 中提取出的页面图像。 \\ \hline
+检测结果 & \begin{tabular}[t]{@{}l@{}}\texttt{DetectionResult}\\\texttt{SubDetectionResult}\end{tabular} & 存储图像级结论、置信度、ELA/LLM/EXIF 结果以及各子方法的细粒度输出。 \\ \hline
+审核流程 & \begin{tabular}[t]{@{}l@{}}\texttt{ReviewRequest}\\\texttt{ManualReview}\\\texttt{ImageReview}\\\texttt{Feedback}\end{tabular} & 承载人工审核申请、审核执行、逐图评分与审核反馈。 \\ \hline
+日志与通知 & \begin{tabular}[t]{@{}l@{}}\texttt{Log}\\\texttt{Notification}\end{tabular} & 支撑系统审计、管理统计和用户消息触达。 \\ \hline
 \end{longtable}
+\endgroup
+
+\subsection{核心实体说明}
+\subsubsection{用户与组织域}
+用户域数据以 \texttt{User} 为中心，记录账号身份、业务角色、权限位、所属组织和个人级剩余检测次数。组织域则由 \texttt{OrganizationApplication}、\texttt{Organization} 与 \texttt{InvitationCode} 组成，分别覆盖组织申请、正式组织信息与成员邀请机制。该设计使系统能够同时支持个人用户和组织用户两种使用模式，并为管理端组织审批和配额控制提供数据支撑。
+
+\subsubsection{资源与任务域}
+当前项目尚未落地统一的 \texttt{Resource} 实体，而是通过 \texttt{FileManagement} 与 \texttt{ImageUpload} 两层结构表达资源关系：前者代表用户上传的原始文件，后者代表参与检测的具体图像对象。对于 PDF 文件，系统会在上传后提取其中的图像页并为每张图建立 \texttt{ImageUpload} 记录。检测任务由 \texttt{DetectionTask} 表示，一个任务通常关联多个 \texttt{ImageUpload} 记录，并统一记录状态和参数。
+
+\subsubsection{结果与审核域}
+自动检测结果以 \texttt{DetectionResult} 为主实体，保存单张图像的真假判定、置信度、LLM 说明、可视化结果和 EXIF 判断。若需要展示多算法结果，则通过 \texttt{SubDetectionResult} 按方法逐条展开。人工审核链路以 \texttt{ReviewRequest} 发起，随后由一个或多个 \texttt{ManualReview} 承接执行，并通过 \texttt{ImageReview} 保存逐图评分、理由、标注点和人工结论，最终可由 \texttt{Feedback} 记录用户对审核结果的反馈。
+
+\subsubsection{治理与协同域}
+\texttt{Log} 用于审计谁在何时对哪个对象执行了何种操作，\texttt{Notification} 用于记录站内消息内容、收发双方、类别与未读状态。二者分别支撑管理端治理和用户侧消息协同，是后续统计分析、运行监控和问题追踪的重要基础。
 
 \subsection{实体关系说明}
-本节后续将补充核心实体关系图，重点体现用户、组织、资源、检测任务、检测结果、人工审核、报告和日志之间的映射关系。
+本系统的数据关系可以概括为“用户/组织 -> 资源 -> 任务 -> 结果 -> 审核 -> 报告/通知/日志”的链式结构。
+
+\begin{itemize}[leftmargin=2em]
+    \item 一个组织可以拥有多个用户，一个用户最多归属于一个组织；
+    \item 一个用户可以上传多个 \texttt{FileManagement} 记录，一个原始文件可以派生出多个 \texttt{ImageUpload} 记录；
+    \item 一个 \texttt{DetectionTask} 由一个用户发起，可关联多个图像资源，并产生多个 \texttt{DetectionResult}；
+    \item 一个 \texttt{DetectionResult} 可以继续关联多个 \texttt{SubDetectionResult}，用于表达多方法检测细节；
+    \item 一个 \texttt{ReviewRequest} 针对一个检测结果发起，并可关联多个审核者和多个被审核图像；
+    \item 一个 \texttt{ManualReview} 归属于一个审核请求与一个审核员，并进一步关联多个 \texttt{ImageReview}；
+    \item 用户、任务、审核请求和管理操作均可派生出对应的日志记录与通知消息。
+\end{itemize}
+
+\subsection{关键数据项设计}
+\begin{longtable}{|p{3.8cm}|p{3.2cm}|p{6.8cm}|}
+\hline
+数据项 & 归属实体 & 设计说明 \\ \hline
+角色与权限位 & \texttt{User} & 通过 \texttt{role} 与 \texttt{permission} 组合描述用户在上传、提交、发布、审核等操作上的权限边界。 \\ \hline
+组织剩余配额 & \texttt{Organization} & 记录组织剩余 LLM 和非 LLM 检测次数，用于检测任务提交前的配额校验。 \\ \hline
+个人剩余配额 & \texttt{User} & 用于未加入组织用户或个人级额度控制场景，和组织配额形成双层约束。 \\ \hline
+文件标签与类型 & \texttt{FileManagement} & 当前通过 \texttt{file\_type} 与 \texttt{tag} 管理资源类别，支撑分类、检索和学科统计。 \\ \hline
+检测参数 & \texttt{DetectionTask} & 通过 \texttt{cmd\_block\_size}、\texttt{urn\_k}、\texttt{if\_use\_llm} 等字段记录任务配置。 \\ \hline
+真假判定与置信度 & \texttt{DetectionResult} & 直接表达自动检测主结论，是报告、列表页与后续审核分流的核心依据。 \\ \hline
+子方法概率与掩码矩阵 & \texttt{SubDetectionResult} & 支撑检测细节解释和可疑区域可视化，便于结果追溯。 \\ \hline
+审核双状态 & \texttt{ReviewRequest} & 通过发布者侧状态与管理员侧状态分离表达审核申请流转。 \\ \hline
+逐图评分与标注点 & \texttt{ImageReview} & 细化人工审核过程，使审核结论具备解释性和可复核性。 \\ \hline
+消息类别与已读状态 & \texttt{Notification} & 区分系统通知、全局通知与用户间通知，并支持通知中心未读管理。 \\ \hline
+\end{longtable}
 
 \subsection{状态设计}
 \begin{itemize}[leftmargin=2em]
-    \item 资源状态：已上传、已解析、可检测、已归档等；
-    \item 任务状态：待处理、处理中、已完成、失败、待人工审核等；
-    \item 审核状态：待审批、审核中、已完成、已拒绝等；
-    \item 通知状态：未读、已读。
+    \item \textbf{资源状态：} 当前代码中未单独定义文件资源状态，但从业务过程上可区分为“已上传、已解析、可检测、已归档”等逻辑状态，后续统一资源模型时应显式落表；
+    \item \textbf{任务状态：} \texttt{DetectionTask} 当前定义为 \texttt{pending}、\texttt{in\_progress}、\texttt{completed}，后续建议补充 \texttt{failed}、\texttt{cancelled} 等异常状态；
+    \item \textbf{检测结果状态：} \texttt{DetectionResult} 当前区分 \texttt{in\_progress} 和 \texttt{completed}，并通过 \texttt{is\_under\_review} 表示是否进入人工审核；
+    \item \textbf{审核状态：} \texttt{ReviewRequest} 通过 \texttt{status1} 和 \texttt{status2} 分别表示发布者侧流程状态与管理员审批状态，\texttt{ManualReview} 进一步记录审核员执行状态；
+    \item \textbf{通知状态：} \texttt{Notification} 采用 \texttt{unread}/\texttt{read} 两态，满足通知中心场景需要。
+\end{itemize}
+
+\subsection{数据流转设计}
+从数据流角度看，当前项目的核心链路如下：
+\begin{enumerate}[leftmargin=2em]
+    \item 用户登录后上传原始文件，系统生成 \texttt{FileManagement} 记录；
+    \item 若上传对象为 PDF，则系统提取其中图像并生成若干 \texttt{ImageUpload} 记录；若为单图，则直接登记图像记录；
+    \item 用户提交检测请求时创建 \texttt{DetectionTask}，并将待检测图像与任务建立关联；
+    \item 异步检测完成后，系统为每个图像生成 \texttt{DetectionResult} 与若干 \texttt{SubDetectionResult}；
+    \item 若用户申请人工审核，则创建 \texttt{ReviewRequest}，并进一步生成 \texttt{ManualReview} 和 \texttt{ImageReview}；
+    \item 在上述过程中，关键业务动作同步写入 \texttt{Log}，关键状态变化则生成 \texttt{Notification}，供前端展示和管理端统计。
+\end{enumerate}
+
+\subsection{完整性与一致性约束}
+\begin{itemize}[leftmargin=2em]
+    \item 用户邮箱、组织名称、组织邮箱和邀请码应保持唯一，避免身份与组织管理冲突；
+    \item 检测结果必须关联到有效的图像资源，子检测结果必须依附于有效的检测结果；
+    \item 审核请求、人工审核与图像审核之间应按流程顺序产生，禁止脱离上游对象单独创建下游数据；
+    \item 配额扣减与任务状态更新需要保持一致，任务创建失败或执行失败时应避免发生重复扣减或脏数据；
+    \item 通知与日志作为辅助数据，不应反向控制主业务，但其引用对象应能追溯到有效的主实体。
+\end{itemize}
+
+\subsection{索引与查询设计}
+\begin{itemize}[leftmargin=2em]
+    \item 当前模型已经在组织外键、用户外键、申请时间、审核时间等高频过滤字段上使用了索引设计；
+    \item 管理端高频查询通常围绕“按用户、按组织、按时间范围、按任务状态、按审核状态”展开，后续详细设计阶段可继续补充组合索引；
+    \item 对于日志与通知类高增长表，应优先保证按时间倒序和按接收者查询的性能；
+    \item 对于检测结果和子检测结果，应重点优化按任务编号、图像编号和审核请求编号的关联查询。
+\end{itemize}
+
+\subsection{数据安全与归档设计}
+\begin{itemize}[leftmargin=2em]
+    \item 用户密码、重置验证码、组织证明材料等敏感信息需严格依赖后端认证机制和文件访问控制；
+    \item 报告文件、审核材料、掩码图和上传图像属于业务关键数据，应保留稳定的文件路径和元数据索引；
+    \item 对于已完成任务的历史结果、日志和通知，可采用归档或分区策略降低在线表压力；
+    \item 日志展示和统计导出时应控制个人隐私字段暴露范围，满足课程项目场景下的基本合规要求。
 \end{itemize}
 
 \subsection{兼容与演进说明}
-考虑到当前代码实现中已有围绕图像任务构建的数据模型，后续详细设计阶段需要明确哪些现有表结构继续复用，哪些通过扩展字段过渡，哪些需要新增统一资源抽象表。
+考虑到当前代码实现仍以图像资源为中心，后续详细设计阶段建议采用“兼容扩展”而非“推倒重建”的方式推进：
+\begin{itemize}[leftmargin=2em]
+    \item 短期内继续复用 \texttt{FileManagement}、\texttt{ImageUpload}、\texttt{DetectionTask} 和 \texttt{DetectionResult}，保证现有图像检测闭环稳定；
+    \item 中期可增加统一资源抽象实体，将论文文件、评审文本和图像资源纳入同一资源域，再通过资源类型字段区分不同检测对象；
+    \item 人工审核、报告和通知模块的数据设计应尽量面向任务与资源抽象，而不是只绑定图像实体，以降低后续支持论文和评审检测时的迁移成本；
+    \item 在模型升级过程中，应优先采用新增表、补充字段、增加映射关系等方式渐进演化，避免直接破坏既有接口和前端页面。
+\end{itemize}
+
+\subsection{本章小结}
+本章结合当前后端模型，对用户、组织、资源、任务、结果、审核、日志与通知等核心数据对象及其关系进行了说明，并给出了状态设计、流转设计、一致性约束与演进方向。该数据设计既能够解释当前图像检测系统的实现基础，也为后续论文检测、评审检测和统一资源抽象提供了可继续细化的结构框架。

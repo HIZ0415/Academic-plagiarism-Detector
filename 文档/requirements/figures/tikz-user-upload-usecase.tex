@@ -1,18 +1,77 @@
-% 用户上传模块整体用例图（FR-YHSC-0001～0006，与 03-3-user-upload.tex 一致）
+% 用户上传模块服务协作类图
 \begin{tikzpicture}[
-  uc/.style={draw,ellipse,minimum width=2.65cm,minimum height=8mm,align=center,font=\scriptsize,inner sep=1.5pt},
-  arr/.style={semithick}
+  class/.style={
+    draw,
+    rectangle split,
+    rectangle split parts=3,
+    rectangle split part align={center,left,left},
+    align=left,
+    text width=2.75cm,
+    font=\scriptsize,
+    inner sep=2.5pt
+  },
+  rel/.style={-{Stealth[length=1.6mm]},semithick},
+  dep/.style={-{Stealth[length=1.6mm]},dashed,semithick}
 ]
-  \node[draw,rounded corners,minimum width=9.1cm,minimum height=5.9cm] (frame) at (5.4,3) {};
-  \node[anchor=north,yshift=-2pt] at (frame.north) {\small\textbf{用户上传模块（全部功能点）}};
-  \node (actor) at (-0.2,3) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 普通用户\\[-2pt]\tiny （已登录）}};
-  \node[uc] (u1) at (3.2,4.75) {文件上传\\FR-YHSC-0001};
-  \node[uc] (u2) at (5.4,4.75) {AI检测\\FR-YHSC-0002};
-  \node[uc] (u3) at (7.6,4.75) {人工审核请求\\FR-YHSC-0003};
-  \node[uc] (u4) at (3.2,2.9) {批量上传\\FR-YHSC-0004};
-  \node[uc] (u5) at (5.4,2.9) {高并发批量检测\\FR-YHSC-0005};
-  \node[uc] (u6) at (7.6,2.9) {检测状态实时同步\\FR-YHSC-0006};
-  \foreach \x in {u1,u2,u3,u4,u5,u6} {
-    \draw[arr] (actor.east) -- ++(0.22,0) |- (\x.west);
-  }
+  \node[class] (controller) at (0,0) {
+    \textbf{上传控制器}
+    \nodepart{second}
+    - 上传请求
+    \nodepart{third}
+    + 接收文件()\\
+    + 查询状态()
+  };
+
+  \node[class] (validator) at (4.2,1.5) {
+    \textbf{文件校验器}
+    \nodepart{second}
+    - 格式, 大小上限
+    \nodepart{third}
+    + 校验格式()\\
+    + 校验完整性()
+  };
+
+  \node[class] (storage) at (4.2,-1.5) {
+    \textbf{文件存储服务}
+    \nodepart{second}
+    - 存储路径, 摘要
+    \nodepart{third}
+    + 保存文件()\\
+    + 生成地址()
+  };
+
+  \node[class] (taskSvc) at (8.4,0) {
+    \textbf{任务创建服务}
+    \nodepart{second}
+    - 任务类型, 入队策略
+    \nodepart{third}
+    + 创建检测任务()\\
+    + 创建批量任务()
+  };
+
+  \node[class] (scheduler) at (12.6,1.5) {
+    \textbf{检测调度器}
+    \nodepart{second}
+    - 队列, 并发阈值
+    \nodepart{third}
+    + 投递作业()\\
+    + 控制并发()
+  };
+
+  \node[class] (status) at (12.6,-1.5) {
+    \textbf{状态与审核服务}
+    \nodepart{second}
+    - 进度, 审核请求
+    \nodepart{third}
+    + 推送状态()\\
+    + 创建审核请求()
+  };
+
+  \draw[rel] (controller) -- (validator);
+  \draw[rel] (controller) -- (storage);
+  \draw[rel] (validator) -- (taskSvc);
+  \draw[rel] (storage) -- (taskSvc);
+  \draw[rel] (taskSvc) -- (scheduler);
+  \draw[dep] (scheduler) -- (status);
+  \draw[dep] (taskSvc) -- (status);
 \end{tikzpicture}

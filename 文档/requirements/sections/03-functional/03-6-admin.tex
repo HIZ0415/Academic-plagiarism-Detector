@@ -1,12 +1,14 @@
-﻿\subsection{管理维护模块}
+\subsection{管理维护模块}
 
-\paragraph*{业务流程}
+\paragraph*{核心领域类图}
 
 \begin{center}
 \resizebox{0.98\linewidth}{!}{\input{figures/tikz-admin-flow.tex}}
 \end{center}
 
-\paragraph*{用例图}
+\clearpage
+
+\paragraph*{服务协作类图}
 
 
 \begin{center}
@@ -14,6 +16,7 @@
 \end{center}
 
 
+{\color{gray}
 \subsubsection{功能点——实体添加（FR-GLWH-0001）}
 
 \paragraph*{简述}
@@ -217,11 +220,13 @@
 
 举报形成明确结论并保留处理痕迹；相关用户收到反馈；被举报方状态按处置结果同步更新。异常时系统应提示并支持重试。
 
-\subsubsection{功能点——学术资源管理（FR-GLWH-0010）}
+}
+
+\subsubsection{\iternew{功能点——学术资源管理（FR-GLWH-0010）}}
 
 \paragraph*{简述}
 
-管理员可统一管理论文、图像与 Review 资源，支持检索、分类、详情查看、状态维护与删除。
+\iternew{管理员可统一管理论文、图像与 Review 资源，支持检索、分类、详情查看、状态维护与删除。}
 
 \paragraph*{前提条件}
 
@@ -240,11 +245,11 @@
 
 资源分类与状态可被统一维护并与前台展示保持一致；删除资源不再参与后续流程。失败时系统应提示原因并允许重试。
 
-\subsubsection{功能点——论文检测日志管理（FR-GLWH-0011）}
+\subsubsection{\iternew{功能点——论文检测日志管理（FR-GLWH-0011）}}
 
 \paragraph*{简述}
 
-管理端应支持论文检测日志的记录、查询与追踪，用于任务复核和异常排查。
+\iternew{管理端应支持论文检测日志的记录、查询与追踪，用于任务复核和异常排查。}
 
 \paragraph*{前提条件}
 
@@ -262,11 +267,11 @@
 
 管理员可追踪任务执行状态并定位异常；日志可用于排障与复核。无匹配日志应提示空状态，加载失败应提示并支持重试。
 
-\subsubsection{功能点——Review检测日志管理（FR-GLWH-0012）}
+\subsubsection{\iternew{功能点——Review检测日志管理（FR-GLWH-0012）}}
 
 \paragraph*{简述}
 
-管理端应支持 Review 检测日志的记录、查询与追踪，用于审计和异常排查。
+\iternew{管理端应支持 Review 检测日志的记录、查询与追踪，用于审计和异常排查。}
 
 \paragraph*{前提条件}
 
@@ -284,11 +289,11 @@
 
 管理员可追踪 Review 任务执行情况并定位异常；日志可用于审计与复核。无匹配日志应提示空状态，加载失败应提示并支持重试。
 
-\subsubsection{功能点——模型管理与配置（FR-GLWH-0013）}
+\subsubsection{\iternew{功能点——模型管理与配置（FR-GLWH-0013）}}
 
 \paragraph*{简述}
 
-后台应支持检测模型的统一管理与配置，包括模型信息、参数、启停状态和任务调用策略。
+\iternew{后台应支持检测模型的统一管理与配置，包括模型信息、参数、启停状态和任务调用策略。}
 
 \paragraph*{前提条件}
 

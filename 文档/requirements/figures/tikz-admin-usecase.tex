@@ -1,34 +1,89 @@
-% 管理维护模块整体用例图（对应 03-6-admin.tex 全部功能点 FR-GLWH-0001～0013）
+% 管理维护模块服务协作类图
 \begin{tikzpicture}[
-  uc/.style={draw,ellipse,minimum width=2.3cm,minimum height=7mm,align=center,font=\tiny,inner sep=1pt},
-  arr/.style={semithick}
+  class/.style={
+    draw,
+    rectangle split,
+    rectangle split parts=3,
+    rectangle split part align={center,left,left},
+    align=left,
+    text width=2.55cm,
+    font=\scriptsize,
+    inner sep=2pt
+  },
+  rel/.style={-{Stealth[length=1.6mm]},semithick},
+  dep/.style={-{Stealth[length=1.6mm]},dashed,semithick}
 ]
-  \node[draw,rounded corners,minimum width=11.4cm,minimum height=7.6cm] (frame) at (6.2,3.95) {};
-  \node[anchor=north,yshift=-2pt] at (frame.north) {\small\textbf{管理维护模块（全部功能点）}};
-  \node (admin) at (-0.4,4.6) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 管理员}};
-  \node (super) at (-0.4,2.75) {\shortstack{\small$\odot$\\[-1pt]\scriptsize 超级管理员}};
+  \node[class] (controller) at (0,0) {
+    \textbf{管理端控制器}
+    \nodepart{second}
+    - 管理员上下文
+    \nodepart{third}
+    + 分发操作()\\
+    + 校验权限()
+  };
 
-  \node[uc] (u1) at (2.7,6.35) {实体添加\\FR-GLWH-0001};
-  \node[uc] (u2) at (4.95,6.35) {实体修改\\FR-GLWH-0002};
-  \node[uc] (u3) at (7.2,6.35) {实体删除\\FR-GLWH-0003};
-  \node[uc] (u4) at (9.45,6.35) {实体检索\\FR-GLWH-0004};
+  \node[class] (entitySvc) at (4.2,2.4) {
+    \textbf{实体管理服务}
+    \nodepart{second}
+    - 实体类型, 标签
+    \nodepart{third}
+    + 添加实体()\\
+    + 维护实体()
+  };
 
-  \node[uc] (u5) at (2.7,4.95) {实体分类\\FR-GLWH-0005};
-  \node[uc] (u6) at (4.95,4.95) {数据信息统计\\FR-GLWH-0006};
-  \node[uc] (u7) at (7.2,4.95) {操作记录统计\\FR-GLWH-0007};
-  \node[uc] (u8) at (9.45,4.95) {超级管理员\\FR-GLWH-0008};
+  \node[class] (statSvc) at (4.2,0.8) {
+    \textbf{统计服务}
+    \nodepart{second}
+    - 维度, 时间范围
+    \nodepart{third}
+    + 生成统计()\\
+    + 导出报表()
+  };
 
-  \node[uc] (u9) at (2.7,3.55) {用户举报审核\\FR-GLWH-0009};
-  \node[uc] (u10) at (4.95,3.55) {学术资源管理\\FR-GLWH-0010};
-  \node[uc] (u11) at (7.2,3.55) {论文检测日志\\FR-GLWH-0011};
-  \node[uc] (u12) at (9.45,3.55) {Review检测日志\\FR-GLWH-0012};
+  \node[class] (auditSvc) at (4.2,-0.8) {
+    \textbf{日志审计服务}
+    \nodepart{second}
+    - 日志类型, 条件
+    \nodepart{third}
+    + 记录日志()\\
+    + 查询审计()
+  };
 
-  \node[uc] (u13) at (6.1,2.15) {模型管理与配置\\FR-GLWH-0013};
+  \node[class] (modelSvc) at (4.2,-2.4) {
+    \textbf{模型配置服务}
+    \nodepart{second}
+    - 参数, 启用策略
+    \nodepart{third}
+    + 更新配置()\\
+    + 验证模型()
+  };
 
-  \foreach \x in {u1,u2,u3,u4,u5,u6,u7,u9,u10,u11,u12,u13} {
-    \draw[arr] (admin.east) -- ++(0.22,0) |- (\x.west);
-  }
-  \foreach \x in {u8,u13} {
-    \draw[arr] (super.east) -- ++(0.22,0) |- (\x.west);
-  }
+  \node[class] (moderation) at (8.4,1.35) {
+    \textbf{举报审核服务}
+    \nodepart{second}
+    - 举报信息, 策略
+    \nodepart{third}
+    + 审核举报()\\
+    + 发送结果()
+  };
+
+  \node[class] (repo) at (8.4,-1.35) {
+    \textbf{管理数据仓储}
+    \nodepart{second}
+    - 用户/资源/日志表
+    \nodepart{third}
+    + 保存管理数据()\\
+    + 查询管理数据()
+  };
+
+  \draw[rel] (controller) -- (entitySvc);
+  \draw[rel] (controller) -- (statSvc);
+  \draw[rel] (controller) -- (auditSvc);
+  \draw[rel] (controller) -- (modelSvc);
+  \draw[rel] (auditSvc.east) -- ++(0.6,0) |- (moderation.west);
+  \draw[dep] (entitySvc) -- (repo);
+  \draw[dep] (statSvc) -- (repo);
+  \draw[dep] (auditSvc) -- (repo);
+  \draw[dep] (modelSvc) -- (repo);
+  \draw[dep] (moderation) -- (repo);
 \end{tikzpicture}
