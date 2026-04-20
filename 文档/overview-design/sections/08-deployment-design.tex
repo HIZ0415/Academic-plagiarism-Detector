@@ -1,23 +1,163 @@
 \section{运行与部署设计}
 
-\subsection{部署结构}
-系统部署上至少包含以下节点：
+\subsection{运行部署目标}
+运行与部署设计的目标，是保证学术 AI 鉴伪系统在本地开发、课程验收和后续生产化部署中都具备明确的启动顺序、服务边界和配置约束。系统包含用户端前端、管理端前端、Django 后端、异步任务系统、AI 推理服务、数据库、消息中间件和文件存储等多个运行单元，因此部署设计需要解决以下问题：
 \begin{itemize}[leftmargin=2em]
-    \item Web前端部署节点；
-    \item Django后端服务节点；
-    \item Redis与异步任务处理节点；
-    \item AI推理服务节点；
-    \item MySQL数据库节点；
-    \item 文件存储目录或对象存储节点。
+    \item 明确各运行节点的职责和网络访问关系，避免前端、后端、AI 服务和数据库之间出现不受控直连；
+    \item 明确本地调试环境与生产部署环境的差异，保证开发联调和正式运行使用同一套核心接口协议；
+    \item 明确静态资源、媒体文件、检测报告和模型文件的存储位置，保证任务结果可追溯、可下载、可迁移；
+    \item 明确长时检测任务的异步运行机制，避免 AI 推理、报告生成等耗时操作阻塞常规 HTTP 请求；
+    \item 为后续引入论文检测、Review 检测和更多模型服务预留部署扩展空间。
 \end{itemize}
 
+\subsection{总体部署结构}
+系统逻辑部署上至少包含以下节点：
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Web 前端部署节点：} 承载用户端和管理端构建后的静态资源，开发环境中由 Vite 开发服务器提供，生产环境中由 Nginx 提供；
+    \item \textbf{Django 后端服务节点：} 对外暴露 REST API、认证鉴权、资源管理、任务创建、结果查询、人工审核、通知和管理端治理能力；
+    \item \textbf{WebSocket 服务节点：} 基于 Django Channels 承担通知推送和任务状态实时同步，生产环境中应通过 ASGI 服务承载；
+    \item \textbf{Redis 与异步任务节点：} Redis 作为 Channels 消息层和 Celery Broker/Result Backend，Celery Worker 负责检测任务、后处理和报告生成；
+    \item \textbf{AI 推理服务节点：} 承载图像鉴伪模型和后续论文、Review 检测模型，对后端提供 HTTP 推理接口；
+    \item \textbf{MySQL 数据库节点：} 保存用户、组织、资源、任务、检测结果、审核记录、日志和通知等结构化数据；
+    \item \textbf{文件存储节点：} 保存上传原始文件、提取图像、检测可视化结果、掩码结果、PDF 报告和模型侧中间产物。
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-deployment-architecture.tex}}
+    \caption{系统部署结构图}
+\end{figure}
+
+\subsection{运行环境设计}
+\subsubsection{本地开发环境}
+本地开发环境用于快速验证前后端联调、接口可用性和基础任务链路。当前项目推荐的本地运行方式如下：
+\begin{itemize}[leftmargin=2em]
+    \item 用户端前端监听 \path{http://127.0.0.1:3000}；
+    \item 管理端前端监听 \path{http://127.0.0.1:3001}；
+    \item Django 后端监听 \path{http://127.0.0.1:8000}；
+    \item AI HTTP 桩服务监听 \path{http://127.0.0.1:8010}；
+    \item 开发环境可使用 \texttt{fake\_image\_detector.local\_settings}，将数据库切换为本地 SQLite，并将 Celery 任务设置为 eager 模式，降低本机联调依赖。
+\end{itemize}
+
+本地环境的设计重点不是性能，而是降低启动成本和暴露问题。对前端页面、接口字段、鉴权逻辑、报告下载和通知轮询等能力，可以在本地环境中优先验证；对 Redis 队列、MySQL 并发、GPU 推理和生产级 WebSocket，则需要在集成或生产环境中继续验证。
+
+\subsubsection{集成测试环境}
+集成测试环境应尽量接近生产部署方式，建议至少启用 Redis、MySQL、Celery Worker 和 AI HTTP 服务。后端通过环境变量 \texttt{AI\_SERVICE\_URL} 指向 AI 服务地址，通过 \texttt{AI\_SERVICE\_TIMEOUT} 控制长时推理等待时间，通过 \texttt{AI\_SERVICE\_API\_TOKEN} 在需要时启用服务间简单鉴权。
+
+该环境主要用于验证异步任务链路、批量检测、报告生成、WebSocket 通知、文件权限和跨服务异常处理。与本地开发环境相比，集成测试环境必须避免使用 eager 任务模式，否则无法发现队列积压、Worker 重启、任务重试和消息层配置问题。
+
+\subsubsection{生产部署环境}
+生产环境建议采用“前端静态资源 + Nginx 网关 + 后端服务 + ASGI WebSocket + Celery Worker + Redis + MySQL + AI 服务”的部署方式。用户端和管理端前端分别构建为静态文件，由 Nginx 根据访问端口或路径进行分发；\path{/api/} 请求转发到 Django 后端；\path{/ws/notifications/} 请求转发到 ASGI 服务；\path{/media/} 和 \path{/static/} 由 Nginx 按受控目录提供访问。
+
+对于 Django 后端，普通 HTTP API 可由 WSGI 或 ASGI 服务承载；对于 Channels WebSocket，必须由 ASGI 服务承载。若生产中同时使用 uWSGI 承载 REST API，应额外明确 WebSocket 对应的 Daphne、Uvicorn 或其他 ASGI 进程，避免将 WebSocket 连接错误转发到纯 WSGI 服务。
+
+\subsection{服务端口与访问路径}
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{|L{3.2cm}|L{3.6cm}|L{6.2cm}|}
+\hline
+服务 & 本地端口/路径 & 说明 \\ \hline
+\endfirsthead
+\hline
+服务 & 本地端口/路径 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+用户端前端 & \path{127.0.0.1:3000} & 面向普通用户、发布者和审核人员的操作入口。 \\ \hline
+管理端前端 & \path{127.0.0.1:3001} & 面向管理员的组织、用户、日志、资源和统计管理入口。 \\ \hline
+Django API & \path{127.0.0.1:8000/api/} & 后端业务接口统一前缀。 \\ \hline
+Django Admin & \path{127.0.0.1:8000/admin/} & 后端管理后台入口，仅用于管理和调试。 \\ \hline
+WebSocket & \path{/ws/notifications/} & 实时通知和任务状态推送入口。 \\ \hline
+AI HTTP 服务 & \path{127.0.0.1:8010} & AI 推理服务或本地桩服务入口。 \\ \hline
+Redis & \path{127.0.0.1:6379} & Celery 与 Channels 共享的消息中间件。 \\ \hline
+MySQL & \path{3306} & 生产或集成环境结构化数据存储。 \\ \hline
+\end{longtable}
+\endgroup
+
 \subsection{运行机制}
-用户请求首先到达前端和后端，短请求由后端同步处理，长时检测任务通过异步队列提交到任务系统，再由AI推理服务执行，最终检测结果、日志和报告回写数据库与文件存储，并通过轮询或消息机制反馈到前端。
+用户请求首先到达前端页面，前端通过 HTTP API 访问 Django 后端。登录、资料查询、文件列表、通知列表、审核审批等短请求由后端同步处理；文件上传、图像解析、检测任务、报告生成等长时操作则通过异步任务机制执行。
+
+检测任务的运行过程如下：
+\begin{enumerate}[leftmargin=2em]
+    \item 前端提交检测请求，Django 后端完成身份校验、权限校验、资源归属校验和配额校验；
+    \item 后端创建检测任务、检测结果占位记录和必要的临时批次文件，并将任务投递到 Celery 队列；
+    \item Celery Worker 从 Redis 中消费任务，读取上传文件或临时批次文件，调用 AI HTTP 推理服务；
+    \item AI 服务完成推理后返回结构化结果、可视化数据或结果文件路径；
+    \item Worker 将检测结论、子方法结果、可视化图片和报告文件写回数据库与文件存储；
+    \item 后端创建通知记录，并通过 Channels 向用户 WebSocket 连接推送任务完成或异常消息；
+    \item 前端收到通知后刷新任务状态，也可通过 REST 状态查询接口补偿实时消息丢失的情况。
+\end{enumerate}
+
+该机制将用户交互请求和 AI 推理请求隔离开来，使前端无需长时间等待单个 HTTP 请求返回，也使后端能够在 AI 服务不可用或任务失败时通过任务状态、重试和通知机制进行恢复。
+
+\subsection{配置项设计}
+系统部署时需要重点管理以下配置项：
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{后端基础配置：} \texttt{SECRET\_KEY}、\texttt{DEBUG}、\texttt{ALLOWED\_HOSTS}、\texttt{CORS\_ALLOW\_ALL\_ORIGINS} 等配置在生产环境中必须收敛，不能沿用开发默认值；
+    \item \textbf{数据库配置：} \texttt{DATABASES} 应根据环境切换到对应 MySQL 或本地 SQLite，生产环境应通过环境变量或独立配置文件管理账号密码；
+    \item \textbf{Redis 配置：} \texttt{CHANNEL\_LAYERS}、\texttt{CELERY\_BROKER\_URL} 和 \texttt{CELERY\_RESULT\_BACKEND} 需要指向同一环境内稳定可达的 Redis；
+    \item \textbf{AI 服务配置：} \texttt{AI\_SERVICE\_URL} 指向 HTTP 推理服务，\texttt{AI\_SERVICE\_TIMEOUT} 控制长时检测超时，\texttt{AI\_SERVICE\_API\_TOKEN} 用于服务间鉴权；
+    \item \textbf{媒体与静态文件配置：} \texttt{MEDIA\_ROOT}、\texttt{MEDIA\_URL}、\texttt{STATIC\_ROOT}、\texttt{STATIC\_URL} 需要与 Nginx 的 \path{/media/}、\path{/static/} 代理配置保持一致；
+    \item \textbf{前端配置：} 两个前端项目的 \texttt{VITE\_API\_URL} 需要指向当前环境的后端 API 域名或地址。
+\end{itemize}
+
+从概要设计角度看，生产部署应避免将数据库口令、邮箱授权码、服务 token 等敏感配置硬编码在仓库中。后续详细设计阶段应将敏感项统一迁移到环境变量、私有配置文件或部署平台密钥管理中。
+
+\subsection{启动顺序设计}
+为降低启动失败和任务丢失风险，各服务建议按照以下顺序启动：
+\begin{enumerate}[leftmargin=2em]
+    \item 启动 MySQL，并确认数据库迁移已经完成；
+    \item 启动 Redis，确保 Channels 和 Celery 能连接消息中间件；
+    \item 启动 AI 推理服务，并通过 \path{/health} 健康检查确认可用；
+    \item 启动 Django 后端 API 与 ASGI WebSocket 服务；
+    \item 启动 Celery Worker，并按任务类型区分 CPU 队列和 AI 队列；
+    \item 启动或发布用户端、管理端前端静态资源；
+    \item 通过健康检查和关键接口验证完成部署验收。
+\end{enumerate}
+
+关闭服务时建议反向执行：先停止前端入口或网关流量，再停止后端和 Worker，最后停止 Redis、AI 服务和数据库。若存在正在执行的检测任务，应优先采用平滑停止方式等待任务完成，避免中间结果只写入文件而未写入数据库。
+
+\subsection{文件与数据存储设计}
+系统运行中会生成多类文件，包括用户上传原始文件、PDF 提取图像、检测可视化图片、子方法掩码、人工审核标注、任务报告和日志导出文件。部署时应遵循以下原则：
+\begin{itemize}[leftmargin=2em]
+    \item 上传文件和检测结果文件必须通过数据库元数据关联，前端不应依赖临时物理路径；
+    \item 生产环境应将 \texttt{MEDIA\_ROOT} 放在稳定持久化目录中，避免随应用版本发布被覆盖；
+    \item 大文件上传需要在 Nginx 中设置合理的 \texttt{client\_max\_body\_size}，并在后端进行文件类型和大小校验；
+    \item 报告文件应保留与任务、检测结果或人工审核记录的关联，便于二次下载和审计；
+    \item 后续若迁移到对象存储，应保持后端文件访问接口不变，只替换存储适配层。
+\end{itemize}
+
+\subsection{监控与运维设计}
+系统运行状态至少需要覆盖以下检查项：
+\begin{itemize}[leftmargin=2em]
+    \item Web 前端页面可访问，静态资源无 404；
+    \item 后端 \path{/admin/} 或健康检查接口可访问，核心 API 返回正常；
+    \item Redis 可连接，Celery Worker 正常消费队列；
+    \item AI 服务 \path{/health} 返回正常，推理接口在超时时间内响应；
+    \item MySQL 连接数、慢查询、磁盘空间和备份状态可观测；
+    \item 媒体目录磁盘空间、报告生成失败率、检测任务失败率和队列积压量可观测。
+\end{itemize}
+
+日志方面，Nginx、Django、Celery Worker、AI 服务和数据库应分别保留运行日志。应用层日志应至少记录任务创建、任务失败、AI 调用异常、报告生成异常、权限拒绝和管理员关键操作。后续可进一步引入统一日志采集和告警机制。
+
+\subsection{备份与恢复设计}
+系统需要同时备份数据库和文件存储。数据库备份用于恢复用户、组织、任务、结果、审核、日志和通知等结构化信息；媒体目录备份用于恢复上传文件、检测可视化结果和报告。两者必须保持时间点一致，否则可能出现数据库中存在报告记录但文件已丢失，或文件存在但缺少元数据索引的问题。
+
+恢复策略上，应优先保证账号、组织、资源和任务结果可恢复；对于临时批次文件、缓存和未完成队列任务，可以根据任务状态重新生成或重新提交。生产环境应定期演练数据库恢复、媒体目录恢复和服务重启流程，避免备份文件存在但不可用。
 
 \subsection{部署约束}
 \begin{itemize}[leftmargin=2em]
-    \item AI推理服务对运行环境、模型文件和GPU资源有依赖；
-    \item 异步任务系统依赖消息中间件与稳定的任务状态存储；
-    \item 文件上传、结果图片和PDF报告需要统一的存储路径管理；
-    \item 生产部署时需明确静态资源、媒体文件、WebSocket与API代理配置。
+    \item AI 推理服务对运行环境、模型文件、CUDA/GPU 资源和 Python 依赖有较强依赖，本地可使用 HTTP 桩服务先打通联调链路；
+    \item 异步任务系统依赖 Redis 与稳定的任务状态存储，生产环境不能依赖本地 eager 模式；
+    \item WebSocket 必须由 ASGI 运行时承载，不能简单复用纯 WSGI 部署方式；
+    \item 文件上传、结果图片和 PDF 报告需要统一的存储路径管理，并与数据库元数据保持一致；
+    \item 生产部署时需明确静态资源、媒体文件、WebSocket 与 API 代理配置，避免前端直接访问后端内部地址或 AI 服务地址；
+    \item 当前项目仍存在部分开发态配置，例如默认开启 \texttt{DEBUG}、宽松跨域和硬编码服务配置，生产化前必须进行配置收敛。
 \end{itemize}
+
+\subsection{本章小结}
+本章给出了系统运行与部署的总体设计，说明了本地开发、集成测试和生产部署三类环境下的服务划分、运行机制、配置项、启动顺序、存储策略和运维关注点。该部署设计的核心思路是将前端展示、后端业务、异步任务、AI 推理、数据存储和文件存储解耦，使当前图像检测闭环能够稳定运行，并为后续论文检测、Review 检测和模型扩展提供可部署的基础结构。
