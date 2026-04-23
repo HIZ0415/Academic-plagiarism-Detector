@@ -1,5 +1,5 @@
 import http from './request'
-import { ref } from 'vue'
+import type { ManagedFileListResponse } from '@/types/core'
 
 
 export default {
@@ -12,7 +12,7 @@ export default {
     startTime?: string;
     endTime?: string;
   }) {
-    return http.get('/get_files/', { params });
+    return http.get<ManagedFileListResponse>('/get_files/', { params });
   },
 
   // 删除文件
