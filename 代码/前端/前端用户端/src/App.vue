@@ -20,6 +20,8 @@
           @click="goToUpload"></v-list-item>
         <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-history" title="检测历史" value="history"
           @click="goToHistory"></v-list-item>
+        <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-file-search-outline" title="论文AIGC"
+          value="paper-aigc" @click="goToPaperAigc"></v-list-item>
         <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-gavel" title="人工审核" value="annual"
           @click="gotoAnnual"></v-list-item>
         <v-list-item v-if="userStore.role === 'reviewer'" prepend-icon="mdi-book-open-page-variant" title="审阅"
@@ -60,6 +62,10 @@
       <v-btn v-if="userStore.role === 'publisher'" to="/history" value="history">
         <v-icon>mdi-history</v-icon>
         <span>检测历史</span>
+      </v-btn>
+      <v-btn v-if="userStore.role === 'publisher'" to="/detect/paper" value="paper-aigc">
+        <v-icon>mdi-file-search-outline</v-icon>
+        <span>论文AIGC</span>
       </v-btn>
       <v-btn v-if="userStore.role === 'publisher'" to="/annual" value="annual">
         <v-icon>mdi-gavel</v-icon>
@@ -283,6 +289,10 @@ const goToUpload = () => {
 
 const goToHistory = () => {
   router.push('/history')
+}
+
+const goToPaperAigc = () => {
+  router.push('/detect/paper')
 }
 
 const gotoAnnual = () => {

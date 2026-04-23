@@ -72,7 +72,7 @@
         <template v-slot:item.actions="{ item }">
           <div class="d-flex justify-center gap-2">
             <v-btn size="small" color="primary" variant="text" @click="handleNext(item)"
-              :disabled="item.status !== 'completed'">
+              :disabled="!canEnterDetail(item)">
               下一步
             </v-btn>
             <v-btn size="small" color="error" variant="text" @click="handleDelete(item)"
@@ -115,6 +115,7 @@ import Review_request_id from './task/[review_request_id].vue'
 
 const router = useRouter()
 const snackbar = useSnackbarStore()
+const useMockAigc = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
 
 // 分页相关
 const pageSize = ref(10)
@@ -365,6 +366,11 @@ const applyFilters = () => {
 // 操作按钮处理函数
 const handleNext = (item: Task) => {
   router.push(`/step/${item.task_id}`)
+}
+
+const canEnterDetail = (item: Task) => {
+  if (useMockAigc) return true
+  return item.status === 'completed'
 }
 
 //处理删除
