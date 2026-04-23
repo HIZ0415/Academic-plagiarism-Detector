@@ -15,13 +15,12 @@ import cv2
 import numpy as np
 from PIL import Image
 from PIL.ExifTags import TAGS
-from skimage.feature import match_template
 
 from .base import DetectionMethod
 from .contracts import DetectionContext, DetectionEvidence, ImageInput
 
 
-DEFAULT_LLM_TEXT = "无"
+DEFAULT_LLM_TEXT = ""
 
 
 def _normalize_probability(value: object) -> float:
@@ -81,6 +80,29 @@ def _build_evidence(
         summary=summary,
         artifacts=artifacts or {},
         metadata=metadata or {},
+    )
+
+
+def _build_failed_evidence(
+    image_name: str,
+    method: str,
+    category: str,
+    evidence_type: str,
+    message: str,
+    *,
+    artifacts: dict | None = None,
+    metadata: dict | None = None,
+) -> DetectionEvidence:
+    return _build_evidence(
+        image_name,
+        method,
+        category,
+        evidence_type,
+        suspicious=False,
+        confidence=0.0,
+        summary=message,
+        artifacts=artifacts,
+        metadata=metadata,
     )
 
 
@@ -187,6 +209,21 @@ class CopyMoveMethod(DetectionMethod):
         images: Sequence[ImageInput],
         context: DetectionContext,
     ) -> list[DetectionEvidence]:
+        try:
+            from skimage.feature import match_template
+        except ModuleNotFoundError:
+            return [
+                _build_failed_evidence(
+                    image.image_name,
+                    self.method_name,
+                    self.category,
+                    self.evidence_type,
+                    "skimage is not installed; copy-move detector returned a placeholder result.",
+                    artifacts={"mask": np.zeros((2, 2), dtype=np.float32)},
+                )
+                for image in images
+            ]
+
         block_size = int(context.parameters.get("cmd_block_size", 64))
         step = max(1, block_size // 2)
 
@@ -255,19 +292,33 @@ class URNMethod(DetectionMethod):
     ) -> list[DetectionEvidence]:
         if not images:
             return []
-        model, hyper_params = self._ensure_model()
-        urn_dir = Path(__file__).resolve().parent.parent / "method" / "urn"
-        if str(urn_dir) not in sys.path:
-            sys.path.insert(0, str(urn_dir))
-        from infer import urn_infer
+        try:
+            model, hyper_params = self._ensure_model()
+            urn_dir = Path(__file__).resolve().parent.parent / "method" / "urn"
+            if str(urn_dir) not in sys.path:
+                sys.path.insert(0, str(urn_dir))
+            from infer import urn_infer
 
-        raw_results = urn_infer(
-            [str(image.image_path) for image in images],
-            model,
-            hyper_params,
-            float(context.parameters.get("urn_k", 0.3)),
-        )
-        parsed_results = self._normalize_results(raw_results, len(images))
+            raw_results = urn_infer(
+                [str(image.image_path) for image in images],
+                model,
+                hyper_params,
+                float(context.parameters.get("urn_k", 0.3)),
+            )
+            parsed_results = self._normalize_results(raw_results, len(images))
+        except Exception as exc:
+            return [
+                _build_failed_evidence(
+                    image.image_name,
+                    self.method_name,
+                    self.category,
+                    self.evidence_type,
+                    f"{self.method_name} detector unavailable: {exc}",
+                    artifacts={"mask": np.zeros((2, 2), dtype=np.float32)},
+                    metadata={"weight_path": self.weight_path},
+                )
+                for image in images
+            ]
 
         evidences: list[DetectionEvidence] = []
         for image, (mask_raw, probability_raw) in zip(images, parsed_results):
@@ -448,3 +499,17 @@ class LLMMethod(DetectionMethod):
             summary="LLM detector completed.",
             artifacts={"text": text_output or DEFAULT_LLM_TEXT, "mask": mask},
         )
+
+
+def build_image_methods():
+    return [
+        LLMMethod(),
+        ELAMethod(),
+        ExifMethod(),
+        CopyMoveMethod(),
+        URNMethod("splicing", "weight/Coarse_v2.pkl"),
+        URNMethod("blurring", "weight/blurring.pkl"),
+        URNMethod("bruteforce", "weight/brute_force.pkl"),
+        URNMethod("contrast", "weight/contrast.pkl"),
+        URNMethod("inpainting", "weight/inpainting.pkl"),
+    ]

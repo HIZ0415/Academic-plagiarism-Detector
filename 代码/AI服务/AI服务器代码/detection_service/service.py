@@ -10,42 +10,48 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .contracts import BACKEND_REQUEST_SCHEMA_VERSION, DetectionContext, DetectionRequest, ImageInput
-from .image_detector import ImageDetector
-
-
-class ValidationError(ValueError):
-    pass
-
-
-class TaskNotImplementedError(NotImplementedError):
-    pass
+from .registry import build_task_handlers
+from .service_errors import TaskNotImplementedError, ValidationError
 
 
 class DetectionService:
     def __init__(self) -> None:
-        self._image_detector = ImageDetector()
+        self._task_handlers = build_task_handlers()
         self._implemented_tasks = {"image"}
         self._reserved_tasks = {"paper", "review"}
 
     def health_payload(self) -> Dict[str, Any]:
+        image_handler = self._task_handlers["image"]
         return {
             "status": "ok",
             "service_version": "ai-detection-service-2026-04",
             "supported_tasks": sorted(self._implemented_tasks),
             "reserved_tasks": sorted(self._reserved_tasks),
             "result_format": "standard-evidence-v1",
-            "image_methods": self._image_detector.method_names,
+            "image_methods": image_handler.method_names,
         }
 
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         request = self._parse_request(request_data)
+        if request.task_type not in self._task_handlers:
+            raise ValidationError(f"unsupported task_type: {request.task_type}")
+
+        context = DetectionContext(
+            task_type=request.task_type,
+            parameters=request.parameters,
+            model_version=self._resolve_model_version(request),
+            batch_id=request.batch_id,
+        )
+
+        extracted_inputs = None
         if request.task_type == "image":
-            return self._handle_image_request(request).to_dict()
-        if request.task_type in self._reserved_tasks:
-            raise TaskNotImplementedError(
-                f"task_type '{request.task_type}' is reserved but not implemented yet"
-            )
-        raise ValidationError(f"unsupported task_type: {request.task_type}")
+            with tempfile.TemporaryDirectory(prefix="ai_image_batch_") as temp_dir:
+                extracted_inputs = self._extract_images(request, Path(temp_dir))
+                return self._task_handlers[request.task_type].detect(
+                    request, context, extracted_inputs
+                ).to_dict()
+
+        return self._task_handlers[request.task_type].detect(request, context, extracted_inputs).to_dict()
 
     def build_request_from_files(
         self,
@@ -91,7 +97,14 @@ class DetectionService:
             raise ValidationError("image_names must be a list")
 
         images_zip_base64 = request_data.get("images_zip_base64")
-        if not isinstance(images_zip_base64, str) or not images_zip_base64:
+        if images_zip_base64 is not None and not isinstance(images_zip_base64, str):
+            raise ValidationError("images_zip_base64 must be a string")
+
+        payload_base64 = request_data.get("payload_base64")
+        if payload_base64 is not None and not isinstance(payload_base64, str):
+            raise ValidationError("payload_base64 must be a string")
+
+        if task_type == "image" and not images_zip_base64:
             raise ValidationError("images_zip_base64 is required")
 
         return DetectionRequest(
@@ -101,21 +114,12 @@ class DetectionService:
             parameters=parameters,
             image_names=image_names,
             images_zip_base64=images_zip_base64,
+            payload_base64=payload_base64,
         )
 
-    def _handle_image_request(self, request: DetectionRequest):
-        model_version = str(
-            request.parameters.get("model_version") or "image-detector-service-2026-04"
-        )
-        context = DetectionContext(
-            task_type="image",
-            parameters=request.parameters,
-            model_version=model_version,
-            batch_id=request.batch_id,
-        )
-        with tempfile.TemporaryDirectory(prefix="ai_image_batch_") as temp_dir:
-            images = self._extract_images(request, Path(temp_dir))
-            return self._image_detector.detect(images, context)
+    @staticmethod
+    def _resolve_model_version(request: DetectionRequest) -> str:
+        return str(request.parameters.get("model_version") or f"{request.task_type}-detector-service-2026-04")
 
     def _extract_images(self, request: DetectionRequest, temp_dir: Path) -> list[ImageInput]:
         try:

@@ -78,8 +78,9 @@ class DetectionRequest:
     task_type: str
     batch_id: Optional[str]
     parameters: Dict[str, Any]
-    image_names: list[str]
-    images_zip_base64: str
+    image_names: list[str] = field(default_factory=list)
+    images_zip_base64: Optional[str] = None
+    payload_base64: Optional[str] = None
 
 
 @dataclass(slots=True)
