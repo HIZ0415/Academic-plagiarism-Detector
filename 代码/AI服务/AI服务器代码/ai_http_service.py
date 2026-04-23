@@ -1,38 +1,87 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import os
-import zipfile
+import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from io import BytesIO
-from typing import Any, Dict, List
+from typing import Any, Dict
+from urllib.parse import parse_qs, urlparse
+
+from detection_service import DetectionService, TaskNotImplementedError, ValidationError
 
 
-SERVICE_VERSION = "ai-http-stub-2026-04"
 IMAGE_BATCH_PATH = "/api/v1/image-detection/batches"
 HEALTH_PATH = "/health"
+ADMIN_REGISTRY_PATH = "/api/v1/admin/model-registry"
+SERVICE = DetectionService()
 
 
-class AIRequestError(ValueError):
-    pass
+def resolve_request_timeout_seconds() -> float | None:
+    raw_value = os.getenv("AI_SERVICE_TIMEOUT_SECONDS", "120").strip()
+    if not raw_value:
+        return None
+    timeout_seconds = float(raw_value)
+    return timeout_seconds if timeout_seconds > 0 else None
+
+
+def map_exception_to_status(exc: Exception) -> HTTPStatus:
+    if isinstance(exc, ValidationError):
+        return HTTPStatus.BAD_REQUEST
+    if isinstance(exc, TaskNotImplementedError):
+        return HTTPStatus.NOT_IMPLEMENTED
+    if isinstance(exc, PermissionError):
+        return HTTPStatus.UNAUTHORIZED
+    if isinstance(exc, TimeoutError):
+        return HTTPStatus.GATEWAY_TIMEOUT
+    return HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+def dispatch_detection_request(
+    request_data: Dict[str, Any],
+    *,
+    timeout_seconds: float | None = None,
+) -> Dict[str, Any]:
+    timeout_seconds = resolve_request_timeout_seconds() if timeout_seconds is None else timeout_seconds
+    if timeout_seconds is None:
+        return SERVICE.handle_request(request_data)
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(SERVICE.handle_request, request_data)
+    try:
+        return future.result(timeout=timeout_seconds)
+    except FuturesTimeoutError as exc:
+        future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise TimeoutError(f"AI detection timed out after {timeout_seconds:.1f}s") from exc
+    except Exception:
+        executor.shutdown(wait=True, cancel_futures=False)
+        raise
+    else:
+        executor.shutdown(wait=True, cancel_futures=False)
 
 
 class AIHTTPHandler(BaseHTTPRequestHandler):
-    server_version = "AcademicAIGateway/1.0"
+    server_version = "AcademicAIGateway/2.1"
 
     def do_GET(self) -> None:
-        if self.path == HEALTH_PATH:
-            self._send_json(
-                HTTPStatus.OK,
-                {
-                    "status": "ok",
-                    "service_version": SERVICE_VERSION,
-                    "supported_tasks": ["image"],
-                },
-            )
+        parsed_url = urlparse(self.path)
+        if parsed_url.path == HEALTH_PATH:
+            self._send_json(HTTPStatus.OK, SERVICE.health_payload())
+            return
+        if parsed_url.path == ADMIN_REGISTRY_PATH:
+            try:
+                self._check_auth()
+                query = parse_qs(parsed_url.query, keep_blank_values=False)
+                profile_name = query.get("profile", [None])[0]
+                payload = handle_management_registry_request(profile_name)
+            except Exception as exc:
+                status = map_exception_to_status(exc)
+                self._send_json(status, {"error": str(exc)})
+                return
+            self._send_json(HTTPStatus.OK, payload)
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -41,20 +90,27 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
             return
 
+        request_started_at = time.perf_counter()
+        request_data: Dict[str, Any] | None = None
         try:
             self._check_auth()
             request_data = self._read_json_body()
-            response_data = handle_image_detection_batch(request_data)
-        except AIRequestError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            return
-        except PermissionError as exc:
-            self._send_json(HTTPStatus.UNAUTHORIZED, {"error": str(exc)})
-            return
+            self._log_request("accepted", request_data)
+            response_data = dispatch_detection_request(request_data)
         except Exception as exc:
-            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            status = map_exception_to_status(exc)
+            self._log_request(
+                "failed",
+                request_data,
+                status=status,
+                elapsed_ms=(time.perf_counter() - request_started_at) * 1000.0,
+                error=str(exc),
+            )
+            self._send_json(status, {"error": str(exc)})
             return
 
+        elapsed_ms = (time.perf_counter() - request_started_at) * 1000.0
+        self._log_request("completed", request_data, status=HTTPStatus.OK, elapsed_ms=elapsed_ms)
         self._send_json(HTTPStatus.OK, response_data)
 
     def log_message(self, fmt: str, *args: Any) -> None:
@@ -71,12 +127,12 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
     def _read_json_body(self) -> Dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0:
-            raise AIRequestError("empty request body")
+            raise ValidationError("empty request body")
         raw = self.rfile.read(length)
         try:
             return json.loads(raw.decode("utf-8"))
         except json.JSONDecodeError as exc:
-            raise AIRequestError("request body must be JSON") from exc
+            raise ValidationError("request body must be JSON") from exc
 
     def _send_json(self, status: HTTPStatus, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -86,78 +142,39 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _log_request(
+        self,
+        event: str,
+        request_data: Dict[str, Any] | None,
+        *,
+        status: HTTPStatus | None = None,
+        elapsed_ms: float | None = None,
+        error: str | None = None,
+    ) -> None:
+        payload = {
+            "event": event,
+            "task_type": (request_data or {}).get("task_type"),
+            "batch_id": (request_data or {}).get("batch_id"),
+        }
+        if status is not None:
+            payload["status"] = int(status)
+        if elapsed_ms is not None:
+            payload["elapsed_ms"] = round(elapsed_ms, 2)
+        if error:
+            payload["error"] = error
+        print(json.dumps(payload, ensure_ascii=False))
+
 
 def handle_image_detection_batch(request_data: Dict[str, Any]) -> Dict[str, Any]:
-    if request_data.get("schema_version") != "backend-ai-request-v1":
-        raise AIRequestError("unsupported schema_version")
-    if request_data.get("task_type") != "image":
-        raise AIRequestError("unsupported task_type")
-
-    zip_base64 = request_data.get("images_zip_base64")
-    if not zip_base64:
-        raise AIRequestError("images_zip_base64 is required")
-
-    extracted_image_names = _extract_image_names(zip_base64)
-    image_names = request_data.get("image_names") or extracted_image_names
-    if len(image_names) != len(extracted_image_names):
-        raise AIRequestError("image_names count does not match zip image count")
-    parameters = request_data.get("parameters") or {}
-    model_version = parameters.get("model_version") or SERVICE_VERSION
-
-    return {
-        "schema_version": "image-detection-v1",
-        "task_type": "image",
-        "model_version": model_version,
-        "batch_id": request_data.get("batch_id"),
-        "results": [_build_stub_image_result(name, model_version) for name in image_names],
-    }
+    return dispatch_detection_request(request_data)
 
 
-def _extract_image_names(zip_base64: str) -> List[str]:
-    try:
-        zip_bytes = base64.b64decode(zip_base64)
-    except ValueError as exc:
-        raise AIRequestError("images_zip_base64 is not valid base64") from exc
-
-    try:
-        with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
-            return [
-                name
-                for name in zf.namelist()
-                if not name.endswith("/") and name.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif"))
-            ]
-    except zipfile.BadZipFile as exc:
-        raise AIRequestError("images_zip_base64 is not a valid zip file") from exc
-
-
-def _build_stub_image_result(image_name: str, model_version: str) -> Dict[str, Any]:
-    return {
-        "schema_version": "image-detection-v1",
-        "task_type": "image",
-        "model_version": model_version,
-        "image_name": image_name,
-        "overall_is_fake": False,
-        "overall_confidence": 0.0,
-        "llm_text": "无",
-        "llm_img": None,
-        "ela": [[0, 0], [0, 0]],
-        "exif_flags": {
-            "photoshop": False,
-            "time_modified": False,
-        },
-        "sub_method_results": [
-            {
-                "method": method,
-                "probability": 0.0,
-                "mask": [[0.0, 0.0], [0.0, 0.0]],
-            }
-            for method in ("splicing", "blurring", "bruteforce", "contrast", "inpainting")
-        ],
-    }
+def handle_management_registry_request(profile_name: str | None = None) -> Dict[str, Any]:
+    return SERVICE.management_payload(profile_name)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="HTTP stub for backend/AI integration.")
+    parser = argparse.ArgumentParser(description="HTTP detection service for backend/AI integration.")
     parser.add_argument("--host", default=os.getenv("AI_SERVICE_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("AI_SERVICE_PORT", "8010")))
     args = parser.parse_args()
