@@ -1,38 +1,26 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import os
-import zipfile
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from io import BytesIO
-from typing import Any, Dict, List
+from typing import Any, Dict
+
+from detection_service import DetectionService, TaskNotImplementedError, ValidationError
 
 
-SERVICE_VERSION = "ai-http-stub-2026-04"
 IMAGE_BATCH_PATH = "/api/v1/image-detection/batches"
 HEALTH_PATH = "/health"
-
-
-class AIRequestError(ValueError):
-    pass
+SERVICE = DetectionService()
 
 
 class AIHTTPHandler(BaseHTTPRequestHandler):
-    server_version = "AcademicAIGateway/1.0"
+    server_version = "AcademicAIGateway/2.0"
 
     def do_GET(self) -> None:
         if self.path == HEALTH_PATH:
-            self._send_json(
-                HTTPStatus.OK,
-                {
-                    "status": "ok",
-                    "service_version": SERVICE_VERSION,
-                    "supported_tasks": ["image"],
-                },
-            )
+            self._send_json(HTTPStatus.OK, SERVICE.health_payload())
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -45,8 +33,11 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
             self._check_auth()
             request_data = self._read_json_body()
             response_data = handle_image_detection_batch(request_data)
-        except AIRequestError as exc:
+        except ValidationError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except TaskNotImplementedError as exc:
+            self._send_json(HTTPStatus.NOT_IMPLEMENTED, {"error": str(exc)})
             return
         except PermissionError as exc:
             self._send_json(HTTPStatus.UNAUTHORIZED, {"error": str(exc)})
@@ -71,12 +62,12 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
     def _read_json_body(self) -> Dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0:
-            raise AIRequestError("empty request body")
+            raise ValidationError("empty request body")
         raw = self.rfile.read(length)
         try:
             return json.loads(raw.decode("utf-8"))
         except json.JSONDecodeError as exc:
-            raise AIRequestError("request body must be JSON") from exc
+            raise ValidationError("request body must be JSON") from exc
 
     def _send_json(self, status: HTTPStatus, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -88,76 +79,11 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
 
 
 def handle_image_detection_batch(request_data: Dict[str, Any]) -> Dict[str, Any]:
-    if request_data.get("schema_version") != "backend-ai-request-v1":
-        raise AIRequestError("unsupported schema_version")
-    if request_data.get("task_type") != "image":
-        raise AIRequestError("unsupported task_type")
-
-    zip_base64 = request_data.get("images_zip_base64")
-    if not zip_base64:
-        raise AIRequestError("images_zip_base64 is required")
-
-    extracted_image_names = _extract_image_names(zip_base64)
-    image_names = request_data.get("image_names") or extracted_image_names
-    if len(image_names) != len(extracted_image_names):
-        raise AIRequestError("image_names count does not match zip image count")
-    parameters = request_data.get("parameters") or {}
-    model_version = parameters.get("model_version") or SERVICE_VERSION
-
-    return {
-        "schema_version": "image-detection-v1",
-        "task_type": "image",
-        "model_version": model_version,
-        "batch_id": request_data.get("batch_id"),
-        "results": [_build_stub_image_result(name, model_version) for name in image_names],
-    }
-
-
-def _extract_image_names(zip_base64: str) -> List[str]:
-    try:
-        zip_bytes = base64.b64decode(zip_base64)
-    except ValueError as exc:
-        raise AIRequestError("images_zip_base64 is not valid base64") from exc
-
-    try:
-        with zipfile.ZipFile(BytesIO(zip_bytes)) as zf:
-            return [
-                name
-                for name in zf.namelist()
-                if not name.endswith("/") and name.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif"))
-            ]
-    except zipfile.BadZipFile as exc:
-        raise AIRequestError("images_zip_base64 is not a valid zip file") from exc
-
-
-def _build_stub_image_result(image_name: str, model_version: str) -> Dict[str, Any]:
-    return {
-        "schema_version": "image-detection-v1",
-        "task_type": "image",
-        "model_version": model_version,
-        "image_name": image_name,
-        "overall_is_fake": False,
-        "overall_confidence": 0.0,
-        "llm_text": "无",
-        "llm_img": None,
-        "ela": [[0, 0], [0, 0]],
-        "exif_flags": {
-            "photoshop": False,
-            "time_modified": False,
-        },
-        "sub_method_results": [
-            {
-                "method": method,
-                "probability": 0.0,
-                "mask": [[0.0, 0.0], [0.0, 0.0]],
-            }
-            for method in ("splicing", "blurring", "bruteforce", "contrast", "inpainting")
-        ],
-    }
+    return SERVICE.handle_request(request_data)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="HTTP stub for backend/AI integration.")
+    parser = argparse.ArgumentParser(description="HTTP detection service for backend/AI integration.")
     parser.add_argument("--host", default=os.getenv("AI_SERVICE_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("AI_SERVICE_PORT", "8010")))
     args = parser.parse_args()
