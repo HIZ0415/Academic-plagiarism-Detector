@@ -1,6 +1,21 @@
 import { da } from 'vuetify/locale'
 import http from './request'
 
+const USE_MOCK_AIGC = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
+
+const ok = <T>(data: T) => Promise.resolve({ data, headers: {} } as any)
+
+const mockImageResults = {
+  fake: [
+    { result_id: '9001', image_id: '3001', image_url: '/media/extracted_images/mock_fake_1.png' },
+    { result_id: '9002', image_id: '3002', image_url: '/media/extracted_images/mock_fake_2.png' },
+  ],
+  normal: [
+    { result_id: '9003', image_id: '3003', image_url: '/media/extracted_images/mock_real_1.png' },
+    { result_id: '9004', image_id: '3004', image_url: '/media/extracted_images/mock_real_2.png' },
+  ],
+}
+
 export default {
   //发布审核任务
   dispatchAnnual(data: any) {
@@ -24,15 +39,46 @@ export default {
   },
 
   getAllReviewers() {
+    if (USE_MOCK_AIGC) {
+      return ok([
+        { id: 101, username: 'mock_reviewer_1', avatar: '/media/avatars/default.png' },
+        { id: 102, username: 'mock_reviewer_2', avatar: '/media/avatars/default.png' },
+      ])
+    }
     return http.get('/get_all_reviewers/')
   },
 
   getReviewers(data: any) {
+    if (USE_MOCK_AIGC) {
+      return ok({
+        publisher_id: Number(data.publisher_id),
+        reviewers: [
+          { id: 101, username: 'mock_reviewer_1', avatar: '/media/avatars/default.png' },
+          { id: 102, username: 'mock_reviewer_2', avatar: '/media/avatars/default.png' },
+        ]
+      })
+    }
     return http.get(`publishers/${data.publisher_id}/reviewers/`)
   },
 
   //获取某个出版社所有检测的任务
   getAllDetectionTask(data: any) {
+    if (USE_MOCK_AIGC) {
+      return ok({
+        tasks: [
+          {
+            task_id: '1',
+            task_name: 'Mock Detection Task',
+            upload_time: '2026-04-20 17:11:38',
+            completion_time: '2026-04-20 17:15:10',
+            status: 'completed',
+          }
+        ],
+        current_page: Number(data?.page || 1),
+        total_pages: 1,
+        total_tasks: 1,
+      })
+    }
     return http.get('/user-tasks/', { params: data })
   },
 
@@ -47,14 +93,44 @@ export default {
   },
 
   getFakeImage(data: any) {
+    if (USE_MOCK_AIGC) {
+      return ok({ task_id: data.task_id, total_results: mockImageResults.fake.length, results: mockImageResults.fake })
+    }
     return http.get(`/tasks/${data.task_id}/fake_results/?include_image=${data.include_image}`)
   },
 
   getNormalImage(data: any) {
+    if (USE_MOCK_AIGC) {
+      return ok({ task_id: data.task_id, total_results: mockImageResults.normal.length, results: mockImageResults.normal })
+    }
     return http.get(`/tasks/${data.task_id}/normal_results/?include_image=${data.include_image}`,)
   },
 
   getSingleImageResult(data: any) {
+    if (USE_MOCK_AIGC) {
+      return ok({
+        result_id: Number(data),
+        overall: {
+          is_fake: Number(data) % 2 === 0,
+          confidence_score: 0.82
+        },
+        llm: '该图片在边缘细节和局部纹理连续性上存在异常，建议结合子方法进一步复核。',
+        llm_image: '/media/llm_results/mock_llm_overlay.png',
+        ela_image: '/media/ela_results/mock_ela_overlay.png',
+        exif: {
+          photoshop_edited: true,
+          time_modified: false
+        },
+        timestamps: '2026-04-20 17:15:10',
+        sub_methods: [
+          { method: 'splicing', probability: 0.83, mask_image: '/media/masks/mock_splicing.png', mask_matrix: null },
+          { method: 'blurring', probability: 0.24, mask_image: '/media/masks/mock_blurring.png', mask_matrix: null },
+          { method: 'bruteforce', probability: 0.61, mask_image: '/media/masks/mock_bruteforce.png', mask_matrix: null },
+          { method: 'contrast', probability: 0.41, mask_image: '/media/masks/mock_contrast.png', mask_matrix: null },
+          { method: 'inpainting', probability: 0.73, mask_image: '/media/masks/mock_inpainting.png', mask_matrix: null }
+        ]
+      })
+    }
     return http.get(`/results/${data}/`)
   },
 
@@ -87,6 +163,9 @@ export default {
   ifHasPermission(params: {
     task_id: string
   }) {
+    if (USE_MOCK_AIGC) {
+      return ok({ access: true })
+    }
     return http.get(`/publisher-dectectiontask-access/`, { params })
   },
 

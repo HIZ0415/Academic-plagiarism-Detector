@@ -1,37 +1,87 @@
-% 学术内容检测模块整体业务流程（对应 03-5-content-detection.tex 全部功能点 FR-TPJC-0001～0003、FR-LWJC-0001～0005、FR-PLJC-0001～0002、FR-NRJC-0001～0002）
+% 学术内容检测模块核心领域类图
 \begin{tikzpicture}[
-  box/.style={draw,rounded corners,align=center,minimum width=1.95cm,inner sep=1.4pt,font=\tiny},
-  arr/.style={-{Stealth[length=1.4mm]},semithick}
+  class/.style={
+    draw,
+    rectangle split,
+    rectangle split parts=3,
+    rectangle split part align={center,left,left},
+    align=left,
+    text width=2.75cm,
+    font=\scriptsize,
+    inner sep=2.5pt
+  },
+  rel/.style={-{Stealth[length=1.6mm]},semithick},
+  dep/.style={-{Stealth[length=1.6mm]},dashed,semithick}
 ]
-  \node[box] (L) at (0,0) {登录/任务就绪};
-  \node[box] (S) at (0,-1.1) {检测任务进入\\学术内容检测模块};
+  \node[class] (resource) at (0,0) {
+    \textbf{学术资源}
+    \nodepart{second}
+    - 类型, 原始文件
+    \nodepart{third}
+    + 解析内容()\\
+    + 标准化输入()
+  };
 
-  \node[box] (T1) at (-4.6,-2.45) {提取图片\\\textbf{TPJC-0001}};
-  \node[box] (P1) at (0,-2.45) {全篇论文AIGC检测\\\textbf{LWJC-0001}};
-  \node[box] (R1) at (4.6,-2.45) {Review检测\\\textbf{PLJC-0001}};
+  \node[class] (image) at (4.2,1.6) {
+    \textbf{学术图像}
+    \nodepart{second}
+    - 来源页码, 编号
+    \nodepart{third}
+    + 提取图像()\\
+    + 生成标注()
+  };
 
-  \node[box] (T2) at (-4.6,-3.75) {学术图像AI鉴伪\\\textbf{TPJC-0002}};
-  \node[box] (P2) at (0,-3.75) {AI生成段落识别\\\textbf{LWJC-0002}};
-  \node[box] (R2) at (4.6,-3.75) {模板化评审倾向\\识别 \textbf{PLJC-0002}};
+  \node[class] (paper) at (4.2,0) {
+    \textbf{论文文档}
+    \nodepart{second}
+    - 标题, 段落
+    \nodepart{third}
+    + 分段解析()\\
+    + 分析AIGC概率()
+  };
 
-  \node[box] (T3) at (-4.6,-5.05) {图像可疑区域\\标注 \textbf{TPJC-0003}};
-  \node[box] (P3) at (0,-5.05) {段落级AI生成\\概率 \textbf{LWJC-0003}};
+  \node[class] (review) at (4.2,-1.6) {
+    \textbf{同行评审Review}
+    \nodepart{second}
+    - 文本, 模板特征
+    \nodepart{third}
+    + 检测虚假评审()\\
+    + 分析模板倾向()
+  };
 
-  \node[box] (P4) at (0,-6.35) {事实性鉴伪\\子结论 \textbf{LWJC-0004}};
-  \node[box] (P5) at (0,-7.65) {事实性鉴伪\\原因说明 \textbf{LWJC-0005}};
+  \node[class] (task) at (8.4,0) {
+    \textbf{内容检测任务}
+    \nodepart{second}
+    - 检测类型, 状态
+    \nodepart{third}
+    + 启动检测()\\
+    + 记录过程()
+  };
 
-  \node[box] (N1) at (0,-9.05) {综合鉴伪结果生成\\\textbf{NRJC-0001}};
-  \node[box] (N2) at (0,-10.4) {检测结果可视化解释\\\textbf{NRJC-0002}};
+  \node[class] (result) at (12.6,0.8) {
+    \textbf{检测结果}
+    \nodepart{second}
+    - 风险, 置信度
+    \nodepart{third}
+    + 生成子结论()\\
+    + 输出解释数据()
+  };
 
-  \draw[arr] (L) -- (S);
-  \draw[arr] (S) -- (T1);
-  \draw[arr] (S) -- (P1);
-  \draw[arr] (S) -- (R1);
-  \draw[arr] (T1) -- (T2) -- (T3);
-  \draw[arr] (P1) -- (P2) -- (P3) -- (P4) -- (P5);
-  \draw[arr] (R1) -- (R2);
-  \draw[arr] (T3.south) -- ++(0,-0.18) -| (N1.west);
-  \draw[arr] (P5) -- (N1);
-  \draw[arr] (R2.south) -- ++(0,-0.18) -| (N1.east);
-  \draw[arr] (N1) -- (N2);
+  \node[class] (report) at (12.6,-0.8) {
+    \textbf{综合鉴伪报告}
+    \nodepart{second}
+    - 综合结论, 格式
+    \nodepart{third}
+    + 融合结果()\\
+    + 导出报告()
+  };
+
+  \draw[rel] (resource) -- (image);
+  \draw[rel] (resource) -- (paper);
+  \draw[rel] (resource) -- (review);
+  \draw[rel] (image) -- (task);
+  \draw[rel] (paper) -- (task);
+  \draw[rel] (review) -- (task);
+  \draw[rel] (task) -- (result);
+  \draw[dep] (result) -- (report);
 \end{tikzpicture}

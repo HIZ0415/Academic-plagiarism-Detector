@@ -32,11 +32,12 @@ from core.models import (
 from .utils.report_generator import generate_detection_task_report
 from .utils.image_saver import save_ndarray_as_image
 from .utils.fanyi import fanyi_text
-from .call_figure_detection import get_result, reconnect
-from core.call_figure_detection import (
-    get_result,                       # GPU 远程调用
-    reconnect,                        # 重连逻辑
+from .utils.ai_result_schema import (
+    AIResultFormatError,
+    is_ai_batch_complete,
+    normalize_ai_batch_results,
 )
+from .utils.ai_gateway import AIGatewayError, reconnect_ai_gateway, run_image_detection_batch
 
 from datetime import datetime
 from channels.layers import get_channel_layer
@@ -105,20 +106,30 @@ def fetch_batch(
     dr_qs.update(status="in_progress")
 
     # 2️⃣  GPU / 网络 调用
-    results = get_result(zip_path, data_path)
+    try:
+        results = run_image_detection_batch(zip_path, data_path)
+    except AIGatewayError as exc:
+        raise self.retry(exc=exc)
     retry_count = 0
-    while (results is None or len(results[1][1]) != len(detection_result_ids)) and retry_count < 3:
-        reconnect()
+    while not is_ai_batch_complete(results, len(detection_result_ids)) and retry_count < 3:
+        reconnect_ai_gateway()
         retry_count += 1
-        results = get_result(zip_path, data_path)
+        try:
+            results = run_image_detection_batch(zip_path, data_path)
+        except AIGatewayError as exc:
+            raise self.retry(exc=exc)
 
-    if results is None:
-        raise self.retry(exc=RuntimeError("AI 服务器不可达"))
+    if not is_ai_batch_complete(results, len(detection_result_ids)):
+        raise self.retry(exc=RuntimeError("AI 服务器返回为空或结果数量不匹配"))
+
+    try:
+        normalized_results = normalize_ai_batch_results(results, expected_count=len(detection_result_ids))
+    except AIResultFormatError as exc:
+        raise self.retry(exc=exc)
 
     # 3️⃣  将每张图片拆成独立 payload，fan‑out 给 CPU worker
     subtasks = []
-    for idx, dr_id in enumerate(detection_result_ids):
-        one_result = _extract_single_result(results, idx)
+    for dr_id, one_result in zip(detection_result_ids, normalized_results):
         subtasks.append(process_single_result.s(dr_id, one_result))
 
     # 4️⃣  fan‑in：全部子任务结束后触发收尾
@@ -246,69 +257,8 @@ def finalize_task(_chord_results: list | None, task_pk: int, image_num: int, _=N
 # ───────────────────────────────────────────────────────────────────────────────
 
 def _extract_single_result(raw_results: Any, idx: int) -> Dict[str, Any]:
-    """根据你给出的原始格式，对 idx 处图片提取所需字段。
-    为了示例清晰，没有做异常防御，请按实际格式自行调整。
-    """
-    # —— LLM 输出 ——
-    llm_entry = raw_results[0][1][idx]
-    llm_text = llm_entry[1][0] if llm_entry[1] is not None else "无"
-    llm_img = llm_entry[1][1] if llm_entry[1] is not None else None  # 如有 mask，可自行提取
-
-    # —— ELA ndarray ——
-    ela_np = raw_results[1][1][idx][1]
-    ela_list = np.asarray(ela_np).tolist()
-
-    # —— EXIF 结果 ——
-    exif_raw = raw_results[2][1][idx][1][1]
-    exif_flags = {"photoshop": False, "time_modified": False}
-    if exif_raw:
-        exif_flags["photoshop"] = "使用了Photoshop进行修改" in exif_raw
-        exif_flags["time_modified"] = "修改了拍摄或制作时间" in exif_raw
-
-    # —— 五种 urn_* 方法 ——
-    urn_offset = 4  # 第 4 个开始是 urn_*，每种方法取 2 切片
-    if len(raw_results[0][1]) == 1:
-        sub_raw = [
-            ("splicing", raw_results[urn_offset + 0][1][0][2 * idx : 2 * idx + 2]),
-            ("blurring", raw_results[urn_offset + 1][1][0][2 * idx : 2 * idx + 2]),
-            ("bruteforce", raw_results[urn_offset + 2][1][0][2 * idx : 2 * idx + 2]),
-            ("contrast", raw_results[urn_offset + 3][1][0][2 * idx : 2 * idx + 2]),
-            ("inpainting", raw_results[urn_offset + 4][1][0][2 * idx : 2 * idx + 2]),
-        ]
-    else:
-        sub_raw = [
-            ("splicing", raw_results[urn_offset + 0][1][2 * idx: 2 * idx + 2]),
-            ("blurring", raw_results[urn_offset + 1][1][2 * idx: 2 * idx + 2]),
-            ("bruteforce", raw_results[urn_offset + 2][1][2 * idx: 2 * idx + 2]),
-            ("contrast", raw_results[urn_offset + 3][1][2 * idx: 2 * idx + 2]),
-            ("inpainting", raw_results[urn_offset + 4][1][2 * idx: 2 * idx + 2]),
-        ]
-
-    bar = 0.5
-    overall_is_fake = any(v[1] > bar for _, v in sub_raw) or exif_raw is not None
-    overall_confidence = max(v[1] for _, v in sub_raw)
-    if exif_raw is not None:
-        overall_confidence = 1.0
-
-    sub_method_results: List[Dict[str, Any]] = []
-    for method_key, (mask_np, prob) in sub_raw:
-        sub_method_results.append(
-            {
-                "method": method_key,
-                "prob": float(prob),
-                "mask": np.squeeze(mask_np).tolist(),
-            }
-        )
-
-    return {
-        "llm_text": llm_text,
-        "llm_img": np.asarray(llm_img).tolist(),
-        "ela": ela_list,
-        "overall_is_fake": overall_is_fake,
-        "overall_confidence": overall_confidence,
-        "exif_flags": exif_flags,
-        "sub_method_results": sub_method_results,
-    }
+    """Backward-compatible helper for callers that still import the old parser."""
+    return normalize_ai_batch_results(raw_results)[idx]
 
 
 # ───────────────────────────────────────────────────────────────────────────────

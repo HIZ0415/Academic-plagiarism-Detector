@@ -1,13 +1,13 @@
-﻿\subsection{用户上传模块}
+\subsection{用户上传模块}
 
-\paragraph*{业务流程}
+\paragraph*{核心领域类图}
 
 \begin{center}
 \resizebox{0.98\linewidth}{!}{\input{figures/tikz-user-upload-flow.tex}}
 \end{center}
 
 
-\paragraph*{用例图}
+\paragraph*{服务协作类图}
 
 \begin{center}
 \resizebox{0.98\linewidth}{!}{\input{figures/tikz-user-upload-usecase.tex}}
@@ -17,7 +17,7 @@
 
 \paragraph*{简述}
 
-用户登录后进入检测页面，上传待检测的学术图像、整篇论文、同行评审Review文本文件、包含学术资源的文件或其压缩包。
+用户登录后进入检测页面，上传待检测的学术图像、\iternew{整篇论文、同行评审Review文本文件}、包含学术资源的文件或其压缩包。
 
 \paragraph*{前提条件}
 
@@ -37,7 +37,7 @@ PNG、JPG、JPEG、PDF、DOCX、TXT、ZIP、RAR 等格式。
     \item 用户登录系统后进入“学术检测”页面；
     \item 点击“上传文件”按钮；
     \item 选择本地待检测文件；
-    \item 系统自动识别文件类型（图像 / 论文 / Review）；
+    \item 系统自动识别文件类型（图像 / \iternew{论文 / Review}）；
     \item 校验文件格式、大小及完整性；
     \item 页面显示上传进度条；
     \item 上传成功后自动跳转至“检测结果”页面。
@@ -61,7 +61,7 @@ PNG、JPG、JPEG、PDF、DOCX、TXT、ZIP、RAR 等格式。
 
 \paragraph*{简述}
 
-用户上传待检测文件后，系统自动执行AI检测，并即时返回图像、论文或Review的检测结果，支持查看详细可视化分析报告及下载综合鉴伪报告。
+用户上传待检测文件后，系统自动执行AI检测，并即时返回图像、\iternew{论文或Review}的检测结果，支持查看详细可视化分析报告及下载综合鉴伪报告。
 
 \paragraph*{前提条件}
 
@@ -77,8 +77,8 @@ PNG、JPG、JPEG、PDF、DOCX、TXT、ZIP、RAR 等格式。
     \item 系统执行AI检测：
     \begin{enumerate}
         \item 图像造假检测；
-        \item 论文AIGC文本检测；
-        \item Review虚假评审检测；
+        \item \iternew{论文AIGC文本检测}；
+        \item \iternew{Review虚假评审检测}；
     \end{enumerate}
     \item 页面实时展示检测进度；
     \item 检测完成后展示鉴定结果；
@@ -130,6 +130,7 @@ AI检测已完成。
 
 审核任务自动进入人工审核页面。
 
+{\color{black}
 \subsubsection{功能点——批量上传（FR-YHSC-0004）}
 
 \paragraph*{简述}
@@ -157,12 +158,14 @@ AI检测已完成。
 生成批量检测任务；
 
 显示任务数量及状态。
+}
 
 \subsubsection{功能点——高并发批量检测（FR-YHSC-0005）}
 
 \paragraph*{简述}
 
-系统支持高并发场景下的大规模批量检测任务处理。
+系统支持高并发场景下的大规模批量检测任务处理，
+并具备异常任务识别、自动重试和失败反馈机制。
 
 \paragraph*{前提条件}
 
@@ -172,19 +175,30 @@ AI检测已完成。
 
 \begin{enumerate}
     \item 系统将批量任务分配至多线程任务队列；
-    \item 后台并行执行图像、论文及Review检测；
-    \item 系统动态分配计算资源；
-    \item 异常任务自动重试。
+    \item 后台并行执行\iternew{文本}、图像及 \iternew{Review} 检测；
+    \item 动态分配计算资源；
+    \item 对异常任务进行自动重试；
+    \item 若连续失败，则标记任务状态为“检测失败”；
+    \item 系统向用户反馈失败原因。
+\end{enumerate}
+
+\paragraph*{异常处理包括}
+
+\begin{enumerate}
+    \item 上传失败；
+    \item 文件损坏；
+    \item 格式异常；
+    \item 模型服务超时；
+    \item 资源不足；
+    \item 网络中断。
 \end{enumerate}
 
 \paragraph*{后继结果}
+输出信息
+保证高并发场景下任务稳定执行，
+并支持部分任务失败后的结果独立返回。
 
-输出信息：
-
-保证高并发下任务稳定执行；
-
-任务结果统一汇总。
-
+{\color{black}
 \subsubsection{功能点——检测状态实时同步（FR-YHSC-0006）}
 
 \paragraph*{简述}
@@ -216,3 +230,4 @@ AI检测已完成。
 输出信息：
 
 用户实时查看检测进度及当前状态。
+}

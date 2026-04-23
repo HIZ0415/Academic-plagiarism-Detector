@@ -67,7 +67,17 @@
 \subsection{性能与容量需求}
 
 \subsubsection{性能需求}
+系统应满足以下响应时间要求：
 
+\begin{itemize}
+    \item 单文件上传响应时间不超过 3 秒；
+    \item 单任务检测平均响应时间不超过 30 秒；
+    \item 批量任务（10 个文件）处理时间不超过 120 秒；
+    \item 页面状态刷新延迟不超过 1 秒；
+    \item 人工审核结果同步时间不超过 2 秒。
+\end{itemize}
+
+在高并发场景下，系统应支持不少于 100 个并发检测任务稳定运行。
 \renewcommand{\arraystretch}{1.5}
 \setlength{\LTleft}{\fill}
 \setlength{\LTright}{\fill}

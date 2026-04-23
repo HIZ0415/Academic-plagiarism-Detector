@@ -1,0 +1,25 @@
+\begin{tikzpicture}[
+  node distance=8mm and 9mm,
+  font=\small,
+  proc/.style={draw, rounded corners=2pt, fill=blue!8, align=center, minimum width=3.0cm, minimum height=0.9cm},
+  store/.style={draw, rounded corners=2pt, fill=yellow!10, align=center, minimum width=3.0cm, minimum height=0.9cm},
+  ext/.style={draw, rounded corners=2pt, fill=green!8, align=center, minimum width=2.7cm, minimum height=0.9cm},
+  flow/.style={-{Latex[length=2.2mm]}, thick}
+]
+
+\node[proc] (event) {业务事件\\任务完成/审核分派/公告发布};
+\node[store, right=of event] (db) {写入 Notification};
+\node[proc, right=of db] (ws) {推送到用户通知组\\WebSocket};
+\node[ext, right=of ws] (online) {在线前端};
+
+\node[proc, below=of db] (rest) {通知查询接口\\未读数/列表/已读};
+\node[ext, left=of rest] (offline) {离线或重连前端};
+
+\draw[flow] (event) -- (db);
+\draw[flow] (db) -- (ws);
+\draw[flow] (ws) -- (online);
+\draw[flow] (db) -- (rest);
+\draw[flow] (offline) -- (rest);
+\draw[flow] (rest) -- (db);
+
+\end{tikzpicture}

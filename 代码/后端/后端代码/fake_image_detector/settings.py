@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/4.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -180,6 +181,12 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     "sep": ":",
     "queue_order_strategy": "priority",      # <<< 关键
 }
+
+# AI service bridge. If AI_SERVICE_URL is empty, the backend uses the historical
+# SSH/SCP bridge in core/call_figure_detection.py.
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "")
+AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT", "1200"))
+AI_SERVICE_API_TOKEN = os.getenv("AI_SERVICE_API_TOKEN", "")
 
 CORS_ALLOW_ALL_ORIGINS = True
 

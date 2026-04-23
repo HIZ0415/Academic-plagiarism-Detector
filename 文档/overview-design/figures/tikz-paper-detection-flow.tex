@@ -1,0 +1,29 @@
+\begin{tikzpicture}[
+  node distance=8mm and 8mm,
+  font=\small,
+  proc/.style={draw, rounded corners=2pt, fill=blue!6, align=center, minimum width=3.0cm, minimum height=0.9cm},
+  store/.style={draw, rounded corners=2pt, fill=yellow!10, align=center, minimum width=3.0cm, minimum height=0.9cm},
+  ext/.style={draw, rounded corners=2pt, fill=green!8, align=center, minimum width=3.0cm, minimum height=0.9cm},
+  flow/.style={-{Latex[length=2.2mm]}, thick}
+]
+
+\node[ext] (upload) {论文上传\\PDF/文档};
+\node[store, right=of upload] (resource) {论文资源登记};
+\node[proc, right=of resource] (parse) {结构解析\\正文/章节/图片};
+\node[proc, right=of parse] (split) {文本切分\\段落级输入};
+
+\node[proc, below=of split] (text) {AIGC 倾向\\事实性分析};
+\node[proc, left=of text] (image) {插图检测\\复用图像链路};
+\node[store, left=of image] (result) {论文级结果聚合};
+\node[ext, left=of result] (report) {论文检测报告};
+
+\draw[flow] (upload) -- (resource);
+\draw[flow] (resource) -- (parse);
+\draw[flow] (parse) -- (split);
+\draw[flow] (split) -- (text);
+\draw[flow] (parse.south) |- (image.north);
+\draw[flow] (text) -- (image);
+\draw[flow] (image) -- (result);
+\draw[flow] (result) -- (report);
+
+\end{tikzpicture}

@@ -1,0 +1,76 @@
+\documentclass[UTF8]{ctexart}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\usepackage{multirow,longtable,array}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{enumitem}
+\usepackage{amssymb}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart,calc}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{学术AI鉴伪系统概要设计说明书（迭代版）}
+\author{}
+\date{}
+
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+
+\begin{center}
+
+\vspace*{3.2cm}
+
+{\bfseries\zihao{3} 学术AI鉴伪系统概要设计说明书（迭代版）\par}
+
+\vspace{0.8cm}
+
+{\bfseries\zihao{-3} (AID-SD-1)\par}
+
+\vspace{1.5cm}
+
+{\zihao{3} 概要设计说明书\par}
+
+\vfill
+
+\renewcommand{\arraystretch}{1.9}
+\setlength{\tabcolsep}{10pt}
+
+\begin{tabular}{|>{\centering\arraybackslash}p{4.6cm}|>{\centering\arraybackslash}p{2.8cm}|>{\centering\arraybackslash}p{4.6cm}|}
+\hline
+\multirow{4}{4.6cm}{\centering 文件状态：\\[0.8em]
+\mbox{[$\checkmark$]} 草稿\\
+\mbox{[ ]} 正式发布\\
+\mbox{[ ]} 正在修改}
+& 文件标识：& AID-SD-1 \\ \cline{2-3}
+& 当前版本：& v1.0 \\ \cline{2-3}
+& 作\qquad 者： & 刘宇童\quad 聂薪羽\quad 苏天\\[0.3em]
+& & 翟润\quad 张与耕 \\ \cline{2-3}
+& 完成日期：& \today \\ \hline
+\end{tabular}
+
+\vspace*{1.8cm}
+
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\input{sections/01-introduction.tex}
+\input{sections/02-overview.tex}
+\input{sections/03-architecture.tex}
+\input{sections/04-module-design.tex}
+\input{sections/05-data-design.tex}
+\input{sections/06-interface-design.tex}
+\input{sections/07-process-design.tex}
+\input{sections/08-deployment-design.tex}
+\input{sections/09-quality-design.tex}
+\input{sections/10-risks.tex}
+
+\end{document}
