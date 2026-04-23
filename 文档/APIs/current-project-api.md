@@ -1,31 +1,55 @@
 # 当前项目 API 文档
 
 ## 1. 说明
-本文档对应当前代码实现中的后端接口清单，依据如下源码整理：
+本文档对应当前仓库中已经落地的接口实现，分为两层：
+
+- 后端对外业务接口：Django 应用，对前端提供统一的 `/api/` 路由。
+- AI 服务内部接口：独立 HTTP 服务，供后端调用，不直接挂载在 Django `/api/` 下。
+
+本文档依据以下代码整理：
 
 - 路由入口：`代码/后端/后端代码/fake_image_detector/urls.py`
 - 业务路由：`代码/后端/后端代码/core/urls.py`
-- 视图实现：`代码/后端/后端代码/core/views/*.py`
+- AI HTTP 服务：`代码/AI服务/AI服务器代码/ai_http_service.py`
+- AI 服务核心：`代码/AI服务/AI服务器代码/detection_service/service.py`
+- AI 契约结构：`代码/AI服务/AI服务器代码/detection_service/contracts.py`
 
-当前项目的 HTTP 接口统一挂载在：
+## 2. 接口分层
+
+### 2.1 后端业务接口
+统一前缀：
 
 ```text
 /api/
 ```
 
-实时通知 WebSocket 接口为：
+WebSocket 实时通知：
 
 ```text
 /ws/notifications/
 ```
 
-## 2. 认证说明
-- 当前项目包含注册、登录、登出和令牌刷新接口。
-- 需要登录的接口通常依赖当前用户上下文执行权限校验。
-- 文件上传接口通常使用 `multipart/form-data`。
-- 文件下载接口返回文件流，其余接口主要返回 JSON。
+### 2.2 AI 服务内部接口
+默认本地开发地址：
 
-## 3. 用户认证与个人信息接口
+```text
+http://127.0.0.1:8010
+```
+
+主要接口：
+
+- `GET /health`
+- `POST /api/v1/image-detection/batches`
+- `GET /api/v1/admin/model-registry`
+
+## 3. 通用约定
+- 需要登录的后端接口依赖当前用户上下文进行权限校验。
+- 文件上传接口通常使用 `multipart/form-data`。
+- 文件下载接口返回文件流，其余接口以 JSON 为主。
+- AI 服务当前只提供 `image` 任务的真实检测链路。
+- AI 服务已预留 `paper` 和 `review` 任务类型，但目前仅作占位，不提供真实检测结果。
+
+## 4. 用户认证与个人信息接口
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -40,7 +64,7 @@
 | `/api/password-reset/confirm/` | `POST` | 提交验证码并重置密码 |
 | `/api/admin-login/` | `POST` | 管理员登录 |
 
-## 4. 用户任务、配额与个人记录接口
+## 5. 用户任务、配额与个人记录接口
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -55,7 +79,7 @@
 | `/api/reviewer/activity_logs/` | `GET` | 审核人员活动日志 |
 | `/api/manual-review/<review_id>/report/` | `GET` | 生成或下载人工审核报告 |
 
-## 5. 文件上传与资源管理接口
+## 6. 文件上传与资源管理接口
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -66,7 +90,7 @@
 | `/api/upload/<file_id>/delete/` | `DELETE` | 删除上传文件 |
 | `/api/upload/get_all_file_images/<file_management_id>/` | `GET` | 获取某文件对应的全部图片 |
 
-## 6. 图像检测、结果与报告接口
+## 7. 图像检测、结果与报告接口
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -82,14 +106,14 @@
 | `/api/tasks_image/<image_id>/report/` | `GET` | 下载图片级检测报告 |
 | `/api/detection-task-delete/<task_id>/` | `DELETE` | 删除检测任务 |
 
-## 7. 人工审核接口
+## 8. 人工审核接口
 
-### 7.1 审核申请与审核任务
+### 8.1 审核申请与审核任务
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
-| `/api/publishers/<publisher_id>/reviewers/` | `GET` | 获取某发布者可选审核人员 |
-| `/api/create_review_task_with_admin_check/` | `POST` | 创建人工审核申请，进入管理员审批流程 |
+| `/api/publishers/<publisher_id>/reviewers/` | `GET` | 获取某发布者可选审核人 |
+| `/api/create_review_task_with_admin_check/` | `POST` | 创建人工审核申请并进入管理员审批流程 |
 | `/api/get_request_completion_status/<task_id>/` | `GET` | 查询审核申请完成状态 |
 | `/api/get_request_detail/<reviewRequest_id>/` | `GET` | 获取审核申请详情 |
 | `/api/get_reviewer_tasks/` | `GET` | 获取审核人员待处理任务 |
@@ -97,11 +121,11 @@
 | `/api/get_publisher_review_tasks/` | `GET` | 获取发布者发起的审核任务列表 |
 | `/api/get-reviewer-request-detail/<reviewRequest_id>/` | `GET` | 审核人员查看审核申请详情 |
 
-### 7.2 审核结果查询与提交
+### 8.2 审核结果查询与提交
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
-| `/api/get_img_review_all/` | `GET` | 获取某审核任务的全部图像审核结果 |
+| `/api/get_img_review_all/` | `GET` | 获取某审核任务的全部图片审核结果 |
 | `/api/get_image_review/` | `GET` | 获取指定图片审核结果 |
 | `/api/get_review_detail/<manual_review_id>/` | `GET` | 获取单个人工审核详情 |
 | `/api/post_review/<manual_review_id>/` | `POST` | 提交人工审核结果 |
@@ -109,7 +133,7 @@
 | `/api/publisher-dectectiontask-access/` | `GET` | 检查发布者是否可访问某检测任务 |
 | `/api/reviewer-manualreview-access/` | `GET` | 检查审核人员是否可访问某人工审核记录 |
 
-## 8. 通知与消息接口
+## 9. 通知与消息接口
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -120,7 +144,7 @@
 | `/api/notification/broadcast/` | `POST` | 管理员广播通知 |
 | `/ws/notifications/` | `WebSocket` | 实时通知推送通道 |
 
-## 9. 组织管理接口
+## 10. 组织管理接口
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -136,9 +160,9 @@
 | `/api/organization/<org_id>/delete/` | `DELETE` | 删除组织 |
 | `/api/organization/<org_id>/permission/` | `POST` | 更新组织角色权限 |
 
-## 10. 管理端用户、资源、审核与统计接口
+## 11. 管理端接口
 
-### 10.1 管理员与用户管理
+### 11.1 管理员与用户管理
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -150,9 +174,9 @@
 | `/api/delete_user/<user_id>/` | `DELETE` | 删除用户 |
 | `/api/create-admin/` | `POST` | 创建管理员 |
 | `/api/user_permission/<user_id>/` | `POST` | 更新用户权限 |
-| `/api/manage-associations/` | `POST` | 建立发布者与审核者关系 |
+| `/api/manage-associations/` | `POST` | 建立发布者与审核者关联关系 |
 
-### 10.2 管理端文件与审核治理
+### 11.2 文件与审核治理
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -164,7 +188,7 @@
 | `/api/delete_image_upload/<image_id>/` | `DELETE` | 删除图片上传记录 |
 | `/api/post_report/<post_id>/` | `POST` | 处理举报 |
 
-### 10.3 日志接口
+### 11.3 日志接口
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -172,7 +196,7 @@
 | `/api/user_action_log/<log_id>/` | `DELETE` | 删除日志 |
 | `/api/user_action_log/download/` | `GET` | 导出日志 |
 
-### 10.4 仪表盘与统计接口
+### 11.4 仪表盘与统计接口
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
@@ -190,22 +214,89 @@
 | `/api/get_detection_task_status/<task_id>/` | `GET` | 管理端检测任务状态 |
 | `/api/get_all_user_tasks/` | `GET` | 管理端查询所有用户任务 |
 
-## 11. 已知接口层问题
-当前代码路由中存在少量需要后续收敛的问题：
+## 12. AI 服务内部接口
 
-- `core/urls.py` 中同时存在 `/api/task-summary/`、`/api/get-task-summary/`、`/api/get_task_summary/` 三类相近路径，命名风格不统一。
-- 存在一个路径定义为：
+### 12.1 健康检查
 
-```text
-/review-requests/<int:review_request_id>/delete/
-```
+| 路径 | 方法 | 说明 |
+|---|---|---|
+| `/health` | `GET` | 返回 AI 服务状态、支持任务、结果格式、profile 与热加载状态 |
 
-其源码路由项带有前导斜杠，挂载到 `/api/` 后可能形成双斜杠路径，建议后续修正。
+当前健康检查响应包含的关键字段：
 
-- 当前接口仍明显偏向图像检测流程；论文检测与 Review 检测尚未形成与图像检测同等级的统一任务接口。
+- `service`
+- `service_version`
+- `supported_tasks`
+- `reserved_tasks`
+- `result_format`
+- `default_image_profile`
+- `available_image_profiles`
+- `reload_count`
+- `last_reload_at`
+- `last_reload_error`
 
-## 12. 后续演进建议
-- 将上传对象统一抽象为资源接口，避免长期只围绕 `file_id` 和 `image_id` 组织。
-- 将图像检测、论文检测、Review 检测统一收敛到统一任务接口与统一状态接口。
-- 将论文检测日志、Review 检测日志、模型管理接口纳入管理端统一治理空间。
-- 逐步收敛路径命名风格，统一使用一种资源命名规范。
+### 12.2 图像批量检测
+
+| 路径 | 方法 | 说明 |
+|---|---|---|
+| `/api/v1/image-detection/batches` | `POST` | AI 服务图像批量检测入口，供后端调用 |
+
+请求关键字段：
+
+- `task_type`：当前应为 `image`
+- `batch_id`：批次标识，可选
+- `model_version`：模型版本，可选
+- `parameters.model_profile`：模型 profile，可选；课堂最小演示建议使用 `minimal_trainable`
+- `items`：待检测图片列表
+
+响应关键字段：
+
+- `batch_id`
+- `task_type`
+- `model_version`
+- `model_profile`
+- `results`
+- `results[].overall_is_fake`
+- `results[].overall_confidence`
+- `results[].sub_method_results`
+- `results[].evidences`
+
+说明：
+
+- 返回中同时保留后端当前兼容字段与标准化证据对象。
+- `evidences` 为标准化证据列表，是当前 AI 侧统一结果结构。
+
+### 12.3 模型注册表查询
+
+| 路径 | 方法 | 说明 |
+|---|---|---|
+| `/api/v1/admin/model-registry` | `GET` | 查询当前 AI 服务已加载的 registry、profile 和热加载状态 |
+
+查询参数：
+
+- `profile`：可选，传入后仅查看指定 profile 详情
+
+用途：
+
+- 验证服务当前启用了哪些检测方法
+- 查看默认 profile 和默认模型版本
+- 排查热加载后的当前生效配置
+
+## 13. 当前后端与 AI 的协作关系
+- 前端不直接调用 AI 服务。
+- 前端调用 Django `/api/` 接口。
+- Django 后端负责整理检测任务并调用 AI 服务 `/api/v1/image-detection/batches`。
+- AI 服务返回兼容字段和标准化证据对象，后端当前继续消费兼容字段。
+- AI 服务的配置热加载和模型注册查询当前仅暴露在 AI 侧，不直接透出给前端。
+
+## 14. 已知接口层问题
+- `core/urls.py` 中同时存在 `/api/task-summary/`、`/api/get-task-summary/`、`/api/get_task_summary/` 三类近似路径，命名风格不统一。
+- `core/urls.py` 中存在一条定义为 `'/review-requests/<int:review_request_id>/delete/'` 的路由，前面额外带了斜杠，挂到 `/api/` 后可能形成异常路径。
+- 后端业务接口当前仍然以图像检测为中心；论文检测和 Review 检测尚未形成与图像检测同等级的统一任务接口。
+- AI 服务虽然已经预留 `paper` 和 `review`，但当前只有 `image` 任务具备可运行链路。
+
+## 15. 后续演进建议
+- 将后端资源对象继续从 `file_id`、`image_id` 扩展为统一资源标识。
+- 将图像检测、论文检测、Review 检测收敛到统一任务提交与统一状态查询接口。
+- 将 AI 服务的模型管理信息逐步纳入管理端统一治理视图。
+- 收敛重复和风格不一致的路径命名，统一 REST 风格。

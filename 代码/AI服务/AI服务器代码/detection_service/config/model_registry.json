@@ -1,0 +1,74 @@
+{
+  "registry_version": "image-model-registry-v1",
+  "default_image_profile": "default",
+  "image_profiles": [
+    {
+      "name": "default",
+      "model_version": "image-detector-service-2026-04",
+      "methods": [
+        { "kind": "llm", "enabled": true },
+        { "kind": "ela", "enabled": true },
+        { "kind": "exif", "enabled": true },
+        { "kind": "cmd", "enabled": true },
+        {
+          "kind": "urn",
+          "name": "splicing",
+          "enabled": true,
+          "params": { "weight_path": "weight/Coarse_v2.pkl" }
+        },
+        {
+          "kind": "urn",
+          "name": "blurring",
+          "enabled": true,
+          "params": { "weight_path": "weight/blurring.pkl" }
+        },
+        {
+          "kind": "urn",
+          "name": "bruteforce",
+          "enabled": true,
+          "params": { "weight_path": "weight/brute_force.pkl" }
+        },
+        {
+          "kind": "urn",
+          "name": "contrast",
+          "enabled": true,
+          "params": { "weight_path": "weight/contrast.pkl" }
+        },
+        {
+          "kind": "urn",
+          "name": "inpainting",
+          "enabled": true,
+          "params": { "weight_path": "weight/inpainting.pkl" }
+        }
+      ]
+    },
+    {
+      "name": "fast",
+      "model_version": "image-detector-fast-2026-04",
+      "methods": [
+        { "kind": "ela", "enabled": true },
+        { "kind": "exif", "enabled": true },
+        { "kind": "cmd", "enabled": true },
+        {
+          "kind": "urn",
+          "name": "splicing",
+          "enabled": true,
+          "params": { "weight_path": "weight/Coarse_v2.pkl" }
+        }
+      ]
+    },
+    {
+      "name": "minimal_trainable",
+      "model_version": "image-detector-minimal-2026-04",
+      "methods": [
+        { "kind": "exif", "enabled": true },
+        {
+          "kind": "baseline_classifier",
+          "name": "splicing",
+          "enabled": true,
+          "params": { "model_path": "../artifacts/minimal_baseline.pkl" }
+        }
+      ]
+    }
+  ]
+}

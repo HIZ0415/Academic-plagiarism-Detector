@@ -58,6 +58,23 @@ def _mask_confidence(mask: np.ndarray) -> float:
     return float(np.clip(normalized.mean(), 0.0, 1.0))
 
 
+def _cv2_read_image(image_path: Path) -> np.ndarray | None:
+    buffer = np.fromfile(str(image_path), dtype=np.uint8)
+    if buffer.size == 0:
+        return None
+    return cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+
+
+def _cv2_write_image(image_path: str | Path, image: np.ndarray, params: list[int] | None = None) -> bool:
+    image_path = Path(image_path)
+    extension = image_path.suffix.lower() or ".png"
+    success, encoded = cv2.imencode(extension, image, params or [])
+    if not success:
+        return False
+    image_path.write_bytes(encoded.tobytes())
+    return True
+
+
 def _build_evidence(
     image_name: str,
     method: str,
@@ -117,14 +134,15 @@ class ELAMethod(DetectionMethod):
         context: DetectionContext,
     ) -> list[DetectionEvidence]:
         def _process(image: ImageInput) -> DetectionEvidence:
-            original = cv2.imread(str(image.image_path))
+            original = _cv2_read_image(image.image_path)
             if original is None:
                 raise ValueError(f"failed to read image: {image.image_path}")
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
                 temp_path = temp_file.name
             try:
-                cv2.imwrite(temp_path, original, [cv2.IMWRITE_JPEG_QUALITY, 90])
-                compressed = cv2.imread(temp_path)
+                if not _cv2_write_image(temp_path, original, [cv2.IMWRITE_JPEG_QUALITY, 90]):
+                    raise ValueError(f"failed to write temp JPEG: {temp_path}")
+                compressed = _cv2_read_image(Path(temp_path))
                 if compressed is None:
                     raise ValueError(f"failed to read temp JPEG: {temp_path}")
                 ela = cv2.absdiff(original, compressed) * 15
@@ -228,7 +246,7 @@ class CopyMoveMethod(DetectionMethod):
         step = max(1, block_size // 2)
 
         def _process(image: ImageInput) -> DetectionEvidence:
-            img = cv2.imread(str(image.image_path))
+            img = _cv2_read_image(image.image_path)
             if img is None:
                 raise ValueError(f"failed to read image: {image.image_path}")
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

@@ -8,12 +8,14 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict
+from urllib.parse import parse_qs, urlparse
 
 from detection_service import DetectionService, TaskNotImplementedError, ValidationError
 
 
 IMAGE_BATCH_PATH = "/api/v1/image-detection/batches"
 HEALTH_PATH = "/health"
+ADMIN_REGISTRY_PATH = "/api/v1/admin/model-registry"
 SERVICE = DetectionService()
 
 
@@ -65,8 +67,21 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
     server_version = "AcademicAIGateway/2.1"
 
     def do_GET(self) -> None:
-        if self.path == HEALTH_PATH:
+        parsed_url = urlparse(self.path)
+        if parsed_url.path == HEALTH_PATH:
             self._send_json(HTTPStatus.OK, SERVICE.health_payload())
+            return
+        if parsed_url.path == ADMIN_REGISTRY_PATH:
+            try:
+                self._check_auth()
+                query = parse_qs(parsed_url.query, keep_blank_values=False)
+                profile_name = query.get("profile", [None])[0]
+                payload = handle_management_registry_request(profile_name)
+            except Exception as exc:
+                status = map_exception_to_status(exc)
+                self._send_json(status, {"error": str(exc)})
+                return
+            self._send_json(HTTPStatus.OK, payload)
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -152,6 +167,10 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
 
 def handle_image_detection_batch(request_data: Dict[str, Any]) -> Dict[str, Any]:
     return dispatch_detection_request(request_data)
+
+
+def handle_management_registry_request(profile_name: str | None = None) -> Dict[str, Any]:
+    return SERVICE.management_payload(profile_name)
 
 
 def main() -> None:

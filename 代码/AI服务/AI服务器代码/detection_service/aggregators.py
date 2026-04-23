@@ -7,6 +7,7 @@ from .image_methods import DEFAULT_LLM_TEXT
 
 
 LEGACY_SUB_METHODS = ("splicing", "blurring", "bruteforce", "contrast", "inpainting")
+NON_SUB_METHODS = {"llm", "ela", "exif"}
 
 
 @dataclass(slots=True)
@@ -37,24 +38,41 @@ class ImageResultAggregator:
         if exif_evidence is not None:
             exif_flags = exif_evidence.metadata.get("flags", exif_flags)
 
+        detector_evidences = [evidence for evidence in evidences if evidence.method not in NON_SUB_METHODS]
         sub_method_results = []
-        max_probability = 0.0
-        overall_is_fake = any(exif_flags.values())
         for method_name in LEGACY_SUB_METHODS:
-            evidence = evidence_map[method_name]
-            probability = float(evidence.confidence)
-            max_probability = max(max_probability, probability)
-            if evidence.suspicious:
-                overall_is_fake = True
+            evidence = evidence_map.get(method_name)
+            if evidence is None:
+                sub_method_results.append({"method": method_name, "probability": 0.0, "mask": []})
+                continue
             sub_method_results.append(
                 {
                     "method": method_name,
-                    "probability": probability,
+                    "probability": float(evidence.confidence),
                     "mask": evidence.artifacts.get("mask", []),
                 }
             )
 
-        overall_confidence = 1.0 if any(exif_flags.values()) else max_probability
+        extra_method_names = sorted(
+            evidence.method
+            for evidence in detector_evidences
+            if evidence.method not in LEGACY_SUB_METHODS
+        )
+        for method_name in extra_method_names:
+            evidence = evidence_map[method_name]
+            sub_method_results.append(
+                {
+                    "method": method_name,
+                    "probability": float(evidence.confidence),
+                    "mask": evidence.artifacts.get("mask", []),
+                }
+            )
+
+        overall_is_fake = any(exif_flags.values()) or any(evidence.suspicious for evidence in detector_evidences)
+        overall_confidence = 1.0 if any(exif_flags.values()) else max(
+            (float(evidence.confidence) for evidence in detector_evidences),
+            default=0.0,
+        )
 
         return StandardImageResult(
             image_name=image.image_name,

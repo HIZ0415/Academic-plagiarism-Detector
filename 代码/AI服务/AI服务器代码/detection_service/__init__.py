@@ -7,7 +7,9 @@ from .contracts import (
     ImageInput,
     StandardImageResult,
 )
-from .service import DetectionService, TaskNotImplementedError, ValidationError
+from .model_registry import DetectionModelRegistry
+from .service import DetectionService
+from .service_errors import TaskNotImplementedError, ValidationError
 
 __all__ = [
     "BACKEND_REQUEST_SCHEMA_VERSION",
@@ -15,6 +17,7 @@ __all__ = [
     "DetectionEvidence",
     "DetectionRequest",
     "DetectionResponse",
+    "DetectionModelRegistry",
     "DetectionService",
     "ImageInput",
     "StandardImageResult",

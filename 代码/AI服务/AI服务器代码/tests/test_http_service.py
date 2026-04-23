@@ -43,6 +43,13 @@ class AIHTTPServiceTest(unittest.TestCase):
             with self.assertRaises(TimeoutError):
                 ai_http_service.dispatch_detection_request({"task_type": "image"}, timeout_seconds=0.01)
 
+    def test_handle_management_registry_request_uses_service(self):
+        expected = {"status": "ok", "default_image_profile": "default"}
+        with patch.object(ai_http_service.SERVICE, "management_payload", return_value=expected) as mock_handle:
+            response = ai_http_service.handle_management_registry_request("fast")
+        self.assertEqual(response, expected)
+        mock_handle.assert_called_once_with("fast")
+
 
 if __name__ == "__main__":
     unittest.main()

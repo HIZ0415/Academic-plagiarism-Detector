@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from .image_detector import ImageDetector
-from .image_methods import build_image_methods
+from .model_registry import DetectionModelRegistry
 from .task_handlers import ImageTaskHandler, UnimplementedTaskHandler
 
 
-def build_task_handlers():
-    image_detector = ImageDetector(methods=build_image_methods())
+def build_task_handlers(model_registry: DetectionModelRegistry | None = None):
+    model_registry = model_registry or DetectionModelRegistry.load()
     return {
-        "image": ImageTaskHandler(image_detector),
+        "image": ImageTaskHandler(model_registry=model_registry),
         "paper": UnimplementedTaskHandler("paper"),
         "review": UnimplementedTaskHandler("review"),
     }

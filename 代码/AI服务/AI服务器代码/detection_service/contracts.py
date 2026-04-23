@@ -66,6 +66,7 @@ class DetectionContext:
     parameters: Dict[str, Any]
     model_version: str
     batch_id: Optional[str] = None
+    model_profile: Optional[str] = None
 
     @property
     def threshold(self) -> float:

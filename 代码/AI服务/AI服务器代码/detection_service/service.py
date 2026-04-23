@@ -4,23 +4,32 @@ import base64
 import json
 import shutil
 import tempfile
+import threading
 import zipfile
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict
 
 from .contracts import BACKEND_REQUEST_SCHEMA_VERSION, DetectionContext, DetectionRequest, ImageInput
+from .model_registry import DetectionModelRegistry
 from .registry import build_task_handlers
-from .service_errors import TaskNotImplementedError, ValidationError
+from .service_errors import ValidationError
 
 
 class DetectionService:
-    def __init__(self) -> None:
-        self._task_handlers = build_task_handlers()
+    def __init__(self, model_registry: DetectionModelRegistry | None = None) -> None:
+        self._reload_lock = threading.RLock()
+        self._model_registry = model_registry or DetectionModelRegistry.load()
+        self._task_handlers = build_task_handlers(self._model_registry)
         self._implemented_tasks = {"image"}
         self._reserved_tasks = {"paper", "review"}
+        self._reload_count = 0
+        self._last_reload_at: str | None = None
+        self._last_reload_error: str | None = None
 
     def health_payload(self) -> Dict[str, Any]:
+        self._refresh_registry_if_needed()
         image_handler = self._task_handlers["image"]
         return {
             "status": "ok",
@@ -28,19 +37,25 @@ class DetectionService:
             "supported_tasks": sorted(self._implemented_tasks),
             "reserved_tasks": sorted(self._reserved_tasks),
             "result_format": "standard-evidence-v1",
+            **self._model_registry.metadata(),
+            "image_profile_details": self._model_registry.describe_image_profiles(),
             "image_methods": image_handler.method_names,
+            "registry_reload": self._reload_status_payload(),
         }
 
     def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        self._refresh_registry_if_needed()
         request = self._parse_request(request_data)
         if request.task_type not in self._task_handlers:
             raise ValidationError(f"unsupported task_type: {request.task_type}")
 
+        model_profile = self._resolve_model_profile(request)
         context = DetectionContext(
             task_type=request.task_type,
             parameters=request.parameters,
-            model_version=self._resolve_model_version(request),
+            model_version=self._resolve_model_version(request, model_profile),
             batch_id=request.batch_id,
+            model_profile=model_profile,
         )
 
         extracted_inputs = None
@@ -52,6 +67,18 @@ class DetectionService:
                 ).to_dict()
 
         return self._task_handlers[request.task_type].detect(request, context, extracted_inputs).to_dict()
+
+    def management_payload(self, profile_name: str | None = None) -> Dict[str, Any]:
+        self._refresh_registry_if_needed()
+        payload = {
+            "status": "ok",
+            **self._model_registry.metadata(),
+            "image_profile_details": self._model_registry.describe_image_profiles(),
+            "registry_reload": self._reload_status_payload(),
+        }
+        if profile_name is not None:
+            payload["selected_image_profile"] = self._model_registry.describe_image_profile(profile_name)
+        return payload
 
     def build_request_from_files(
         self,
@@ -117,9 +144,55 @@ class DetectionService:
             payload_base64=payload_base64,
         )
 
-    @staticmethod
-    def _resolve_model_version(request: DetectionRequest) -> str:
-        return str(request.parameters.get("model_version") or f"{request.task_type}-detector-service-2026-04")
+    def _resolve_model_profile(self, request: DetectionRequest) -> str | None:
+        if request.task_type != "image":
+            return None
+        requested_profile = request.parameters.get("model_profile")
+        if requested_profile is None:
+            return self._model_registry.default_image_profile
+        if not isinstance(requested_profile, str):
+            raise ValidationError("parameters.model_profile must be a string")
+        return self._model_registry.resolve_image_profile(requested_profile).name
+
+    def _resolve_model_version(self, request: DetectionRequest, model_profile: str | None) -> str:
+        requested_version = request.parameters.get("model_version")
+        if requested_version:
+            return str(requested_version)
+        if request.task_type == "image":
+            profile = self._model_registry.resolve_image_profile(model_profile)
+            return profile.model_version
+        return f"{request.task_type}-detector-service-2026-04"
+
+    def _refresh_registry_if_needed(self) -> bool:
+        with self._reload_lock:
+            try:
+                current_mtime_ns = self._model_registry.config_path.stat().st_mtime_ns
+            except OSError as exc:
+                self._last_reload_error = f"failed to stat model registry: {exc}"
+                return False
+
+            if current_mtime_ns == self._model_registry.config_mtime_ns:
+                return False
+
+            try:
+                reloaded_registry = DetectionModelRegistry.load(self._model_registry.config_path)
+            except ValidationError as exc:
+                self._last_reload_error = str(exc)
+                return False
+
+            self._model_registry = reloaded_registry
+            self._task_handlers = build_task_handlers(self._model_registry)
+            self._reload_count += 1
+            self._last_reload_at = datetime.now(timezone.utc).isoformat()
+            self._last_reload_error = None
+            return True
+
+    def _reload_status_payload(self) -> Dict[str, Any]:
+        return {
+            "reload_count": self._reload_count,
+            "last_reload_at": self._last_reload_at,
+            "last_reload_error": self._last_reload_error,
+        }
 
     def _extract_images(self, request: DetectionRequest, temp_dir: Path) -> list[ImageInput]:
         try:
