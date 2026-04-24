@@ -16,20 +16,16 @@
 
       <v-list density="compact" nav>
         <v-list-item prepend-icon="mdi-home" title="主页" value="home" @click="goToHome"></v-list-item>
-        <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-image" title="上传任务" value="upload"
+        <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-image" title="学术检测" value="upload"
           @click="goToUpload"></v-list-item>
         <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-history" title="检测历史" value="history"
           @click="goToHistory"></v-list-item>
-        <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-file-search-outline" title="论文AIGC"
-          value="paper-aigc" @click="goToPaperAigc"></v-list-item>
         <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-gavel" title="人工审核" value="annual"
           @click="gotoAnnual"></v-list-item>
         <v-list-item v-if="userStore.role === 'reviewer'" prepend-icon="mdi-book-open-page-variant" title="审阅"
           value="review" @click="goToReview"></v-list-item>
         <v-list-item v-if="isLoggedIn" prepend-icon="mdi-account" title="个人主页" value="profile"
           @click="goToProfile"></v-list-item>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-logout" title="退出登录" value="logout"
-          @click="handleLogout"></v-list-item>
         <v-list-item v-else prepend-icon="mdi-login" title="登录" value="login" @click="goToLogin"></v-list-item>
       </v-list>
     </v-navigation-drawer>
@@ -57,15 +53,11 @@
       </v-btn>
       <v-btn v-if="userStore.role === 'publisher'" to="/upload" value="upload">
         <v-icon>mdi-image</v-icon>
-        <span>上传任务</span>
+        <span>学术检测</span>
       </v-btn>
       <v-btn v-if="userStore.role === 'publisher'" to="/history" value="history">
         <v-icon>mdi-history</v-icon>
         <span>检测历史</span>
-      </v-btn>
-      <v-btn v-if="userStore.role === 'publisher'" to="/detect/paper" value="paper-aigc">
-        <v-icon>mdi-file-search-outline</v-icon>
-        <span>论文AIGC</span>
       </v-btn>
       <v-btn v-if="userStore.role === 'publisher'" to="/annual" value="annual">
         <v-icon>mdi-gavel</v-icon>
@@ -78,10 +70,6 @@
       <v-btn v-if="isLoggedIn" to="/profile" value="profile">
         <v-icon>mdi-account</v-icon>
         <span>个人主页</span>
-      </v-btn>
-      <v-btn v-if="isLoggedIn" @click="handleLogout" value="logout">
-        <v-icon>mdi-logout</v-icon>
-        <span>退出登录</span>
       </v-btn>
       <v-btn v-else @click="goToLogin" value="login">
         <v-icon>mdi-login</v-icon>
@@ -280,6 +268,14 @@ const markAsRead = async (item: Notification) => {
 
 
 const goToHome = () => {
+  if (userStore.role === 'publisher') {
+    router.push('/upload')
+    return
+  }
+  if (userStore.role === 'reviewer') {
+    router.push('/review')
+    return
+  }
   router.push('/')
 }
 
@@ -289,10 +285,6 @@ const goToUpload = () => {
 
 const goToHistory = () => {
   router.push('/history')
-}
-
-const goToPaperAigc = () => {
-  router.push('/detect/paper')
 }
 
 const gotoAnnual = () => {
