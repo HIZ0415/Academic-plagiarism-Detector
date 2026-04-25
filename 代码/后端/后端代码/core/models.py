@@ -278,12 +278,28 @@ class DetectionTask(models.Model):
         ('pending', '待处理'),
         ('in_progress', '进行中'),
         ('completed', '已完成'),
+        ('failed', '失败'),
+    ]
+    TASK_TYPE_CHOICES = [
+        ('image_detection', '图像检测'),
+        ('paper_aigc', '论文AIGC检测'),
+        ('resource_check', '学术资源检测'),
+        ('review_detection', 'Review检测'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)  # 任务属于哪个用户
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, db_index=True, null=True, blank=True)
+    task_type = models.CharField(max_length=32, choices=TASK_TYPE_CHOICES, default='image_detection')
+    paper_file = models.ForeignKey(
+        FileManagement,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='paper_detection_tasks'
+    )
     task_name = models.CharField(max_length=255)  # 任务名称，用户可以自定义
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')  # 任务状态
+    error_message = models.TextField(blank=True, default='')
     upload_time = models.DateTimeField(default=timezone.localtime)  # 上传时间
     completion_time = models.DateTimeField(null=True, blank=True)  # 完成时间（如果已完成）
     report_file = models.FileField(upload_to='reports/', null=True, blank=True,

@@ -629,10 +629,52 @@ import os
 from django.conf import settings
 from django.http import FileResponse
 @api_view(['GET'])  # 明确指定允许的 HTTP 方法
+@permission_classes([IsAuthenticated])
 def generate_manual_review_report_view(request, review_id):
-    review = ManualReview.objects.get(id=review_id)
-    report_path = generate_manual_review_report(review)
-    # return Response({"report_url": review.report_file.url})
+    review = (
+        ManualReview.objects
+        .select_related('review_request', 'review_request__user', 'reviewer')
+        .filter(id=review_id)
+        .first()
+    )
+
+    if review is None:
+        review_request = ReviewRequest.objects.filter(id=review_id).first()
+        if review_request is None:
+            return Response({"detail": "Review request or manual review not found."}, status=404)
+
+        candidate_reviews = ManualReview.objects.filter(review_request=review_request)
+        if request.user.role == 'reviewer':
+            candidate_reviews = candidate_reviews.filter(reviewer=request.user)
+        elif request.user.role == 'publisher':
+            if review_request.user_id != request.user.id:
+                return Response({"detail": "Permission denied."}, status=403)
+        elif not request.user.is_staff:
+            return Response({"detail": "Permission denied."}, status=403)
+
+        review = (
+            candidate_reviews
+            .filter(report_file__isnull=False)
+            .order_by('-review_time', '-id')
+            .first()
+            or candidate_reviews.order_by('-review_time', '-id').first()
+        )
+        if review is None:
+            return Response({"detail": "No manual review found for this review request."}, status=404)
+    else:
+        if request.user.role == 'reviewer' and review.reviewer_id != request.user.id:
+            return Response({"detail": "Permission denied."}, status=403)
+        if request.user.role == 'publisher' and review.review_request.user_id != request.user.id:
+            return Response({"detail": "Permission denied."}, status=403)
+        if request.user.role not in ('reviewer', 'publisher') and not request.user.is_staff:
+            return Response({"detail": "Permission denied."}, status=403)
+
+    # 若还没生成过报告，先尝试生成
+    if not review.report_file:
+        generate_manual_review_report(review)
+        review.refresh_from_db()
+    if not review.report_file:
+        return Response({"detail": "Report is still being generated."}, status=202)
 
     # task = review.review_request.detection_result.image_upload.detection_task
     #
