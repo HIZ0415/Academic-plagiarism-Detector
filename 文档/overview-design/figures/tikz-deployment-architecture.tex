@@ -1,0 +1,31 @@
+\begin{tikzpicture}[
+    node distance=1.4cm and 1.6cm,
+    box/.style={rectangle, rounded corners=4pt, draw, align=center, minimum width=3.2cm, minimum height=1.0cm, fill=blue!6},
+    service/.style={rectangle, rounded corners=4pt, draw, align=center, minimum width=3.2cm, minimum height=1.0cm, fill=green!8},
+    store/.style={cylinder, shape border rotate=90, draw, align=center, minimum width=2.4cm, minimum height=1.0cm, fill=yellow!12},
+    queue/.style={rectangle, rounded corners=4pt, draw, align=center, minimum width=2.8cm, minimum height=1.0cm, fill=orange!12},
+    arrow/.style={-Latex, thick}
+]
+
+\node[box] (user) {用户浏览器\\用户端/管理端};
+\node[box, right=of user] (nginx) {Nginx/网关\\静态资源与反向代理};
+\node[service, right=of nginx] (backend) {Django 后端\\REST API/业务编排};
+\node[queue, below=of backend] (redis) {Redis\\Channels/Celery Broker};
+\node[service, right=of redis] (worker) {Celery Worker\\检测/报告任务};
+\node[service, right=of backend] (ai) {AI 推理服务\\HTTP/模型运行};
+\node[store, below=of nginx] (media) {文件存储\\上传/结果/报告};
+\node[store, below=of worker] (mysql) {MySQL\\业务数据};
+
+\draw[arrow] (user) -- node[above]{HTTP/WebSocket} (nginx);
+\draw[arrow] (nginx) -- node[above]{/api/} (backend);
+\draw[arrow] (nginx.south) -- node[left]{/media/} (media.north);
+\draw[arrow] (backend) -- node[right]{消息/任务} (redis);
+\draw[arrow] (redis) -- node[below]{队列消费} (worker);
+\draw[arrow] (worker) -- node[above]{推理请求} (ai);
+\draw[arrow] (backend) |- node[pos=0.2,left]{元数据} (mysql);
+\draw[arrow] (worker) -- node[right]{结果回写} (mysql);
+\draw[arrow] (backend) -- node[left]{文件读写} (media);
+\draw[arrow] (worker) |- node[pos=0.25,right]{报告/可视化} (media);
+\draw[arrow] (backend) -- node[above]{实时通知} (nginx);
+
+\end{tikzpicture}

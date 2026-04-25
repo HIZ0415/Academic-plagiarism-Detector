@@ -1,0 +1,47 @@
+\begin{tikzpicture}[
+    font=\scriptsize,
+    box/.style={draw, rounded corners=2pt, line width=0.6pt},
+    sec/.style={draw, rounded corners=2pt, line width=0.6pt, fill=gray!6},
+    lbl/.style={anchor=west, align=left},
+]
+% Page frame
+\draw[box] (0,0) rectangle (16,9.2);
+\node[lbl] at (0.4,8.85) {\textbf{全篇论文 AIGC 检测页（/detect/paper）}};
+
+% Header / breadcrumbs
+\draw[sec] (0.6,8.15) rectangle (15.4,8.55);
+\node[lbl, text width=14.2cm] at (0.9,8.35) {导航/标题区：论文检测 \quad|\quad 任务状态 \quad|\quad 帮助说明};
+
+% Left: upload + meta
+\draw[sec] (0.6,4.9) rectangle (10.2,7.95);
+\node[lbl] at (0.9,7.65) {\textbf{A. 上传与格式说明}};
+\node[lbl, text width=9.0cm] at (0.9,7.25) {文件选择（PDF/DOCX/TXT） \quad|\quad 大小/格式校验提示};
+\node[lbl, text width=9.0cm] at (0.9,6.85) {组织/个人配额提示 \quad|\quad 隐私与合规提示};
+\draw[box] (0.9,5.35) rectangle (9.9,6.55);
+\node at (5.4,5.95) {拖拽上传区 / 文件列表（占位）};
+
+\draw[sec] (0.6,1.45) rectangle (10.2,4.6);
+\node[lbl] at (0.9,4.30) {\textbf{B. 任务元数据与检测选项}};
+\node[lbl] at (0.9,3.90) {任务名称 \quad| \quad 学科标签（可选）};
+\node[lbl, text width=9.0cm] at (0.9,3.50) {开关：事实性鉴伪（可选） \quad|\quad 模型/阈值（占位）};
+\draw[box] (0.9,1.85) rectangle (9.9,3.10);
+\node at (5.4,2.45) {参数表单区域（占位）};
+
+% Right: submit + status + summary
+\draw[sec] (10.6,4.9) rectangle (15.4,7.95);
+\node[lbl] at (10.9,7.65) {\textbf{C. 提交与状态}};
+\draw[box] (10.9,7.10) rectangle (15.1,7.42);
+\node at (13.0,7.26) {提交检测 / 取消};
+\draw[box] (10.9,5.35) rectangle (15.1,6.95);
+\node[align=center, text width=4.0cm] at (13.0,6.15) {状态卡片：排队/进行中/完成/失败\\进度条 + 重试 + 前往记录};
+
+\draw[sec] (10.6,1.45) rectangle (15.4,4.6);
+\node[lbl] at (10.9,4.30) {\textbf{D. 结果摘要（完成后显示）}};
+\draw[box] (10.9,1.85) rectangle (15.1,4.00);
+\node[align=center, text width=4.0cm] at (13.0,2.95) {全文风险等级 + AI贡献占比（占位）\\高风险段落入口/报告下载入口};
+
+% Footer actions
+\draw[sec] (0.6,0.45) rectangle (15.4,1.10);
+\node[lbl, text width=14.2cm] at (0.9,0.78) {页脚辅助：FAQ \quad|\quad 反馈入口 \quad|\quad 任务提示（可选）};
+\end{tikzpicture}
+

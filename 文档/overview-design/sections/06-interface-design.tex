@@ -1,7 +1,7 @@
-﻿\section{接口设计}
+\section{接口设计}
 
 \subsection{接口设计目标}
-本系统接口设计的目标，是在当前项目已有的用户端、管理端、后端业务服务、异步任务调度和实时通知基础上，形成统一、清晰、可扩展的接口体系。接口设计既要服务当前已实现的图像上传、图像检测、人工审核、通知与管理功能，也要为论文检测、Review 检测、综合鉴伪报告和模型扩展预留统一接入方式。
+本系统接口设计的目标，是在当前项目已有的用户端、管理端、后端业务服务、异步任务调度和实时通知基础上，形成统一、清晰、可扩展的接口体系。接口设计既要服务当前已实现的图像上传、图像检测、人工审核、通知与管理功能，也要为论文检测、Review 检测、综合鉴伪报告和模型扩展预留统一接入方式。与之配套，用户端需配置清晰的页面路由与导航结构（见本章第~\ref{sec:user-client-routing}~节），使 REST/WebSocket 能力与界面入口一一可追溯。
 
 从系统边界上看，本章接口设计主要覆盖三类接口：
 \begin{itemize}[leftmargin=2em]
@@ -375,5 +375,136 @@
     \item 对现有路径命名、重复路由和个别异常路径进行收敛，提升整体接口规范性。
 \end{itemize}
 
+\subsection{用户端页面框架与导航路由设计}\label{sec:user-client-routing}
+用户端基于 Vue~3 与 Vuetify，采用 \texttt{vue-router} 文件式路由（\texttt{src/pages} 目录映射 URL）。迭代阶段需在保留现有图像上传、检测历史、人工审核与审阅员待办等能力的前提下，补齐\textbf{全篇论文 AIGC 检测}、\textbf{同行评审 Review 文本检测}与\textbf{造假检测记录统一管理}的页面骨架及导航入口，使三类检测对象在交互结构上对齐、在路由上可区分、在记录侧可汇总。
+
+\subsubsection{全局壳层与导航原则}
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{布局壳层}：继续使用应用根布局中的顶栏、侧栏（桌面端）与底部导航（移动端）承载一级入口；业务页面仅负责 \texttt{router-view} 内主内容区，不在各业务页重复实现顶栏与认证态判断。
+    \item \textbf{鉴权与角色}：沿用全局路由守卫，未登录用户统一跳转登录页；发布者（\texttt{publisher}）可见检测与记录相关入口，审核者（\texttt{reviewer}）可见人工审阅待办入口，与需求规格中用户展示与权限划分一致。
+    \item \textbf{路由命名区分}：现有路径 \path{/review} 表示审核参与者「我的审阅任务」，与「同行评审 Review 文本鉴伪检测」业务不同；迭代中 Review 文本检测应使用独立路径前缀（如 \path{/detect/review}），避免语义冲突与后期维护混淆。
+    \item \textbf{异步任务一致体验}：论文与 Review 检测均为长时任务，页面框架须预留任务 ID、状态轮询或 WebSocket 订阅、错误与重试区域，与图像检测任务交互模式保持一致，降低用户学习成本。
+\end{itemize}
+
+\subsubsection{全篇论文 AIGC 检测页面框架}
+\textbf{目标：}支撑用户上传论文文件（如 PDF、DOCX）、填写任务名称与检测选项、提交后查看排队/进行中/完成状态，并在完成后跳转结果摘要或统一记录详情。
+
+\textbf{建议路由：}
+\begin{itemize}[leftmargin=2em]
+    \item \path{/detect/paper}：论文检测主页面（上传区 + 参数区 + 提交区）；
+    \item \path{/detect/paper/task/:taskId}：单任务进度与结果入口（可与记录详情复用同一详情布局，仅默认来源为「从论文检测进入」）。
+\end{itemize}
+
+\textbf{页面分区（框架级）：}
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{上传与格式说明区}：文件选择、大小与格式提示、组织配额或次数提示（与后端 \path{/api/organization/usage/} 等接口衔接，具体字段以实现为准）；
+    \item \textbf{任务元数据区}：任务名称、是否启用事实性鉴伪等开关（与论文检测模块参数对齐）；
+    \item \textbf{状态与操作区}：提交按钮、进行中进度、失败重试与「前往检测记录」链接；
+    \item \textbf{预留结果摘要区}：任务完成后展示全文级风险、段落级入口或跳转详情的按钮（详细可视化在详细设计阶段展开）。
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-ui-paper-detect-wireframe.tex}}
+    \caption{用户端全篇论文 AIGC 检测页线框图（最小框架）}
+\end{figure}
+
+\subsubsection{同行评审 Review 检测页面框架}
+\textbf{目标：}支撑用户粘贴 Review 文本或上传含评审意见的文件，发起针对「虚假评审/模板化/AI 生成倾向」的检测，并复用统一任务状态与通知机制。
+
+\textbf{建议路由：}
+\begin{itemize}[leftmargin=2em]
+    \item \path{/detect/review}：Review 检测主页面（文本编辑区或文件上传区二选一或并列）；
+    \item \path{/detect/review/task/:taskId}：单任务进度与结果入口（同样可与记录详情复用）。
+\end{itemize}
+
+\textbf{页面分区（框架级）：}
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{输入模式切换}：纯文本输入与文件上传切换，便于短评与长文档两种场景；
+    \item \textbf{检测参数区}：语言、阈值或策略占位（与评审检测模块后续接口字段对齐）；
+    \item \textbf{证据展示占位}：为可疑片段高亮、模板化提示预留主内容槽位，框架阶段可用占位组件标出数据流挂载点；
+    \item \textbf{合规提示区}：提示用户仅检测有权处理的评审文本，符合学术数据使用边界。
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-ui-review-detect-wireframe.tex}}
+    \caption{用户端 Review 文本检测页线框图（最小框架）}
+\end{figure}
+
+\subsubsection{造假检测记录管理页面框架与路由}
+\textbf{目标：}对应需求中的「造假检测记录管理」：用户按时间查看本人发起的检测任务，覆盖\textbf{学术图像、全篇论文、Review}等类型，支持筛选、检索、进入详情与报告下载（与 FR-YHZS-0002 一致）。
+
+\textbf{路由策略：}
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{演进方案 A（兼容现有）}：保留现有 \path{/history} 作为统一「检测记录」入口，在页面内以 Tab 或分段列表区分任务类型（图像 / 论文 / Review），列表项展示任务类型标签、状态、时间与报告入口；
+    \item \textbf{演进方案 B（路径语义化）}：新增 \path{/records} 作为统一记录中心，\path{/history} 通过路由重定向至 \path{/records}，减少后续文档与代码中的「历史」与「全类型记录」双轨表述。
+\end{itemize}
+
+\textbf{建议子路由（记录详情，可与各检测子页复用）：}
+\begin{itemize}[leftmargin=2em]
+    \item \path{/records/:taskId} 或 \path{/history/:taskId}：单条检测记录详情（状态时间线、类型专属结果槽位、报告下载）；
+    \item 查询参数占位：在记录列表路径上附加查询参数 \texttt{type}（取值如 \texttt{paper}、\texttt{image}、\texttt{review}）支持类型筛选，便于导航栏「记录」直达某类列表。
+\end{itemize}
+
+\textbf{页面分区（框架级）：}
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{筛选与检索条}：时间范围、内容类型、关键字（任务名等）；
+    \item \textbf{列表区}：分页或虚拟滚动列表，列含类型、名称、状态、时间、操作（详情、下载、删除若开放）；
+    \item \textbf{空状态与加载状态}：无数据与接口失败时的统一占位；
+    \item \textbf{详情抽屉或独立详情页}：与 \path{/api/user-tasks/}、\path{/api/tasks/<task_id>/results/} 等统一任务接口配合，详情内按 \texttt{task\_type} 或等价字段切换结果子视图。
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-ui-records-list-wireframe.tex}}
+    \caption{用户端检测记录列表页线框图（最小框架）}
+\end{figure}
+
+\subsubsection{检测记录详情页框架（复用统一任务详情）}
+检测记录详情页用于承载三类检测对象的统一任务状态展示，并在同一页面内通过“类型专属结果槽位”挂载图像可疑区域、论文段落级结果或 Review 可疑片段等差异化内容。该页面应提供报告下载与可选的删除、人工审核入口，使用户能从“记录中心”闭环进入报告与复核链路。
+
+\begin{figure}[H]
+    \centering
+    \resizebox{0.98\textwidth}{!}{\input{figures/tikz-ui-records-detail-wireframe.tex}}
+    \caption{用户端检测记录详情页线框图（最小框架）}
+\end{figure}
+
+\subsubsection{主导航与路由配置一览}
+下表给出迭代目标下用户端一级导航与路径的\textbf{概要设计约定}（实现时可按团队规范微调路径字符串，但应保持「审阅任务」与「Review 文本检测」路径分离）。
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|p{3.4cm}|p{4.2cm}|p{6.4cm}|}
+\hline
+导航名称（建议） & 路径 & 说明 \\ \hline
+\endfirsthead
+\hline
+导航名称（建议） & 路径 & 说明 \\ \hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+主页 & \path{/} & 欢迎与功能导览，可补充三类检测入口卡片。 \\ \hline
+图像检测（现有） & \path{/upload}、\path{/step/:id} 等 & 保持现有上传与步骤流；导航标题可逐步改为「图像检测」以与论文、Review 并列。 \\ \hline
+论文 AIGC 检测 & \path{/detect/paper}（及任务子路径） & 发布者可见；对接统一检测任务创建接口的论文类型。 \\ \hline
+Review 文本检测 & \path{/detect/review}（及任务子路径） & 发布者可见；与 \path{/review}（审阅员待办）严格区分。 \\ \hline
+检测记录 & \path{/history} 或 \path{/records} & 统一造假检测记录管理；含筛选与详情框架。 \\ \hline
+人工审核（现有） & \path{/annual} & 保持现网路径；迭代中在文案与详情中扩展对论文、Review 审核的展示占位。 \\ \hline
+我的审阅（现有） & \path{/review} & 审核者任务列表，非 Review 文本自动检测。 \\ \hline
+个人主页 & \path{/profile} & 用户资料与设置。 \\ \hline
+登录 & \path{/login} & 未登录入口。 \\ \hline
+\end{longtable}
+\endgroup
+
+\subsubsection{与后端接口的衔接说明}
+论文检测、Review 检测与统一记录在接口层应逐步收敛到「统一任务提交 + 统一状态查询 + 差异化结果查询」协议（见本章前文演进方向）；用户端路由仅负责\textbf{按任务类型与任务 ID 组织视图}，不在前端硬编码具体模型或算法版本。检测记录页应优先消费带任务类型与分页的任务列表接口，避免为图像、论文、Review 各写一套列表页而增加导航与权限维护成本。
+
+\subsubsection{本小节与实现关系}
+当前仓库用户端已实现图像上传、检测历史、人工审核与审阅任务等页面及 \path{/history}、\path{/upload}、\path{/review} 等路由；本小节给出论文与 Review 检测的\textbf{页面框架与路由配置概要}，作为详细设计与编码迭代的依据。落地时需在 \texttt{App.vue}（或等价布局）中为发布者增加「论文检测」「Review 检测」导航项，并实现对应 \texttt{pages} 下路由文件，使导航、路由与统一记录中心三者一致。
+
 \subsection{本章小结}
-本章从概要设计角度给出了系统接口体系的总体设计。当前项目已经形成以用户认证、资源上传、图像检测、人工审核、通知和管理端治理为主体的接口闭环；后续论文检测与 Review 检测能力可在统一资源、统一任务和差异化结果接口框架下继续扩展。接口设计的核心目标不是增加更多零散接口，而是在现有工程基础上形成可持续演进的统一接口体系。
+本章从概要设计角度给出了系统接口体系的总体设计，并补充了\textbf{用户端}在论文 AIGC 检测、Review 文本检测与造假检测记录管理方面的页面框架与导航路由约定。当前项目已经形成以用户认证、资源上传、图像检测、人工审核、通知和管理端治理为主体的接口闭环；后续论文检测与 Review 检测能力可在统一资源、统一任务和差异化结果接口框架下继续扩展，并与统一检测记录路由协同演进。接口设计的核心目标不是增加更多零散接口，而是在现有工程基础上形成可持续演进的统一接口体系。

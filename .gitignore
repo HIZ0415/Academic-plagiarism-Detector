@@ -119,3 +119,7 @@ _preview/
 *.ckpt
 *.safetensors
 *.pkl
+
+# AI service generated artifacts
+代码/AI服务/AI服务器代码/detection_service/artifacts/minimal_dataset/
+代码/AI服务/AI服务器代码/detection_service/artifacts/*_eval.json

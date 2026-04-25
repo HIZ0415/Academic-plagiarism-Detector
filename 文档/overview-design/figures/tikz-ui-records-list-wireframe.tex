@@ -1,0 +1,47 @@
+\begin{tikzpicture}[
+    font=\scriptsize,
+    box/.style={draw, rounded corners=2pt, line width=0.6pt},
+    sec/.style={draw, rounded corners=2pt, line width=0.6pt, fill=gray!6},
+    pill/.style={draw, rounded corners=10pt, line width=0.6pt, fill=gray!8},
+    lbl/.style={anchor=west, align=left},
+]
+\draw[box] (0,0) rectangle (16,9.2);
+\node[lbl] at (0.4,8.85) {\textbf{检测记录列表页（/history 或 /records）}};
+
+% Header
+\draw[sec] (0.6,8.15) rectangle (15.4,8.55);
+\node[lbl] at (0.9,8.35) {标题：检测记录 \quad|\quad 统计摘要（可选）};
+
+% Filters row
+\draw[sec] (0.6,7.10) rectangle (15.4,7.95);
+\node[lbl] at (0.9,7.70) {\textbf{筛选与检索：}};
+\draw[pill] (3.0,7.25) rectangle (5.2,7.80);
+\node at (4.1,7.52) {类型：全部};
+\draw[pill] (5.5,7.25) rectangle (8.3,7.80);
+\node at (6.9,7.52) {时间：近半年};
+\draw[pill] (8.6,7.25) rectangle (12.0,7.80);
+\node at (10.3,7.52) {关键字：任务名};
+\draw[pill] (12.3,7.25) rectangle (13.7,7.80);
+\node at (13.0,7.52) {查询};
+\draw[pill] (14.0,7.25) rectangle (15.2,7.80);
+\node at (14.6,7.52) {重置};
+
+% Table header
+\draw[sec] (0.6,6.30) rectangle (15.4,6.90);
+\node[lbl, text width=14.2cm] at (0.9,6.58) {列：类型 \quad|\quad 任务名称 \quad|\quad 状态 \quad|\quad 时间 \quad|\quad 操作（详情/报告/删除）};
+
+% List area with rows
+\draw[box] (0.6,1.35) rectangle (15.4,6.20);
+\foreach \y/\t in {5.75/1,5.05/2,4.35/3,3.65/4,2.95/5,2.25/6,1.55/7} {
+  \draw (0.6,\y) -- (15.4,\y);
+}
+\node[lbl, text width=14.2cm] at (0.9,5.95) {[图像] \quad 任务A \quad|\quad completed \quad|\quad 2026-04-19 \quad|\quad 详情/下载};
+\node[lbl, text width=14.2cm] at (0.9,5.25) {[\textbf{论文}] \quad 任务B \quad|\quad in\_progress \quad|\quad 2026-04-18 \quad|\quad 查看进度};
+\node[lbl, text width=14.2cm] at (0.9,4.55) {[\textbf{Review}] \quad 任务C \quad|\quad failed \quad|\quad 2026-04-17 \quad|\quad 重试};
+\node[lbl] at (0.9,3.85) {…（更多记录）};
+
+% Pagination
+\draw[sec] (0.6,0.45) rectangle (15.4,1.10);
+\node[lbl, text width=14.2cm] at (0.9,0.78) {分页：上一页 \quad 1 / N \quad 下一页 \quad|\quad 每页条数};
+\end{tikzpicture}
+

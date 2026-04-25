@@ -1,4 +1,5 @@
 import http from './request'
+import type { DashboardPoint } from '@/types/core'
 
 export default {
   // 获取图像标签统计
@@ -12,19 +13,19 @@ export default {
     return http.get('/dashboard/top_organizations/')
   },
   getDailyTaskCount: () => {
-    return http.get('/dashboard/daily_task_count/')
+    return http.get<DashboardPoint[]>('/dashboard/daily_task_count/')
   },
   getDailyReviewRequestCount: () => {
-    return http.get('/dashboard/daily_review_request_count/')
+    return http.get<DashboardPoint[]>('/dashboard/daily_review_request_count/')
   },
   getDailyCompletedManualReviewCount: () => {
-    return http.get('/dashboard/daily_completed_manual_review_count/')
+    return http.get<DashboardPoint[]>('/dashboard/daily_completed_manual_review_count/')
   },
   getDailyActiveUsers: () => {
-    return http.get('/dashboard/daily_active_users/')
+    return http.get<DashboardPoint[]>('/dashboard/daily_active_users/')
   },
   getDailyActiveOrganizations: () => {
-    return http.get('/dashboard/daily_active_organizations/')
+    return http.get<DashboardPoint[]>('/dashboard/daily_active_organizations/')
   },
   getDetectionMethodStats: () => {
     return http.get('/dashboard/get_sub_method_distribution_by_tag/')
