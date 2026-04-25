@@ -3,6 +3,14 @@ from .views.views_review import get_manualReview_from_reviewRequestId
 from .views.views_user import *
 from .views.views_imageupload import *
 from .views.views_dectection import *
+from .views.views_paper import (
+    upload_paper,
+    submit_aigc_task,
+    get_paper_task_status,
+    get_aigc_result,
+    submit_resource_check_task,
+    get_resource_check_result,
+)
 # 新增: 导入人工审查相关的视图类
 from .views import views_review, views_organization
 from .views import views_admin
@@ -58,6 +66,13 @@ urlpatterns = [
     path('upload/<int:file_id>/addTag/', add_file_tag, name='add_file_tag'),
     path('upload/<int:file_id>/delete/', delete_upload, name='delete_upload'),
     path('upload/get_all_file_images/<int:file_management_id>/', get_all_file_images, name='get_all_file_images'),
+    # 论文检测相关 URL（前后端联调新增）
+    path('paper/upload/', upload_paper, name='paper_upload'),
+    path('paper/aigc/submit/', submit_aigc_task, name='paper_aigc_submit'),
+    path('paper/tasks/<int:task_id>/status/', get_paper_task_status, name='paper_task_status'),
+    path('paper/aigc/<int:task_id>/result/', get_aigc_result, name='paper_aigc_result'),
+    path('paper/resource-check/submit/', submit_resource_check_task, name='paper_resource_submit'),
+    path('paper/resource-check/<int:task_id>/result/', get_resource_check_result, name='paper_resource_result'),
     # 图片检测相关的URL
     path('detection/<int:image_id>/', get_detection_result, name='image_detection'),
     path('detection/submit/', submit_detection2, name='submit_detection'),
@@ -75,7 +90,12 @@ urlpatterns = [
     path('publishers/<int:publisher_id>/reviewers/', views_review.get_reviewers_for_publisher),
     path('create_review_task_with_admin_check/', views_review.create_review_task_with_admin_check, name='create_review_task_with_admin_check'),
     path('get_request_completion_status/<int:task_id>/', views_review.get_request_completion_status, name='get_request_completion_status'),
+    path('get_task_completion_status/<int:task_id>', views_review.get_task_completion_status, name='get_task_completion_status_compat'),
+    path('get_task_completion_status/<int:task_id>/', views_review.get_task_completion_status, name='get_task_completion_status_compat_slash'),
     path('get_request_detail/<int:reviewRequest_id>/', views_review.get_request_detail, name='get_request_detail'),
+    path('get_task_detail/<int:task_id>/', views_review.get_task_detail, name='get_task_detail_compat'),
+    path('get_task_reviewer_detail/<int:task_id>/<int:reviewer_id>', views_review.get_task_reviewer_detail, name='get_task_reviewer_detail_compat'),
+    path('get_task_reviewer_detail/<int:task_id>/<int:reviewer_id>/', views_review.get_task_reviewer_detail, name='get_task_reviewer_detail_compat_slash'),
     path('get_reviewer_tasks/', views_review.get_reviewer_manual_request, name='get_reviewer_tasks'),
     path('get_all_reviewers/', views_review.get_all_reviewers_in_org, name='get_all_reviewers'),
     path('get_publisher_review_tasks/', views_review.get_publisher_review_tasks, name='get_publisher_review_tasks'),

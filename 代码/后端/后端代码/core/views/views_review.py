@@ -319,16 +319,41 @@ def get_request_completion_status(request, task_id):
     except DetectionTask.DoesNotExist:
         return Response({'error': 'Task not found'}, status=404)
 
-    review_requests = detection_task.detection_results.first().review_requests.all()
-    total_reviewers = review_requests.count()
-    completed_reviewers = review_requests.filter(status='completed').count()
+    review_requests = ReviewRequest.objects.filter(
+        detection_result__detection_task=detection_task
+    ).distinct()
+    if not review_requests.exists():
+        return Response({
+            'task_id': task_id,
+            'completion_percentage': 0.0
+        })
 
-    completion_percentage = (completed_reviewers / total_reviewers) * 100 if total_reviewers > 0 else 0
+    total_expected = ManualReview.objects.filter(review_request__in=review_requests).count()
+    completed_count = ManualReview.objects.filter(
+        review_request__in=review_requests,
+        status='completed'
+    ).count()
+
+    # 若管理员尚未审批并分配 ManualReview，则回退到 reviewers 总数口径
+    if total_expected == 0:
+        total_expected = sum(rr.reviewers.count() for rr in review_requests)
+        completed_count = 0
+
+    completion_percentage = (completed_count / total_expected) * 100 if total_expected > 0 else 0
 
     return Response({
         'task_id': task_id,
         'completion_percentage': completion_percentage
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_task_completion_status(request, task_id):
+    """
+    兼容旧前端命名：/get_task_completion_status/{taskId}
+    """
+    return get_request_completion_status(request, task_id)
 
 
 @api_view(['GET'])
@@ -399,6 +424,106 @@ def get_request_detail(request, reviewRequest_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def get_task_detail(request, task_id):
+    """
+    兼容旧前端命名：按 detection task_id 获取审核任务详情。
+    """
+    user_id = request.user.id
+    user = User.objects.get(id=user_id)
+    if user.role != 'publisher':
+        return Response({'error': 'Only publishers can view task details'}, status=403)
+
+    review_request = (
+        ReviewRequest.objects
+        .filter(user=user, detection_result__detection_task_id=task_id)
+        .order_by('-request_time')
+        .first()
+    )
+    if not review_request:
+        return Response({'error': 'ReviewRequest not found for this task'}, status=404)
+    return get_request_detail(request, review_request.id)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_task_reviewer_detail(request, task_id, reviewer_id):
+    """
+    兼容旧前端命名：按 task_id + reviewer_id 获取某审核员明细。
+    """
+    user_id = request.user.id
+    user = User.objects.get(id=user_id)
+    if user.role != 'publisher':
+        return Response({'error': 'Only publishers can view task details'}, status=403)
+
+    review_request = (
+        ReviewRequest.objects
+        .filter(user=user, detection_result__detection_task_id=task_id)
+        .order_by('-request_time')
+        .first()
+    )
+    if not review_request:
+        return Response({'error': 'ReviewRequest not found for this task'}, status=404)
+
+    image_obj = review_request.imgs.order_by('id').first()
+    if not image_obj:
+        return Response({'error': 'No images found in review request'}, status=404)
+
+    try:
+        manual_review = ManualReview.objects.get(
+            review_request=review_request,
+            reviewer_id=reviewer_id,
+            imgs__id=image_obj.id
+        )
+    except ManualReview.DoesNotExist:
+        return Response({'error': 'ManualReview not found'}, status=404)
+
+    try:
+        image_review = ImageReview.objects.get(
+            manual_review=manual_review,
+            img_id=image_obj.id
+        )
+    except ImageReview.DoesNotExist:
+        return Response({'error': 'ImageReview not found'}, status=404)
+
+    scores = [
+        image_review.score1,
+        image_review.score2,
+        image_review.score3,
+        image_review.score4,
+        image_review.score5,
+        image_review.score6,
+        image_review.score7
+    ]
+    reasons = [
+        image_review.reason1,
+        image_review.reason2,
+        image_review.reason3,
+        image_review.reason4,
+        image_review.reason5,
+        image_review.reason6,
+        image_review.reason7
+    ]
+    points = [
+        image_review.points1,
+        image_review.points2,
+        image_review.points3,
+        image_review.points4,
+        image_review.points5,
+        image_review.points6,
+        image_review.points7
+    ]
+
+    return Response({
+        'img_id': image_obj.id,
+        'scores': scores,
+        'reasons': reasons,
+        'points': points,
+        'result': image_review.result
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_publisher_review_tasks(request):
     user_id = request.user.id
     user = User.objects.get(id=user_id)
@@ -406,7 +531,7 @@ def get_publisher_review_tasks(request):
         return Response({'error': 'Only publishers can view their review tasks'}, status=403)
 
     # 获取查询参数
-    status = request.query_params.get('status', '')
+    status_filter = request.query_params.get('status', '')
     start_time = request.query_params.get('startTime', None)
     end_time = request.query_params.get('endTime', None)
     page = int(request.query_params.get('page', 1))
@@ -417,8 +542,8 @@ def get_publisher_review_tasks(request):
         'detection_result__detection_task').prefetch_related('reviewers', 'manual_reviews')
     review_requests = review_requests.order_by('-request_time')
 
-    if status:
-        review_requests = review_requests.filter(status1=status)
+    if status_filter:
+        review_requests = review_requests.filter(status1=status_filter)
     if start_time:
         review_requests = review_requests.filter(request_time__gte=start_time)
     if end_time:

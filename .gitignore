@@ -70,6 +70,15 @@ pnpm-debug.log*
 代码/前端/**/.output/
 代码/前端/**/.cache/
 
+# Frontend auto-generated files (local dev/runtime)
+代码/前端/**/.eslintrc-auto-import.json
+代码/前端/**/src/auto-imports.d.ts
+代码/前端/**/src/components.d.ts
+代码/前端/**/src/typed-router.d.ts
+
+# Local deployment notes
+服务器部署.md
+
 # IDE / editor
 .idea/
 .vscode/

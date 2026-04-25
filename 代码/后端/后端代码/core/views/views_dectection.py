@@ -168,6 +168,7 @@ def submit_detection2(request):
     detection_task = DetectionTask.objects.create(
         organization=user.organization,
         user=request.user,
+        task_type='image_detection',
         task_name=task_name,  # 使用用户提交的任务名称
         status='pending',  # 初始状态为"排队中"
         cmd_block_size=cmd_block_size,
@@ -309,6 +310,7 @@ def image2dr(request, image_id):
     try:
         detection_result = DetectionResult.objects.select_related('detection_task').get(
             image_upload_id=image_id,
+            detection_task__user=request.user,
         )
     except DetectionResult.DoesNotExist:
         return Response({"detail": "Image or task not found, or permission denied."}, status=404)
@@ -329,7 +331,7 @@ def download_image_report(request, image_id):
         # 获取与image_id关联且属于当前用户的DetectionResult及其关联的DetectionTask
         detection_result = DetectionResult.objects.select_related('detection_task').get(
             image_upload_id=image_id,
-            # detection_task__user=request.user
+            detection_task__user=request.user
         )
     except DetectionResult.DoesNotExist:
         return Response({"detail": "Image or task not found, or permission denied."}, status=404)
@@ -474,9 +476,10 @@ from ..utils.serializers_safe import serialize_value
 @permission_classes([IsAuthenticated])
 def detection_result_detail(request, result_id):
     dr = get_object_or_404(
-        DetectionResult,
+        DetectionResult.objects.filter(
+            Q(detection_task__user=request.user) | Q(image_upload__file_management__user=request.user)
+        ),
         id=result_id,
-        # image_upload__file_management__user=request.user
     )
 
     # -------- 解析 fields & include_matrix ------------------------------
@@ -526,9 +529,10 @@ def detection_result_detail(request, result_id):
 def detection_result_by_image(request, image_id):
     # 通过image_id获取对应的DetectionResult
     dr = get_object_or_404(
-        DetectionResult,
+        DetectionResult.objects.filter(
+            Q(detection_task__user=request.user) | Q(image_upload__file_management__user=request.user)
+        ),
         image_upload__id=image_id,
-        # image_upload__file_management__user=request.user
     )
 
     # -------- 解析 fields & include_matrix ------------------------------
@@ -577,7 +581,7 @@ def detection_result_by_image(request, image_id):
 def get_detection_task_status_normal(request, task_id):
     try:
         # 获取任务和关联的检测结果
-        detection_task = DetectionTask.objects.get(id=task_id)
+        detection_task = DetectionTask.objects.get(id=task_id, user=request.user)
         detection_results = DetectionResult.objects.filter(detection_task=detection_task)
 
         # 收集任务相关的图像和状态信息
@@ -619,6 +623,7 @@ class CustomPagination(PageNumberPagination):
             'tasks': data
         })
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_tasks(request):
@@ -650,9 +655,11 @@ def get_user_tasks(request):
         {
             'task_id': task.id,
             'task_name': task.task_name,
+            'task_type': task.task_type or 'image_detection',
             'upload_time': timezone.localtime(task.upload_time).strftime('%Y-%m-%d %H:%M:%S'),
             'status': task.status,
-            'completion_time': timezone.localtime(task.completion_time).strftime('%Y-%m-%d %H:%M:%S') if task.completion_time else None
+            'completion_time': timezone.localtime(task.completion_time).strftime('%Y-%m-%d %H:%M:%S') if task.completion_time else None,
+            'error_message': task.error_message or '',
         } for task in page_obj.object_list
     ]
 
@@ -703,7 +710,7 @@ class DetectionTaskDeleteView(APIView):
 
     def delete(self, request, task_id, *args, **kwargs):
         try:
-            task = DetectionTask.objects.get(pk=task_id)
+            task = DetectionTask.objects.get(pk=task_id, user=request.user)
         except DetectionTask.DoesNotExist:
             return Response(
                 {"detail": "任务不存在"},
