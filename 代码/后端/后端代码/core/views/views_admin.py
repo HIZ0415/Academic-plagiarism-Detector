@@ -633,8 +633,7 @@ class PostReportView(APIView):
     """
     帖子举报处理视图
     """
-
-    @permission_classes([IsAdminUser])
+    permission_classes = [IsAdminUser]
     def post(self, request, post_id):
         try:
             # 获取被举报的检测任务
@@ -661,11 +660,9 @@ class UserActionLogGetView(APIView):
     """
     用户操作日志视图
     """
-
-    @permission_classes([IsAdminUser])
+    permission_classes = [IsAdminUser]
     def get(self, request):
-        user_id = request.user.id
-        user = User.objects.get(id=user_id)
+        user = request.user
 
         # 获取分页参数
         page = int(request.GET.get('page', 1))
@@ -731,7 +728,7 @@ class UserActionLogGetView(APIView):
 
 
 class UserActionLogDeleteView(APIView):
-    @permission_classes([IsAdminUser])
+    permission_classes = [IsAdminUser]
     def delete(self, request, log_id):
         try:
             # 删除指定的日志记录
@@ -743,13 +740,12 @@ class UserActionLogDeleteView(APIView):
 
 
 class UserActionLogDownloadView(APIView):
-    @permission_classes([IsAdminUser])
+    permission_classes = [IsAdminUser]
     def get(self, request):
         """
         下载日志文件
         """
-        user_id = request.user.id
-        user = User.objects.get(id=user_id)
+        user = request.user
 
         # 获取查询参数
         query = request.query_params.get('query', None)  # query 应该是一个逗号分隔的字符串

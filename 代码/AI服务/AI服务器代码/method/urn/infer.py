@@ -1,9 +1,7 @@
 import torch
 import tqdm
 import sys
-print(sys.path)
 import os
-print(os.getcwd())
 import cv2
 import numpy as np
 

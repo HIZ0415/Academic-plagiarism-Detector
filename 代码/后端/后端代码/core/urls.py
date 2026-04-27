@@ -3,6 +3,14 @@ from .views.views_review import get_manualReview_from_reviewRequestId
 from .views.views_user import *
 from .views.views_imageupload import *
 from .views.views_dectection import *
+from .views.views_paper import (
+    upload_paper,
+    submit_aigc_task,
+    get_paper_task_status,
+    get_aigc_result,
+    submit_resource_check_task,
+    get_resource_check_result,
+)
 # 新增: 导入人工审查相关的视图类
 from .views import views_review, views_organization
 from .views import views_admin
@@ -58,6 +66,13 @@ urlpatterns = [
     path('upload/<int:file_id>/addTag/', add_file_tag, name='add_file_tag'),
     path('upload/<int:file_id>/delete/', delete_upload, name='delete_upload'),
     path('upload/get_all_file_images/<int:file_management_id>/', get_all_file_images, name='get_all_file_images'),
+    # 论文检测相关 URL（前后端联调新增）
+    path('paper/upload/', upload_paper, name='paper_upload'),
+    path('paper/aigc/submit/', submit_aigc_task, name='paper_aigc_submit'),
+    path('paper/tasks/<int:task_id>/status/', get_paper_task_status, name='paper_task_status'),
+    path('paper/aigc/<int:task_id>/result/', get_aigc_result, name='paper_aigc_result'),
+    path('paper/resource-check/submit/', submit_resource_check_task, name='paper_resource_submit'),
+    path('paper/resource-check/<int:task_id>/result/', get_resource_check_result, name='paper_resource_result'),
     # 图片检测相关的URL
     path('detection/<int:image_id>/', get_detection_result, name='image_detection'),
     path('detection/submit/', submit_detection2, name='submit_detection'),
@@ -75,7 +90,12 @@ urlpatterns = [
     path('publishers/<int:publisher_id>/reviewers/', views_review.get_reviewers_for_publisher),
     path('create_review_task_with_admin_check/', views_review.create_review_task_with_admin_check, name='create_review_task_with_admin_check'),
     path('get_request_completion_status/<int:task_id>/', views_review.get_request_completion_status, name='get_request_completion_status'),
+    path('get_task_completion_status/<int:task_id>', views_review.get_task_completion_status, name='get_task_completion_status_compat'),
+    path('get_task_completion_status/<int:task_id>/', views_review.get_task_completion_status, name='get_task_completion_status_compat_slash'),
     path('get_request_detail/<int:reviewRequest_id>/', views_review.get_request_detail, name='get_request_detail'),
+    path('get_task_detail/<int:task_id>/', views_review.get_task_detail, name='get_task_detail_compat'),
+    path('get_task_reviewer_detail/<int:task_id>/<int:reviewer_id>', views_review.get_task_reviewer_detail, name='get_task_reviewer_detail_compat'),
+    path('get_task_reviewer_detail/<int:task_id>/<int:reviewer_id>/', views_review.get_task_reviewer_detail, name='get_task_reviewer_detail_compat_slash'),
     path('get_reviewer_tasks/', views_review.get_reviewer_manual_request, name='get_reviewer_tasks'),
     path('get_all_reviewers/', views_review.get_all_reviewers_in_org, name='get_all_reviewers'),
     path('get_publisher_review_tasks/', views_review.get_publisher_review_tasks, name='get_publisher_review_tasks'),
@@ -138,7 +158,6 @@ urlpatterns = [
     path('get_review_request_detail/<int:manual_review_id>/', views_admin.get_review_request_detail, name='get_review_request_detail'),
     path('handle_reviewRequest/<int:reviewRequest_id>/', views_admin.handle_review_request, name='handle_review_request'),
     path('delete_image_upload/<int:image_id>/', views_admin.delete_image_upload, name='delete_image_upload'),
-    path('/review-requests/<int:review_request_id>/delete/', views_admin.delete_review_request, name='get_image_upload'),
 
     # 通知部分
     path('notification/notify/', views_notify.get_notification_status, name='notification_status'),
@@ -161,7 +180,11 @@ urlpatterns = [
     path('organization/<int:org_id>/', views_organization.get_organization_detail, name='get_organization_detail'),
     path('organization/<int:org_id>/delete/', views_organization.delete_organization, name='delete_organization'),
     path('organization/<int:org_id>/permission/', views_organization.update_organization_role_permissions, name='update_organization_role_permissions'),
+    path('organization/upload_logo/', views_organization.upload_organization_logo, name='upload_organization_logo'),
 
     path('manual-review/<int:review_request_id>/', get_manualReview_from_reviewRequestId, name='get_manualReview_from_reviewRequestId'),
+
+    # Keep path without a leading slash; Django route strings should be relative.
+    path('review-requests/<int:review_request_id>/delete/', views_admin.delete_review_request, name='delete_review_request'),
 
 ]

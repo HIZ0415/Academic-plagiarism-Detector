@@ -1,8 +1,9 @@
 import http from './request'
+import type { ActionLogListResponse } from '@/types/core'
 
 export default {
   getLogs(params: any) {
-    return http.get('/user_action_log/', { params });
+    return http.get<ActionLogListResponse>('/user_action_log/', { params });
   },
 
   deleteLog(logId: number) {

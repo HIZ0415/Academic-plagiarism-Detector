@@ -56,6 +56,7 @@ local_settings.py
 # Node / Vue / Vite
 node_modules/
 .tools/
+.local-dev/
 .vite/
 .vite-inspect/
 coverage/
@@ -69,6 +70,15 @@ pnpm-debug.log*
 代码/前端/**/dist/
 代码/前端/**/.output/
 代码/前端/**/.cache/
+
+# Frontend auto-generated files (local dev/runtime)
+代码/前端/**/.eslintrc-auto-import.json
+代码/前端/**/src/auto-imports.d.ts
+代码/前端/**/src/components.d.ts
+代码/前端/**/src/typed-router.d.ts
+
+# Local deployment notes
+服务器部署.md
 
 # IDE / editor
 .idea/
@@ -119,3 +129,7 @@ _preview/
 *.ckpt
 *.safetensors
 *.pkl
+
+# AI service generated artifacts
+代码/AI服务/AI服务器代码/detection_service/artifacts/minimal_dataset/
+代码/AI服务/AI服务器代码/detection_service/artifacts/*_eval.json
