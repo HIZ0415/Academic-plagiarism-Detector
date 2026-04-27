@@ -56,6 +56,7 @@ local_settings.py
 # Node / Vue / Vite
 node_modules/
 .tools/
+.local-dev/
 .vite/
 .vite-inspect/
 coverage/
