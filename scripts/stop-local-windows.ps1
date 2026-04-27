@@ -7,13 +7,38 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
-$RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$StatePath = Join-Path $RootDir '.local-dev\processes.json'
-
 function Write-Step {
     param([string]$Message)
     Write-Host ''
     Write-Host "==> $Message" -ForegroundColor Cyan
+}
+
+function Assert-WindowsPlatform {
+    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
+        throw 'This script is Windows-only.'
+    }
+}
+
+function Resolve-RepositoryRoot {
+    param([string]$StartDir)
+
+    $current = Resolve-Path -LiteralPath $StartDir
+    while ($null -ne $current) {
+        $hasGitIgnore = Test-Path -LiteralPath (Join-Path $current.Path '.gitignore')
+        $hasReadme = Test-Path -LiteralPath (Join-Path $current.Path 'README.md')
+        if ($hasGitIgnore -and $hasReadme) {
+            return $current.Path
+        }
+
+        $parent = Split-Path -Parent $current.Path
+        if (-not $parent -or $parent -eq $current.Path) {
+            break
+        }
+
+        $current = Resolve-Path -LiteralPath $parent
+    }
+
+    throw 'Unable to locate the repository root from the current script directory.'
 }
 
 function Get-PortProcessIds {
@@ -60,6 +85,12 @@ function Stop-ProcessId {
     catch {
     }
 }
+
+Assert-WindowsPlatform
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RootDir = Resolve-RepositoryRoot -StartDir $ScriptDir
+$StatePath = Join-Path $RootDir '.local-dev\processes.json'
 
 Write-Step 'Stopping processes recorded by the local state file'
 if (Test-Path -LiteralPath $StatePath) {
