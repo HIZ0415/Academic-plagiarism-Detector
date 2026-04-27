@@ -158,7 +158,6 @@ urlpatterns = [
     path('get_review_request_detail/<int:manual_review_id>/', views_admin.get_review_request_detail, name='get_review_request_detail'),
     path('handle_reviewRequest/<int:reviewRequest_id>/', views_admin.handle_review_request, name='handle_review_request'),
     path('delete_image_upload/<int:image_id>/', views_admin.delete_image_upload, name='delete_image_upload'),
-    path('/review-requests/<int:review_request_id>/delete/', views_admin.delete_review_request, name='get_image_upload'),
 
     # 通知部分
     path('notification/notify/', views_notify.get_notification_status, name='notification_status'),
@@ -181,7 +180,11 @@ urlpatterns = [
     path('organization/<int:org_id>/', views_organization.get_organization_detail, name='get_organization_detail'),
     path('organization/<int:org_id>/delete/', views_organization.delete_organization, name='delete_organization'),
     path('organization/<int:org_id>/permission/', views_organization.update_organization_role_permissions, name='update_organization_role_permissions'),
+    path('organization/upload_logo/', views_organization.upload_organization_logo, name='upload_organization_logo'),
 
     path('manual-review/<int:review_request_id>/', get_manualReview_from_reviewRequestId, name='get_manualReview_from_reviewRequestId'),
+
+    # Keep path without a leading slash; Django route strings should be relative.
+    path('review-requests/<int:review_request_id>/delete/', views_admin.delete_review_request, name='delete_review_request'),
 
 ]

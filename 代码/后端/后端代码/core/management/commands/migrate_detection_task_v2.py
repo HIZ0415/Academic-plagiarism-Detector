@@ -74,6 +74,24 @@ class Command(BaseCommand):
                 """
             )
 
+    def _create_user_upload_index(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE INDEX dt_user_upload_idx
+                ON core_detectiontask (user_id, upload_time)
+                """
+            )
+
+    def _create_type_status_index(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE INDEX dt_type_status_idx
+                ON core_detectiontask (task_type, status)
+                """
+            )
+
     def _create_fk_if_mysql(self):
         if connection.vendor != "mysql":
             return
@@ -119,6 +137,18 @@ class Command(BaseCommand):
             created.append("core_detectiontask_paper_file_id_idx")
         else:
             skipped.append("core_detectiontask_paper_file_id_idx")
+
+        if not self._index_exists("dt_user_upload_idx"):
+            self._create_user_upload_index()
+            created.append("dt_user_upload_idx")
+        else:
+            skipped.append("dt_user_upload_idx")
+
+        if not self._index_exists("dt_type_status_idx"):
+            self._create_type_status_index()
+            created.append("dt_type_status_idx")
+        else:
+            skipped.append("dt_type_status_idx")
 
         self._create_fk_if_mysql()
 
