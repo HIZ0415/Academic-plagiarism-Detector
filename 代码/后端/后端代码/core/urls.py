@@ -10,6 +10,8 @@ from .views.views_paper import (
     get_aigc_result,
     submit_resource_check_task,
     get_resource_check_result,
+    submit_review_detection_task,
+    get_review_task_status,
 )
 # 新增: 导入人工审查相关的视图类
 from .views import views_review, views_organization
@@ -52,6 +54,7 @@ urlpatterns = [
     path('task-summary/', get_task_summary_lzy, name='get_task_summary_lzy'),
     path('get-task-summary/', get_task_summary, name='get_task_summary'),
     path('user-tasks/', get_user_tasks, name='get_user_tasks'),
+    path('tasks/<int:task_id>/detail/', get_task_detail_unified, name='get_task_detail_unified'),
     path('organization/usage/', get_organization_usage_info, name='get_usage_info'),
     path('organization/recharge-uses/', recharge_uses, name='recharge_uses'),
     path('single-user-action-log/', SingleUserActionLogView.as_view(), name='single_user_action_log'),
@@ -73,6 +76,8 @@ urlpatterns = [
     path('paper/aigc/<int:task_id>/result/', get_aigc_result, name='paper_aigc_result'),
     path('paper/resource-check/submit/', submit_resource_check_task, name='paper_resource_submit'),
     path('paper/resource-check/<int:task_id>/result/', get_resource_check_result, name='paper_resource_result'),
+    path('review/submit/', submit_review_detection_task, name='review_submit'),
+    path('review/tasks/<int:task_id>/status/', get_review_task_status, name='review_task_status'),
     # 图片检测相关的URL
     path('detection/<int:image_id>/', get_detection_result, name='image_detection'),
     path('detection/submit/', submit_detection2, name='submit_detection'),
