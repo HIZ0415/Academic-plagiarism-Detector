@@ -10,6 +10,7 @@ import numpy as np
 BACKEND_REQUEST_SCHEMA_VERSION = "backend-ai-request-v1"
 IMAGE_RESULT_SCHEMA_VERSION = "image-detection-v1"
 STANDARD_EVIDENCE_SCHEMA_VERSION = "standard-evidence-v1"
+ERROR_RESPONSE_SCHEMA_VERSION = "ai-service-error-v1"
 
 
 def _serialize_value(value: Any) -> Any:
@@ -132,3 +133,33 @@ class DetectionResponse:
             "batch_id": self.batch_id,
             "results": [result.to_dict() for result in self.results],
         }
+
+
+@dataclass(slots=True)
+class ErrorResponse:
+    error_code: str
+    error_type: str
+    message: str
+    status: int
+    retriable: bool = False
+    task_type: Optional[str] = None
+    batch_id: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = {
+            "schema_version": ERROR_RESPONSE_SCHEMA_VERSION,
+            "error_code": self.error_code,
+            "error_type": self.error_type,
+            "message": self.message,
+            "error": self.message,
+            "status": int(self.status),
+            "retriable": bool(self.retriable),
+        }
+        if self.task_type is not None:
+            payload["task_type"] = self.task_type
+        if self.batch_id is not None:
+            payload["batch_id"] = self.batch_id
+        if self.details:
+            payload["details"] = _serialize_value(self.details)
+        return payload

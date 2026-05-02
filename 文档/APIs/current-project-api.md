@@ -292,7 +292,7 @@ http://127.0.0.1:8010
 ## 14. 已知接口层问题
 - `core/urls.py` 中同时存在 `/api/task-summary/`、`/api/get-task-summary/`、`/api/get_task_summary/` 三类近似路径，命名风格不统一。
 - `core/urls.py` 中存在一条定义为 `'/review-requests/<int:review_request_id>/delete/'` 的路由，前面额外带了斜杠，挂到 `/api/` 后可能形成异常路径。
-- 后端业务接口当前仍然以图像检测为中心；论文检测和 Review 检测尚未形成与图像检测同等级的统一任务接口。
+- 后端业务接口当前仍然以图像检测为中心；论文检测和 Review 检测已形成专项接口与预处理产物，但尚未收敛为与图像检测同等级的统一任务接口。
 - AI 服务虽然已经预留 `paper` 和 `review`，但当前只有 `image` 任务具备可运行链路。
 
 ## 15. 后续演进建议
@@ -300,3 +300,25 @@ http://127.0.0.1:8010
 - 将图像检测、论文检测、Review 检测收敛到统一任务提交与统一状态查询接口。
 - 将 AI 服务的模型管理信息逐步纳入管理端统一治理视图。
 - 收敛重复和风格不一致的路径命名，统一 REST 风格。
+
+## 16. 论文与 Review 预处理接口约定
+
+当前后端已为论文检测和专家人工 Review 检测建立本地预处理产物，调用 AI 前统一生成 `backend-ai-request-v1` 外层请求。
+
+### 16.1 论文 PDF 预处理
+
+- 接口：`POST /api/paper/upload/`
+- 支持格式：仅 `.pdf`
+- 后端处理：使用 PyMuPDF 提取文本，执行文本清洗和段落切分。
+- 持久化产物：原始 PDF、`*_raw_text.txt`、`*_cleaned_text.txt`、`*_paragraphs.json`、`*_ai_input.json`。
+- AI 输入：`task_type = paper`，内层 schema 为 `paper-preprocess-v1`。
+- 上传响应新增/保留字段：`paper_file_id`、`file_name`、`upload_time`、`paragraph_count`。
+
+### 16.2 专家人工 Review 预处理
+
+- 接口：`POST /api/review/submit/`
+- 支持输入：`text` 在线文本，或 `file=.txt`
+- 后端处理：解码与编码标准化，清理 UTF-8 BOM、控制字符和多余空白。
+- 持久化产物：`*_raw_text.txt`、`*_cleaned_text.txt`、`*_ai_input.json`。
+- AI 输入：`task_type = review`，内层 schema 为 `review-preprocess-v1`。
+- 提交响应新增/保留字段：`task_id`、`status`、`cleaned_text_length`。

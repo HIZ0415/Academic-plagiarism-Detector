@@ -2372,3 +2372,23 @@ Content-Type: application/json
 {"error": "错误信息"}
 undefined
 ```
+
+## 论文与专家人工 Review 预处理接口补充
+
+### 论文 PDF 预处理
+
+- 接口：`POST /api/paper/upload/`
+- 支持格式：仅 `.pdf`
+- 后端流程：PDF 文本提取、文本清洗、段落切分、生成 AI 输入。
+- 预处理产物：原始 PDF、原始文本、清洗后文本、段落 JSON、`paper-preprocess-v1` AI 输入 JSON。
+- 响应字段：`paper_file_id`、`file_name`、`upload_time`、`paragraph_count`。
+
+### 专家人工 Review 预处理
+
+- 接口：`POST /api/review/submit/`
+- 支持输入：`text` 在线文本，或上传 `.txt` 文件。
+- 后端流程：编码标准化、UTF-8 BOM 清理、控制字符清理、空白归一化、生成 AI 输入。
+- 预处理产物：原始文本、清洗后文本、`review-preprocess-v1` AI 输入 JSON。
+- 响应字段：`task_id`、`status`、`cleaned_text_length`。
+
+注意：本阶段不新增论文 DOCX/TXT、Review PDF/DOCX 等格式支持，前端和调用方应按上述格式约束提交。

@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict
 from urllib.parse import parse_qs, urlparse
 
-from detection_service import DetectionService, TaskNotImplementedError, ValidationError
+from detection_service import DetectionService, ErrorResponse, TaskNotImplementedError, ValidationError
 
 
 IMAGE_BATCH_PATH = "/api/v1/image-detection/batches"
@@ -37,6 +37,57 @@ def map_exception_to_status(exc: Exception) -> HTTPStatus:
     if isinstance(exc, TimeoutError):
         return HTTPStatus.GATEWAY_TIMEOUT
     return HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+def map_exception_to_error_code(exc: Exception) -> str:
+    if isinstance(exc, ValidationError):
+        return "validation_error"
+    if isinstance(exc, TaskNotImplementedError):
+        return "task_not_implemented"
+    if isinstance(exc, PermissionError):
+        return "unauthorized"
+    if isinstance(exc, TimeoutError):
+        return "timeout"
+    return "internal_error"
+
+
+def build_error_response(
+    *,
+    status: HTTPStatus,
+    message: str,
+    error_code: str,
+    error_type: str,
+    request_data: Dict[str, Any] | None = None,
+    retriable: bool = False,
+    details: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    return ErrorResponse(
+        error_code=error_code,
+        error_type=error_type,
+        message=message,
+        status=int(status),
+        retriable=retriable,
+        task_type=(request_data or {}).get("task_type"),
+        batch_id=(request_data or {}).get("batch_id"),
+        details=details or {},
+    ).to_dict()
+
+
+def build_error_response_from_exception(
+    exc: Exception,
+    *,
+    request_data: Dict[str, Any] | None = None,
+) -> tuple[HTTPStatus, Dict[str, Any]]:
+    status = map_exception_to_status(exc)
+    payload = build_error_response(
+        status=status,
+        message=str(exc),
+        error_code=map_exception_to_error_code(exc),
+        error_type=type(exc).__name__,
+        request_data=request_data,
+        retriable=isinstance(exc, TimeoutError),
+    )
+    return status, payload
 
 
 def dispatch_detection_request(
@@ -78,16 +129,34 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
                 profile_name = query.get("profile", [None])[0]
                 payload = handle_management_registry_request(profile_name)
             except Exception as exc:
-                status = map_exception_to_status(exc)
-                self._send_json(status, {"error": str(exc)})
+                status, payload = build_error_response_from_exception(exc)
+                self._send_json(status, payload)
                 return
             self._send_json(HTTPStatus.OK, payload)
             return
-        self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+        self._send_json(
+            HTTPStatus.NOT_FOUND,
+            build_error_response(
+                status=HTTPStatus.NOT_FOUND,
+                message="not found",
+                error_code="not_found",
+                error_type="NotFound",
+                details={"path": parsed_url.path},
+            ),
+        )
 
     def do_POST(self) -> None:
         if self.path != IMAGE_BATCH_PATH:
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                build_error_response(
+                    status=HTTPStatus.NOT_FOUND,
+                    message="not found",
+                    error_code="not_found",
+                    error_type="NotFound",
+                    details={"path": self.path},
+                ),
+            )
             return
 
         request_started_at = time.perf_counter()
@@ -98,7 +167,7 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
             self._log_request("accepted", request_data)
             response_data = dispatch_detection_request(request_data)
         except Exception as exc:
-            status = map_exception_to_status(exc)
+            status, payload = build_error_response_from_exception(exc, request_data=request_data)
             self._log_request(
                 "failed",
                 request_data,
@@ -106,7 +175,7 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
                 elapsed_ms=(time.perf_counter() - request_started_at) * 1000.0,
                 error=str(exc),
             )
-            self._send_json(status, {"error": str(exc)})
+            self._send_json(status, payload)
             return
 
         elapsed_ms = (time.perf_counter() - request_started_at) * 1000.0

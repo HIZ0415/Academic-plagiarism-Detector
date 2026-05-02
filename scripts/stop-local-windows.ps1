@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [int[]]$Ports = @(3000, 3001, 8000, 8010)
+    [int[]]$Ports = @(3000, 3001, 8000, 8010),
+    [switch]$CleanTemp
 )
 
 Set-StrictMode -Version Latest
@@ -86,11 +87,62 @@ function Stop-ProcessId {
     }
 }
 
+function Get-ChildProcessIds {
+    param([int]$ParentProcessId)
+
+    $children = @()
+    try {
+        $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $ParentProcessId" -ErrorAction Stop)
+    }
+    catch {
+        return @()
+    }
+
+    $ids = New-Object System.Collections.Generic.List[int]
+    foreach ($child in $children) {
+        if ($child.ProcessId) {
+            $ids.Add([int]$child.ProcessId)
+            foreach ($descendantId in (Get-ChildProcessIds -ParentProcessId ([int]$child.ProcessId))) {
+                if (-not $ids.Contains($descendantId)) {
+                    $ids.Add($descendantId)
+                }
+            }
+        }
+    }
+
+    return $ids.ToArray()
+}
+
+function Stop-ProcessTree {
+    param(
+        [int]$ProcessId,
+        [string]$Name = ''
+    )
+
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if (-not $process) {
+        return
+    }
+
+    $childProcessIds = @(Get-ChildProcessIds -ParentProcessId $ProcessId)
+    [array]::Reverse($childProcessIds)
+    foreach ($childProcessId in $childProcessIds) {
+        Stop-ProcessId -ProcessId $childProcessId
+    }
+
+    if ($Name) {
+        Write-Host "Stopping $Name PID $ProcessId"
+    }
+    Stop-ProcessId -ProcessId $ProcessId
+}
+
 Assert-WindowsPlatform
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Resolve-RepositoryRoot -StartDir $ScriptDir
-$StatePath = Join-Path $RootDir '.local-dev\processes.json'
+$LocalDevDir = Join-Path $RootDir '.local-dev'
+$StatePath = Join-Path $LocalDevDir 'processes.json'
+$TmpDir = Join-Path $LocalDevDir 'tmp'
 
 Write-Step 'Stopping processes recorded by the local state file'
 if (Test-Path -LiteralPath $StatePath) {
@@ -103,7 +155,8 @@ if (Test-Path -LiteralPath $StatePath) {
 
     foreach ($entry in @($state)) {
         if ($null -ne $entry -and $entry.pid) {
-            Stop-ProcessId -ProcessId ([int]$entry.pid)
+            $entryName = if ($entry.name) { [string]$entry.name } else { '' }
+            Stop-ProcessTree -ProcessId ([int]$entry.pid) -Name $entryName
         }
     }
 
@@ -113,7 +166,17 @@ if (Test-Path -LiteralPath $StatePath) {
 Write-Step 'Cleaning up any remaining listeners on known ports'
 foreach ($port in $Ports) {
     foreach ($processId in (Get-PortProcessIds -Port $port)) {
-        Stop-ProcessId -ProcessId $processId
+        Stop-ProcessTree -ProcessId $processId
+    }
+}
+
+if ($CleanTemp -and (Test-Path -LiteralPath $TmpDir)) {
+    Write-Step 'Cleaning local temporary files'
+    try {
+        Get-ChildItem -LiteralPath $TmpDir -Force -ErrorAction Stop | Remove-Item -Recurse -Force -ErrorAction Stop
+    }
+    catch {
+        Write-Warning "Failed to clean ${TmpDir}: $($_.Exception.Message)"
     }
 }
 

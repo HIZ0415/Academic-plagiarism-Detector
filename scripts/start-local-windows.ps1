@@ -523,7 +523,8 @@ function Invoke-NpmCommandChecked {
     )
 
     if ($NodeToolchain.NpmCliPath) {
-        Invoke-CommandChecked -Executable $NodeToolchain.NodePath -Arguments @($NodeToolchain.NpmCliPath) + $Arguments -WorkingDirectory $WorkingDirectory
+        $nodeArguments = @($NodeToolchain.NpmCliPath) + $Arguments
+        Invoke-CommandChecked -Executable $NodeToolchain.NodePath -Arguments $nodeArguments -WorkingDirectory $WorkingDirectory
         return
     }
 
@@ -560,7 +561,7 @@ function Ensure-BackendDependencies {
     $stampPath = Join-Path $LocalDevDir 'backend-requirements.sha256'
     $requirementsHash = (Get-FileHash -LiteralPath $BackendRequirements -Algorithm SHA256).Hash
     $recordedHash = if (Test-Path -LiteralPath $stampPath) { (Get-Content -LiteralPath $stampPath -Raw).Trim() } else { '' }
-    $importProbe = 'import django, rest_framework, corsheaders, channels, celery, pymysql, paramiko, scp, numpy, PIL, reportlab, cv2, sklearn'
+    $importProbe = 'import django, rest_framework, corsheaders, channels, celery, pymysql, paramiko, scp, numpy, PIL, fitz, reportlab, cv2, sklearn'
     $importsHealthy = $false
 
     try {
@@ -686,14 +687,25 @@ function Ensure-FrontendDependencies {
     $lockHash = (Get-FileHash -LiteralPath $lockPath -Algorithm SHA256).Hash
     $recordedHash = if (Test-Path -LiteralPath $stampPath) { (Get-Content -LiteralPath $stampPath -Raw).Trim() } else { '' }
     $viteBinary = Join-Path $FrontendDir 'node_modules\.bin\vite.cmd'
+    $viteCliPath = Join-Path $FrontendDir 'node_modules\vite\bin\vite.js'
 
-    $needsInstall = $ForceRefresh -or -not (Test-Path -LiteralPath $nodeModulesPath) -or -not (Test-Path -LiteralPath $viteBinary) -or ($lockHash -ne $recordedHash)
+    if (-not $ForceRefresh -and (Test-Path -LiteralPath $nodeModulesPath) -and (Test-Path -LiteralPath $viteBinary) -and (Test-Path -LiteralPath $viteCliPath)) {
+        if ($lockHash -ne $recordedHash) {
+            Set-Content -LiteralPath $stampPath -Value $lockHash -Encoding UTF8
+        }
+        return
+    }
+
+    $needsInstall = $ForceRefresh -or -not (Test-Path -LiteralPath $nodeModulesPath) -or -not (Test-Path -LiteralPath $viteBinary) -or -not (Test-Path -LiteralPath $viteCliPath) -or ($lockHash -ne $recordedHash)
 
     if (-not $needsInstall) {
         return
     }
 
     Write-Step "Installing $FrontendName frontend dependencies"
+    if (Test-Path -LiteralPath $nodeModulesPath) {
+        Remove-Item -LiteralPath $nodeModulesPath -Recurse -Force
+    }
     Invoke-NpmCommandChecked -NodeToolchain $NodeToolchain -Arguments @('install', '--no-fund', '--no-audit') -WorkingDirectory $FrontendDir
     Set-Content -LiteralPath $stampPath -Value $lockHash -Encoding UTF8
 }
@@ -884,7 +896,8 @@ function Start-NpmManagedProcess {
     )
 
     if ($NodeToolchain.NpmCliPath) {
-        return Start-ManagedProcess -Name $Name -Executable $NodeToolchain.NodePath -Arguments @($NodeToolchain.NpmCliPath) + $NpmArguments -WorkingDirectory $WorkingDirectory -HealthUrl $HealthUrl -LogsDir $LogsDir -Port $Port -TimeoutSeconds $TimeoutSeconds
+        $nodeArguments = @($NodeToolchain.NpmCliPath) + $NpmArguments
+        return Start-ManagedProcess -Name $Name -Executable $NodeToolchain.NodePath -Arguments $nodeArguments -WorkingDirectory $WorkingDirectory -HealthUrl $HealthUrl -LogsDir $LogsDir -Port $Port -TimeoutSeconds $TimeoutSeconds
     }
 
     return Start-ManagedProcess -Name $Name -Executable $NodeToolchain.NpmCommand -Arguments $NpmArguments -WorkingDirectory $WorkingDirectory -HealthUrl $HealthUrl -LogsDir $LogsDir -Port $Port -TimeoutSeconds $TimeoutSeconds
@@ -974,6 +987,12 @@ $AiArtifactPath = Join-Path $AiDir 'detection_service\artifacts\minimal_baseline
 Write-Step 'Preparing local working directories'
 Ensure-Directory -Path $LocalDevDir
 Ensure-Directory -Path $LogsDir
+Ensure-Directory -Path (Join-Path $LocalDevDir 'npm-cache')
+Ensure-Directory -Path (Join-Path $LocalDevDir 'tmp')
+$env:npm_config_cache = Join-Path $LocalDevDir 'npm-cache'
+$env:npm_config_update_notifier = 'false'
+$env:TEMP = Join-Path $LocalDevDir 'tmp'
+$env:TMP = Join-Path $LocalDevDir 'tmp'
 
 Write-Step 'Stopping existing local service processes'
 Stop-ManagedProcesses -StatePath $StatePath -Ports $Ports -Quiet
@@ -991,6 +1010,10 @@ Ensure-BackendDependencies -BackendPython $BackendPython -BackendDir $BackendDir
 
 Write-Step 'Checking Node.js environment'
 $NodeToolchain = Ensure-NodeToolchain -RootDir $RootDir -LocalDevDir $LocalDevDir -Version $PortableNodeVersion
+$nodeBinDir = Split-Path -Parent $NodeToolchain.NodePath
+if ($env:Path -notlike "*$nodeBinDir*") {
+    $env:Path = "$nodeBinDir;$env:Path"
+}
 
 Ensure-LocalSettings -LocalSettingsPath $LocalSettingsPath
 Ensure-FrontendEnvFiles -UserEnvPath $UserEnvPath -AdminEnvPath $AdminEnvPath -BindHost $BindHost -BackendPort $BackendPort

@@ -9,6 +9,7 @@ from ..models import DetectionResult, ImageUpload, Log, User
 from django.db.models import Q
 from datetime import datetime
 from django.core.paginator import Paginator
+from ..utils.image_preprocessing import DetectionBatchImage, build_detection_batch_artifacts
 
 TASK_STATUS_WHITELIST = {"pending", "in_progress", "completed", "failed"}
 
@@ -206,6 +207,35 @@ def submit_detection2(request):
     batch_size = 20
     for idx in range(0, len(detection_results), batch_size):
         batch_drs = detection_results[idx: idx + batch_size]
+
+        batch_dir = temp_root / f"task_{detection_task.id}_batch_{idx // batch_size}"
+        batch_images = [
+            DetectionBatchImage(
+                image_id=int(dr.image_upload.id),
+                image_path=Path(dr.image_upload.image.path),
+            )
+            for dr in batch_drs
+        ]
+        build_detection_batch_artifacts(
+            batch_dir,
+            batch_images,
+            cmd_block_size=cmd_block_size,
+            urn_k=urn_k,
+            if_use_llm=if_use_llm,
+        )
+
+        celery_time = time.time()
+        print('浠庢彁浜ゅ埌璋冪敤celery鑰楁椂', celery_time - submit_time)
+        if mode == 2:
+            pri = 0
+        else:
+            pri = 1
+        fetch_batch.apply_async(
+            args=[[dr.id for dr in batch_drs], str(batch_dir), len(image_ids), detection_task.pk],
+            queue='ai',
+            priority=pri
+        )
+        continue
 
         # ——— ① 为该批创建专属子目录 temp/task_<task_id>_batch_<n>/ ———
         batch_dir = temp_root / f"task_{detection_task.id}_batch_{idx // batch_size}"

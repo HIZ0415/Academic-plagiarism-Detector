@@ -27,6 +27,46 @@ class AIHTTPServiceTest(unittest.TestCase):
         self.assertEqual(ai_http_service.map_exception_to_status(TimeoutError("slow")), HTTPStatus.GATEWAY_TIMEOUT)
         self.assertEqual(ai_http_service.map_exception_to_status(RuntimeError("boom")), HTTPStatus.INTERNAL_SERVER_ERROR)
 
+    def test_map_exception_to_error_code(self):
+        self.assertEqual(ai_http_service.map_exception_to_error_code(ValidationError("bad")), "validation_error")
+        self.assertEqual(
+            ai_http_service.map_exception_to_error_code(TaskNotImplementedError("todo")),
+            "task_not_implemented",
+        )
+        self.assertEqual(ai_http_service.map_exception_to_error_code(PermissionError("no")), "unauthorized")
+        self.assertEqual(ai_http_service.map_exception_to_error_code(TimeoutError("slow")), "timeout")
+        self.assertEqual(ai_http_service.map_exception_to_error_code(RuntimeError("boom")), "internal_error")
+
+    def test_build_error_response_keeps_legacy_error_field(self):
+        payload = ai_http_service.build_error_response(
+            status=HTTPStatus.BAD_REQUEST,
+            message="bad request",
+            error_code="validation_error",
+            error_type="ValidationError",
+            request_data={"task_type": "image", "batch_id": "task_1_batch_0"},
+            details={"field": "schema_version"},
+        )
+        self.assertEqual(payload["schema_version"], "ai-service-error-v1")
+        self.assertEqual(payload["error_code"], "validation_error")
+        self.assertEqual(payload["error_type"], "ValidationError")
+        self.assertEqual(payload["message"], "bad request")
+        self.assertEqual(payload["error"], "bad request")
+        self.assertEqual(payload["status"], 400)
+        self.assertFalse(payload["retriable"])
+        self.assertEqual(payload["task_type"], "image")
+        self.assertEqual(payload["batch_id"], "task_1_batch_0")
+        self.assertEqual(payload["details"], {"field": "schema_version"})
+
+    def test_build_error_response_from_exception_marks_timeout_retriable(self):
+        status, payload = ai_http_service.build_error_response_from_exception(
+            TimeoutError("slow"),
+            request_data={"task_type": "image", "batch_id": "batch_1"},
+        )
+        self.assertEqual(status, HTTPStatus.GATEWAY_TIMEOUT)
+        self.assertEqual(payload["error_code"], "timeout")
+        self.assertTrue(payload["retriable"])
+        self.assertEqual(payload["batch_id"], "batch_1")
+
     def test_dispatch_detection_request_uses_service(self):
         expected = {"task_type": "image", "results": []}
         with patch.object(ai_http_service.SERVICE, "handle_request", return_value=expected) as mock_handle:

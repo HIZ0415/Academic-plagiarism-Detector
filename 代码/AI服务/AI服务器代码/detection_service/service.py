@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import shutil
 import tempfile
 import threading
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from io import BytesIO
@@ -60,8 +62,8 @@ class DetectionService:
 
         extracted_inputs = None
         if request.task_type == "image":
-            with tempfile.TemporaryDirectory(prefix="ai_image_batch_") as temp_dir:
-                extracted_inputs = self._extract_images(request, Path(temp_dir))
+            with self._temporary_image_batch_dir() as temp_dir:
+                extracted_inputs = self._extract_images(request, temp_dir)
                 return self._task_handlers[request.task_type].detect(
                     request, context, extracted_inputs
                 ).to_dict()
@@ -232,7 +234,38 @@ class DetectionService:
                 images.append(ImageInput(image_name=safe_name, image_path=target_path, image_id=image_id))
             return images
 
+    def _temporary_image_batch_dir(self):
+        custom_root = os.getenv("AI_SERVICE_TEMP_ROOT", "").strip()
+        if not custom_root:
+            return _stdlib_temp_dir()
+        return _custom_temp_dir(Path(custom_root))
+
     @staticmethod
     def _parse_image_id(image_name: str) -> int | None:
         stem = Path(image_name).stem
         return int(stem) if stem.isdigit() else None
+
+
+class _stdlib_temp_dir:
+    def __enter__(self) -> Path:
+        self._temp_dir = tempfile.TemporaryDirectory(prefix="ai_image_batch_")
+        return Path(self._temp_dir.__enter__())
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._temp_dir.__exit__(exc_type, exc, tb)
+
+
+class _custom_temp_dir:
+    def __init__(self, root: Path) -> None:
+        self._root = root
+        self._path: Path | None = None
+
+    def __enter__(self) -> Path:
+        self._root.mkdir(parents=True, exist_ok=True)
+        self._path = self._root / f"ai_image_batch_{uuid.uuid4().hex}"
+        self._path.mkdir(parents=True, exist_ok=True)
+        return self._path
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._path is not None:
+            shutil.rmtree(self._path, ignore_errors=True)
