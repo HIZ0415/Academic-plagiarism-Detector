@@ -2,8 +2,6 @@ import hashlib
 import json
 import re
 import uuid
-import zipfile
-from html import unescape
 from pathlib import Path
 
 from django.conf import settings
@@ -15,6 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..models import DetectionTask, FileManagement, Log, User
+from ..utils.paper_preprocessing import preprocess_pdf_paper
+from ..utils.review_preprocessing import preprocess_review_bytes, preprocess_review_text
 
 ALPHA_ALLOWED_PAPER_EXT = {".pdf"}
 ALPHA_ALLOWED_REVIEW_FILE_EXT = {".txt"}
@@ -47,64 +47,6 @@ def _save_paper_meta(file_id, payload):
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-
-
-def _extract_text_from_docx_bytes(data):
-    try:
-        with zipfile.ZipFile(ContentFile(data)) as archive:
-            xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
-        text = re.sub(r"<[^>]+>", " ", xml)
-        return re.sub(r"\s+", " ", unescape(text)).strip()
-    except Exception:
-        return ""
-
-
-def _extract_text_from_pdf_bytes(data):
-    try:
-        import fitz  # type: ignore
-
-        doc = fitz.open(stream=data, filetype="pdf")
-        chunks = []
-        for i in range(doc.page_count):
-            chunks.append(doc.load_page(i).get_text("text"))
-        return "\n".join(chunks).strip()
-    except Exception:
-        return ""
-
-
-def _extract_text(file_name, content_type, raw_bytes):
-    suffix = Path(file_name).suffix.lower()
-
-    if suffix == ".txt" or content_type.startswith("text/"):
-        for encoding in ("utf-8", "gbk", "latin-1"):
-            try:
-                return raw_bytes.decode(encoding).strip()
-            except Exception:
-                continue
-        return ""
-
-    if suffix == ".docx":
-        text = _extract_text_from_docx_bytes(raw_bytes)
-        if text:
-            return text
-
-    if suffix == ".pdf":
-        text = _extract_text_from_pdf_bytes(raw_bytes)
-        if text:
-            return text
-
-    return raw_bytes.decode("utf-8", errors="ignore").strip()
-
-
-def _extract_review_text(file_name, raw_bytes):
-    suffix = Path(file_name).suffix.lower()
-    if suffix in ALPHA_ALLOWED_REVIEW_FILE_EXT:
-        for encoding in ("utf-8", "gbk", "latin-1"):
-            try:
-                return raw_bytes.decode(encoding).strip()
-            except Exception:
-                continue
-    return raw_bytes.decode("utf-8", errors="ignore").strip()
 
 
 def _sync_paper_task_status(task, meta_exists):
@@ -158,6 +100,26 @@ def _split_paragraphs(text):
     return chunks[:12]
 
 
+def _load_paper_paragraphs(file_id):
+    meta = _load_paper_meta(file_id)
+    if not meta:
+        return []
+
+    paragraphs_rel_path = meta.get("paragraphs_path", "")
+    paragraphs_abs_path = Path(settings.MEDIA_ROOT) / paragraphs_rel_path
+    if not paragraphs_abs_path.exists():
+        return []
+
+    try:
+        payload = json.loads(paragraphs_abs_path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict) and item.get("text")]
+
+
 def _risk_level(score):
     if score >= 0.7:
         return "high"
@@ -166,21 +128,30 @@ def _risk_level(score):
     return "low"
 
 
-def _build_aigc_result(task, paper_text):
+def _build_aigc_result(task, paper_text, paragraphs_data=None):
     base = f"{task.id}|{paper_text[:2000]}"
     digest = hashlib.sha256(base.encode("utf-8")).hexdigest()
     ratio = round(0.2 + (int(digest[:8], 16) / 0xFFFFFFFF) * 0.65, 4)
 
+    paragraph_items = paragraphs_data or [
+        {"index": idx, "text": para}
+        for idx, para in enumerate(_split_paragraphs(paper_text), start=1)
+    ]
     paragraphs = []
-    for idx, para in enumerate(_split_paragraphs(paper_text), start=1):
+    for idx, item in enumerate(paragraph_items[:12], start=1):
+        para = str(item.get("text", "")).strip()
+        if not para:
+            continue
         phash = hashlib.md5(f"{task.id}:{idx}:{para[:200]}".encode("utf-8")).hexdigest()
         score = round(0.2 + (int(phash[:6], 16) / 0xFFFFFF) * 0.75, 3)
         paragraphs.append(
             {
-                "index": idx,
+                "index": item.get("index", idx),
                 "risk_score": score,
                 "risk_level": _risk_level(score),
                 "excerpt": para[:180],
+                "char_start": item.get("char_start"),
+                "char_end": item.get("char_end"),
             }
         )
 
@@ -259,7 +230,7 @@ def _get_paper_text(file_id):
     if not meta:
         return "", None
 
-    text_rel_path = meta.get("text_path", "")
+    text_rel_path = meta.get("cleaned_text_path") or meta.get("text_path", "")
     text_abs_path = Path(settings.MEDIA_ROOT) / text_rel_path
     if text_abs_path.exists():
         try:
@@ -355,6 +326,11 @@ def upload_paper(request):
     content_type = uploaded_file.content_type or "application/octet-stream"
     raw_bytes = uploaded_file.read()
 
+    try:
+        preprocessed = preprocess_pdf_paper(raw_bytes, source_name=file_name)
+    except ValueError as exc:
+        return Response({"detail": str(exc)}, status=400)
+
     file_management = FileManagement.objects.create(
         organization=user.organization,
         user=request.user,
@@ -370,10 +346,22 @@ def upload_paper(request):
         ContentFile(raw_bytes),
     )
 
-    extracted_text = _extract_text(file_name, content_type, raw_bytes)
-    text_rel_path = fs.save(
-        f"paper_uploads/{file_management.id}_content.txt",
-        ContentFile((extracted_text or "").encode("utf-8")),
+    raw_text_rel_path = fs.save(
+        f"paper_uploads/{file_management.id}_raw_text.txt",
+        ContentFile(preprocessed.raw_text.encode("utf-8")),
+    )
+    cleaned_text_rel_path = fs.save(
+        f"paper_uploads/{file_management.id}_cleaned_text.txt",
+        ContentFile(preprocessed.cleaned_text.encode("utf-8")),
+    )
+    paragraphs = [paragraph.as_dict() for paragraph in preprocessed.paragraphs]
+    paragraphs_rel_path = fs.save(
+        f"paper_uploads/{file_management.id}_paragraphs.json",
+        ContentFile(json.dumps(paragraphs, ensure_ascii=False, indent=2).encode("utf-8")),
+    )
+    ai_payload_rel_path = fs.save(
+        f"paper_uploads/{file_management.id}_ai_input.json",
+        ContentFile(json.dumps(preprocessed.ai_payload, ensure_ascii=False, indent=2).encode("utf-8")),
     )
 
     _save_paper_meta(
@@ -383,7 +371,13 @@ def upload_paper(request):
             "file_name": file_name,
             "file_type": content_type,
             "binary_path": binary_rel_path,
-            "text_path": text_rel_path,
+            "text_path": cleaned_text_rel_path,
+            "raw_text_path": raw_text_rel_path,
+            "cleaned_text_path": cleaned_text_rel_path,
+            "paragraphs_path": paragraphs_rel_path,
+            "ai_payload_path": ai_payload_rel_path,
+            "paragraph_count": len(paragraphs),
+            "cleaned_text_length": len(preprocessed.cleaned_text),
             "upload_time": _now_str(file_management.upload_time),
         },
     )
@@ -400,6 +394,7 @@ def upload_paper(request):
             "paper_file_id": file_management.id,
             "file_name": file_management.file_name,
             "upload_time": _now_str(file_management.upload_time),
+            "paragraph_count": len(paragraphs),
         }
     )
 
@@ -424,6 +419,10 @@ def _submit_paper_task(request, expected_type):
     except FileManagement.DoesNotExist:
         return Response({"detail": "paper_file_id 不存在或无访问权限。"}, status=404)
 
+    meta = _load_paper_meta(file_obj.id)
+    if not meta or not meta.get("ai_payload_path") or int(meta.get("paragraph_count") or 0) <= 0:
+        return Response({"detail": "Paper preprocessing output is missing or invalid."}, status=400)
+
     task = DetectionTask.objects.create(
         organization=user.organization,
         user=request.user,
@@ -442,7 +441,14 @@ def _submit_paper_task(request, expected_type):
         related_id=task.id,
     )
 
-    return Response({"task_id": task.id, "status": task.status})
+    return Response(
+        {
+            "task_id": task.id,
+            "status": task.status,
+            "paper_file_id": file_obj.id,
+            "paragraph_count": meta.get("paragraph_count", 0),
+        }
+    )
 
 
 @api_view(["POST"])
@@ -516,11 +522,11 @@ def get_aigc_result(request, task_id):
     except DetectionTask.DoesNotExist:
         return Response({"detail": "任务不存在。"}, status=404)
 
-    _, paper_text, error_resp = _ready_result_or_error(task, "paper_aigc")
+    paper_file_id, paper_text, error_resp = _ready_result_or_error(task, "paper_aigc")
     if error_resp is not None:
         return error_resp
 
-    return Response(_build_aigc_result(task, paper_text))
+    return Response(_build_aigc_result(task, paper_text, _load_paper_paragraphs(paper_file_id)))
 
 
 @api_view(["GET"])
@@ -552,10 +558,13 @@ def submit_review_detection_task(request):
     if not raw_text and not uploaded_file:
         return Response({"detail": "请提供 text 或 txt 文件。"}, status=400)
 
-    review_text = raw_text
     file_name = "review_input.txt"
     file_type = "text/plain"
     raw_bytes = (raw_text or "").encode("utf-8")
+    try:
+        preprocessed = preprocess_review_text(raw_text, source_name=file_name)
+    except ValueError:
+        preprocessed = None
 
     if uploaded_file is not None:
         file_name = uploaded_file.name or "review_input.txt"
@@ -564,9 +573,12 @@ def submit_review_detection_task(request):
             return Response({"detail": "Review 检测仅支持文本输入或 TXT 文件。"}, status=400)
         file_type = uploaded_file.content_type or "text/plain"
         raw_bytes = uploaded_file.read()
-        review_text = _extract_review_text(file_name, raw_bytes)
+        try:
+            preprocessed = preprocess_review_bytes(raw_bytes, source_name=file_name)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
 
-    if not review_text:
+    if preprocessed is None:
         return Response({"detail": "未读取到有效的 Review 文本内容。"}, status=400)
 
     file_management = FileManagement.objects.create(
@@ -578,9 +590,17 @@ def submit_review_detection_task(request):
     )
 
     fs = FileSystemStorage()
-    text_rel_path = fs.save(
-        f"review_uploads/{file_management.id}_content.txt",
-        ContentFile(review_text.encode("utf-8")),
+    raw_text_rel_path = fs.save(
+        f"review_uploads/{file_management.id}_raw_text.txt",
+        ContentFile(preprocessed.raw_text.encode("utf-8")),
+    )
+    cleaned_text_rel_path = fs.save(
+        f"review_uploads/{file_management.id}_cleaned_text.txt",
+        ContentFile(preprocessed.cleaned_text.encode("utf-8")),
+    )
+    ai_payload_rel_path = fs.save(
+        f"review_uploads/{file_management.id}_ai_input.json",
+        ContentFile(json.dumps(preprocessed.ai_payload, ensure_ascii=False, indent=2).encode("utf-8")),
     )
     _save_review_meta(
         file_management.id,
@@ -588,7 +608,12 @@ def submit_review_detection_task(request):
             "review_file_id": file_management.id,
             "file_name": file_name,
             "file_type": file_type,
-            "text_path": text_rel_path,
+            "text_path": cleaned_text_rel_path,
+            "raw_text_path": raw_text_rel_path,
+            "cleaned_text_path": cleaned_text_rel_path,
+            "ai_payload_path": ai_payload_rel_path,
+            "encoding": preprocessed.encoding,
+            "cleaned_text_length": len(preprocessed.cleaned_text),
             "upload_time": _now_str(file_management.upload_time),
         },
     )
@@ -610,7 +635,13 @@ def submit_review_detection_task(request):
         related_id=task.id,
     )
 
-    return Response({"task_id": task.id, "status": task.status})
+    return Response(
+        {
+            "task_id": task.id,
+            "status": task.status,
+            "cleaned_text_length": len(preprocessed.cleaned_text),
+        }
+    )
 
 
 @api_view(["GET"])
@@ -624,7 +655,8 @@ def get_review_task_status(request, task_id):
     if not task.paper_file_id:
         return Response({"detail": "Review 任务缺少文件关联。"}, status=400)
 
-    meta_exists = bool(_load_review_meta(task.paper_file_id))
+    meta = _load_review_meta(task.paper_file_id)
+    meta_exists = bool(meta and meta.get("ai_payload_path") and meta.get("cleaned_text_path"))
     status_text, progress, error_message = _sync_review_task_status(task, meta_exists)
     return Response(
         {
