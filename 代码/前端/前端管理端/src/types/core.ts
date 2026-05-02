@@ -70,3 +70,58 @@ export interface ActionLogListResponse {
   total_pages: number
   total_logs: number
 }
+
+/** 与后端 DetectionTask.task_type 对齐 */
+export type AdminTaskType =
+  | 'image_detection'
+  | 'paper_aigc'
+  | 'resource_check'
+  | 'review_detection'
+
+/** 后端未升级时可能缺少 task_type / username 等字段，见 `文档/前后端对接-管理端.md` §2.1 */
+export interface AdminTaskItem {
+  task_id: number
+  task_name: string
+  task_type?: AdminTaskType | string
+  status: string
+  upload_time: string
+  completion_time: string | null
+  organization: string | null
+  user_id?: number
+  username?: string | null
+  error_message?: string
+}
+
+export interface AdminTaskListResponse {
+  tasks: AdminTaskItem[]
+}
+
+/** GET /api/get_detection_task_status/:id/ */
+export interface AdminTaskStatusDetail {
+  task_id: number
+  task_name: string
+  status: string
+  upload_time: string
+  completion_time: string | null
+  organization: string | null
+  detection_results?: Array<{
+    image_id: number
+    status: string
+    is_fake: boolean
+    confidence_score: number | null
+    detection_time: string | null
+  }>
+}
+
+export interface AdminDashboardTaskStats {
+  total_tasks: number
+  completed_tasks: number
+  pending_tasks: number
+  in_progress_tasks: number
+}
+
+export interface AdminDashboardResponse {
+  users: Array<{ id: number; username: string; email: string; role: string; date_joined: string }>
+  task_stats: AdminDashboardTaskStats
+}
+

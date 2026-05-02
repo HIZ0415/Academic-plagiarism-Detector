@@ -25,6 +25,8 @@
           @click="goToOrganizationProfile"></v-list-item>
         <v-list-item v-if="isLoggedIn" prepend-icon="mdi-folder" title="图像管理" value="files"
           @click="goToFiles"></v-list-item>
+        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-clipboard-list-outline" title="任务列表" value="tasks"
+          @click="goToTasks"></v-list-item>
         <v-list-item v-if="isLoggedIn" prepend-icon="mdi-account-group" title="用户管理" value="users"
           @click="goToUsers"></v-list-item>
         <v-list-item v-if="isLoggedIn" prepend-icon="mdi-clipboard-text-clock" title="日志记录" value="logs"
@@ -41,7 +43,7 @@
 
     <v-app-bar class="app-bar">
       <v-app-bar-nav-icon @click="drawer = !drawer" v-if="!isMobile"></v-app-bar-nav-icon>
-      <v-toolbar-title>学术图像检测系统</v-toolbar-title>
+      <v-toolbar-title>学术检测管理平台</v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn :icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'" @click="toggleTheme"></v-btn>
       <!-- <v-btn v-if="isAdmin" :color="hasUnreadNotifications ? 'red' : ''"
@@ -78,6 +80,10 @@
       <v-btn v-if="isLoggedIn" to="/files" value="files">
         <v-icon>mdi-folder</v-icon>
         <span>图像管理</span>
+      </v-btn>
+      <v-btn v-if="isLoggedIn" to="/tasks" value="tasks">
+        <v-icon>mdi-clipboard-list-outline</v-icon>
+        <span>任务</span>
       </v-btn>
       <v-btn v-if="isLoggedIn" to="/users" value="users">
         <v-icon>mdi-account-group</v-icon>
@@ -291,6 +297,10 @@ const goToAnalytics = () => {
 
 const goToFiles = () => {
   router.push('/files')
+}
+
+const goToTasks = () => {
+  router.push('/tasks')
 }
 
 const goToOrganizations = () => {
