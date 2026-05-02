@@ -4,6 +4,8 @@ from .contracts import (
     DetectionEvidence,
     DetectionRequest,
     DetectionResponse,
+    ERROR_RESPONSE_SCHEMA_VERSION,
+    ErrorResponse,
     ImageInput,
     StandardImageResult,
 )
@@ -17,6 +19,8 @@ __all__ = [
     "DetectionEvidence",
     "DetectionRequest",
     "DetectionResponse",
+    "ERROR_RESPONSE_SCHEMA_VERSION",
+    "ErrorResponse",
     "DetectionModelRegistry",
     "DetectionService",
     "ImageInput",

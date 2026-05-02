@@ -38,6 +38,8 @@ GET  /api/v1/admin/model-registry
 Authorization: Bearer <AI_SERVICE_API_TOKEN>
 ```
 
+除成功响应外，AI 服务当前统一返回标准错误对象，见“错误响应结构”一节。
+
 ## 3. 图像检测请求
 
 推荐请求结构如下：
@@ -147,7 +149,58 @@ AI 服务也保留了从这两个文件组装请求的本地脚本入口。
 - `evidences` 是新的标准化证据对象，后端当前可忽略，但推荐后续使用
 - `batch_id` 已贯穿到顶层响应
 
-## 5. 单图结果字段说明
+## 5. 错误响应结构
+
+AI 服务当前定义统一错误响应 schema：
+
+```json
+{
+  "schema_version": "ai-service-error-v1",
+  "error_code": "validation_error",
+  "error_type": "ValidationError",
+  "message": "unsupported schema_version",
+  "error": "unsupported schema_version",
+  "status": 400,
+  "retriable": false,
+  "task_type": "image",
+  "batch_id": "task_1_batch_0",
+  "details": {
+    "field": "schema_version"
+  }
+}
+```
+
+字段说明：
+
+- `schema_version`：当前固定为 `ai-service-error-v1`
+- `error_code`：稳定错误码，便于后端做分类处理
+- `error_type`：AI 服务内部异常类型名
+- `message`：标准错误消息
+- `error`：兼容字段，语义与 `message` 一致；为避免影响现有调用方继续保留
+- `status`：HTTP 状态码数值
+- `retriable`：是否建议重试
+- `task_type`：可选，请求里携带时回传
+- `batch_id`：可选，请求里携带时回传
+- `details`：可选，附加错误上下文
+
+当前稳定错误码约定：
+
+| HTTP 状态码 | `error_code` | 说明 |
+|---|---|---|
+| `400` | `validation_error` | 请求结构、字段类型或压缩包内容非法 |
+| `401` | `unauthorized` | `AI_SERVICE_API_TOKEN` 校验失败 |
+| `404` | `not_found` | 路径不存在 |
+| `501` | `task_not_implemented` | 任务类型已预留但尚未实现 |
+| `504` | `timeout` | AI 请求超时 |
+| `500` | `internal_error` | 未分类内部异常 |
+
+说明：
+
+- `timeout` 当前会返回 `retriable = true`
+- 其余错误默认返回 `retriable = false`
+- 新增错误字段时，优先追加字段，不删除 `error` 兼容字段
+
+## 6. 单图结果字段说明
 
 | 字段 | 必填 | 说明 |
 |---|---:|---|
@@ -165,7 +218,7 @@ AI 服务也保留了从这两个文件组装请求的本地脚本入口。
 | `sub_method_results[].mask` | 是 | 子方法 mask |
 | `evidences` | 否 | 标准化证据对象列表 |
 
-## 6. 健康检查接口
+## 7. 健康检查接口
 
 ```text
 GET /health
@@ -197,7 +250,7 @@ GET /health
 }
 ```
 
-## 7. 只读管理接口
+## 8. 只读管理接口
 
 ```text
 GET /api/v1/admin/model-registry
@@ -214,7 +267,7 @@ GET /api/v1/admin/model-registry?profile=minimal_trainable
 
 该接口为只读接口，不负责在线修改配置。
 
-## 8. `paper` / `review` 预留规则
+## 9. `paper` / `review` 预留规则
 
 当前 AI 服务已预留：
 
@@ -231,7 +284,7 @@ GET /api/v1/admin/model-registry?profile=minimal_trainable
 
 但当前仅保留路由与错误语义，尚未形成真实检测链路；调用时会返回未实现错误。
 
-## 9. 迭代规则
+## 10. 迭代规则
 
 1. 新模型可以替换内部算法，但不要改变后端已消费字段的语义。
 2. 如需扩展能力，优先新增字段，不直接删除旧字段。
