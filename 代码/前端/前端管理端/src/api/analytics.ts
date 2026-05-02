@@ -1,7 +1,10 @@
 import http from './request'
-import type { DashboardPoint } from '@/types/core'
+import type { AdminDashboardResponse, DashboardPoint } from '@/types/core'
 
 export default {
+  getAdminDashboard() {
+    return http.get<AdminDashboardResponse>('/admin_dashboard/')
+  },
   // 获取图像标签统计
   getImgTag: (params: { startTime?: string; endTime?: string }) => {
     return http.get('/dashboard/img_tag/', { params })

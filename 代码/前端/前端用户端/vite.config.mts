@@ -85,6 +85,7 @@ export default defineConfig({
     preprocessorOptions: {
       sass: {
         api: 'modern-compiler',
+        quietDeps: true,
       },
     },
   },

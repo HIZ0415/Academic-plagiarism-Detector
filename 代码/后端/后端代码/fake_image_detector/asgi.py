@@ -12,11 +12,11 @@ import os
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-from . routings import websocket_urlpatterns
 import django
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fake_image_detector.settings")
 django.setup()
+from .routings import websocket_urlpatterns
 
 # application = get_asgi_application()
 application = ProtocolTypeRouter(

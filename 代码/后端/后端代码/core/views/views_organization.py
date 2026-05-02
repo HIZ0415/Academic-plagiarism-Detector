@@ -15,6 +15,42 @@ from django.db import models
 from django.db.models import Count, F
 
 
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def upload_organization_logo(request):
+    org_id = request.data.get('organization_id')
+    logo = request.FILES.get('logo')
+
+    if not org_id:
+        return Response({"message": "organization_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not logo:
+        return Response({"message": "logo file is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        organization = Organization.objects.get(id=int(org_id))
+    except (ValueError, TypeError):
+        return Response({"message": "organization_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+    except Organization.DoesNotExist:
+        return Response({"message": "Organization not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    # Allow software root admin, superuser, or the target organization admin.
+    if not (
+        request.user.is_superuser
+        or request.user.email == 'admin@mail.com'
+        or organization.admin_user_id == request.user.id
+    ):
+        return Response({"message": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    organization.logo = logo
+    organization.save(update_fields=['logo'])
+
+    return Response({
+        "message": "Organization logo uploaded successfully",
+        "organization_id": organization.id,
+        "logo": organization.logo.url if organization.logo else None,
+    }, status=status.HTTP_200_OK)
+
+
 class CreateOrganizationApplicationView(views.APIView):
     def post(self, request):
         org_name = request.data.get('name')

@@ -309,6 +309,12 @@ class DetectionTask(models.Model):
     urn_k = models.FloatField(null=True, blank=True)
     if_use_llm = models.BooleanField(default=False)  # 是否使用大语言模型
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'upload_time'], name='dt_user_upload_idx'),
+            models.Index(fields=['task_type', 'status'], name='dt_type_status_idx'),
+        ]
+
     def __str__(self):
         return f"Task {self.id} - {self.user.username}"
 

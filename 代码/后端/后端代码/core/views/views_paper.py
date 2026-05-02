@@ -16,6 +16,9 @@ from rest_framework.response import Response
 
 from ..models import DetectionTask, FileManagement, Log, User
 
+ALPHA_ALLOWED_PAPER_EXT = {".pdf"}
+ALPHA_ALLOWED_REVIEW_FILE_EXT = {".txt"}
+
 
 def _now_str(dt):
     if not dt:
@@ -90,6 +93,17 @@ def _extract_text(file_name, content_type, raw_bytes):
         if text:
             return text
 
+    return raw_bytes.decode("utf-8", errors="ignore").strip()
+
+
+def _extract_review_text(file_name, raw_bytes):
+    suffix = Path(file_name).suffix.lower()
+    if suffix in ALPHA_ALLOWED_REVIEW_FILE_EXT:
+        for encoding in ("utf-8", "gbk", "latin-1"):
+            try:
+                return raw_bytes.decode(encoding).strip()
+            except Exception:
+                continue
     return raw_bytes.decode("utf-8", errors="ignore").strip()
 
 
@@ -255,6 +269,73 @@ def _get_paper_text(file_id):
     return "", meta
 
 
+def _review_meta_path(file_id):
+    return Path(settings.MEDIA_ROOT) / "review_uploads" / f"{file_id}_meta.json"
+
+
+def _load_review_meta(file_id):
+    meta_path = _review_meta_path(file_id)
+    if not meta_path.exists():
+        return None
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _save_review_meta(file_id, payload):
+    folder = Path(settings.MEDIA_ROOT) / "review_uploads"
+    folder.mkdir(parents=True, exist_ok=True)
+    _review_meta_path(file_id).write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _sync_review_task_status(task, meta_exists):
+    if task.status == "failed":
+        message = task.error_message or "Review 文件元数据缺失或已损坏。"
+        if task.error_message != message:
+            task.error_message = message
+            task.save(update_fields=["error_message"])
+        return "failed", 100, message
+
+    if not meta_exists:
+        task.status = "failed"
+        task.error_message = "Review 文件元数据缺失或已损坏。"
+        task.save(update_fields=["status", "error_message"])
+        return "failed", 100, task.error_message
+
+    if task.status == "completed":
+        if task.error_message:
+            task.error_message = ""
+            task.save(update_fields=["error_message"])
+        return "completed", 100, ""
+
+    elapsed = max((timezone.now() - task.upload_time).total_seconds(), 0)
+    if elapsed < 1.0:
+        if task.status != "pending":
+            task.status = "pending"
+            task.error_message = ""
+            task.save(update_fields=["status", "error_message"])
+        return "pending", 30, ""
+
+    if elapsed < 2.2:
+        if task.status != "in_progress":
+            task.status = "in_progress"
+            task.error_message = ""
+            task.save(update_fields=["status", "error_message"])
+        return "in_progress", 80, ""
+
+    if task.status != "completed":
+        task.status = "completed"
+        if not task.completion_time:
+            task.completion_time = timezone.now()
+        task.error_message = ""
+        task.save(update_fields=["status", "completion_time", "error_message"])
+    return "completed", 100, ""
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def upload_paper(request):
@@ -268,9 +349,8 @@ def upload_paper(request):
 
     file_name = uploaded_file.name or "paper_upload"
     suffix = Path(file_name).suffix.lower()
-    allowed_ext = {".pdf", ".docx", ".txt"}
-    if suffix not in allowed_ext:
-        return Response({"detail": "仅支持 PDF/DOCX/TXT 文件。"}, status=400)
+    if suffix not in ALPHA_ALLOWED_PAPER_EXT:
+        return Response({"detail": "仅支持 PDF 文件。"}, status=400)
 
     content_type = uploaded_file.content_type or "application/octet-stream"
     raw_bytes = uploaded_file.read()
@@ -456,3 +536,101 @@ def get_resource_check_result(request, task_id):
         return error_resp
 
     return Response(_build_resource_result(task, paper_text))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def submit_review_detection_task(request):
+    user = User.objects.get(id=request.user.id)
+    if not user.has_permission("submit"):
+        return Response({"detail": "该用户没有提交检测权限。"}, status=403)
+
+    task_name = (request.data.get("task_name") or "review-task").strip()
+    raw_text = (request.data.get("text") or "").strip()
+    uploaded_file = request.FILES.get("file")
+
+    if not raw_text and not uploaded_file:
+        return Response({"detail": "请提供 text 或 txt 文件。"}, status=400)
+
+    review_text = raw_text
+    file_name = "review_input.txt"
+    file_type = "text/plain"
+    raw_bytes = (raw_text or "").encode("utf-8")
+
+    if uploaded_file is not None:
+        file_name = uploaded_file.name or "review_input.txt"
+        suffix = Path(file_name).suffix.lower()
+        if suffix not in ALPHA_ALLOWED_REVIEW_FILE_EXT:
+            return Response({"detail": "Review 检测仅支持文本输入或 TXT 文件。"}, status=400)
+        file_type = uploaded_file.content_type or "text/plain"
+        raw_bytes = uploaded_file.read()
+        review_text = _extract_review_text(file_name, raw_bytes)
+
+    if not review_text:
+        return Response({"detail": "未读取到有效的 Review 文本内容。"}, status=400)
+
+    file_management = FileManagement.objects.create(
+        organization=user.organization,
+        user=request.user,
+        file_name=file_name,
+        file_size=len(raw_bytes),
+        file_type=file_type,
+    )
+
+    fs = FileSystemStorage()
+    text_rel_path = fs.save(
+        f"review_uploads/{file_management.id}_content.txt",
+        ContentFile(review_text.encode("utf-8")),
+    )
+    _save_review_meta(
+        file_management.id,
+        {
+            "review_file_id": file_management.id,
+            "file_name": file_name,
+            "file_type": file_type,
+            "text_path": text_rel_path,
+            "upload_time": _now_str(file_management.upload_time),
+        },
+    )
+
+    task = DetectionTask.objects.create(
+        organization=user.organization,
+        user=request.user,
+        task_type="review_detection",
+        paper_file=file_management,
+        task_name=task_name,
+        status="pending",
+        error_message="",
+        if_use_llm=False,
+    )
+    Log.objects.create(
+        user=request.user,
+        operation_type="detection",
+        related_model="DetectionTask",
+        related_id=task.id,
+    )
+
+    return Response({"task_id": task.id, "status": task.status})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_review_task_status(request, task_id):
+    try:
+        task = DetectionTask.objects.get(id=task_id, user=request.user, task_type="review_detection")
+    except DetectionTask.DoesNotExist:
+        return Response({"detail": "任务不存在。"}, status=404)
+
+    if not task.paper_file_id:
+        return Response({"detail": "Review 任务缺少文件关联。"}, status=400)
+
+    meta_exists = bool(_load_review_meta(task.paper_file_id))
+    status_text, progress, error_message = _sync_review_task_status(task, meta_exists)
+    return Response(
+        {
+            "task_id": task.id,
+            "status": status_text,
+            "progress": progress,
+            "error_message": error_message,
+        }
+    )
