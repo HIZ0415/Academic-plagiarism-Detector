@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$BindHost = '127.0.0.1',
     [int]$UserPort = 3000,
@@ -920,10 +920,50 @@ $PortableNodeVersion = if ($env:LOCAL_NODE_VERSION) { $env:LOCAL_NODE_VERSION } 
 $Ports = @($UserPort, $AdminPort, $BackendPort, $AiPort)
 
 Write-Step 'Resolving project directories'
-$BackendDir = Find-SingleFileParent -RootDir $RootDir -Filter 'manage.py' -Description 'backend'
-$AiDir = Find-SingleFileParent -RootDir $RootDir -Filter 'ai_http_service.py' -Description 'AI service'
-$UserFrontendDir = Find-FrontendDirectory -RootDir $RootDir -PackageName 'buaa_se'
-$AdminFrontendDir = Find-FrontendDirectory -RootDir $RootDir -PackageName 'BUAA_SE_manage'
+# 优先使用本仓库约定路径，避免对整个目录树递归（会扫过 node_modules，极慢或看似卡死）
+$BackendDirGuess = Join-Path $RootDir '代码\后端\后端代码'
+$AiDirGuess = Join-Path $RootDir '代码\AI服务\AI服务器代码'
+$UserFrontendDirGuess = Join-Path $RootDir '代码\前端\前端用户端'
+$AdminFrontendDirGuess = Join-Path $RootDir '代码\前端\前端管理端'
+
+if (Test-Path -LiteralPath (Join-Path $BackendDirGuess 'manage.py')) {
+    $BackendDir = $BackendDirGuess
+}
+else {
+    $BackendDir = Find-SingleFileParent -RootDir $RootDir -Filter 'manage.py' -Description 'backend'
+}
+
+if (Test-Path -LiteralPath (Join-Path $AiDirGuess 'ai_http_service.py')) {
+    $AiDir = $AiDirGuess
+}
+else {
+    $AiDir = Find-SingleFileParent -RootDir $RootDir -Filter 'ai_http_service.py' -Description 'AI service'
+}
+
+function Resolve-FrontendDirByPackageName {
+    param(
+        [string]$RootDir,
+        [string]$GuessDir,
+        [string]$PackageName
+    )
+
+    $pkgPath = Join-Path $GuessDir 'package.json'
+    if (Test-Path -LiteralPath $pkgPath) {
+        try {
+            $pkg = Get-Content -LiteralPath $pkgPath -Raw | ConvertFrom-Json
+            if ($pkg.name -eq $PackageName) {
+                return $GuessDir
+            }
+        }
+        catch {
+        }
+    }
+
+    return (Find-FrontendDirectory -RootDir $RootDir -PackageName $PackageName)
+}
+
+$UserFrontendDir = Resolve-FrontendDirByPackageName -RootDir $RootDir -GuessDir $UserFrontendDirGuess -PackageName 'buaa_se'
+$AdminFrontendDir = Resolve-FrontendDirByPackageName -RootDir $RootDir -GuessDir $AdminFrontendDirGuess -PackageName 'BUAA_SE_manage'
 $VenvDir = Join-Path $BackendDir '.venv'
 $BackendRequirements = Join-Path $BackendDir 'requirements.local.txt'
 $LocalSettingsPath = Join-Path $BackendDir 'fake_image_detector\local_settings.py'

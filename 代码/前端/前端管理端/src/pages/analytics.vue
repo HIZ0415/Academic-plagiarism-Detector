@@ -1,5 +1,6 @@
 <template>
   <v-container class="analytics-container">
+    <DashboardSummaryCards v-if="dashboardStats" :stats="dashboardStats" />
     <v-row>
       <v-col cols="12" md="6">
         <ImageTagStats />
@@ -39,11 +40,14 @@ import OrgRanking from '@/components/analytics/OrgRanking.vue'
 import TaskTrend from '@/components/analytics/TaskTrend.vue'
 import ActiveUserTrend from '@/components/analytics/ActiveUserTrend.vue'
 import ActiveOrgTrend from '@/components/analytics/ActiveOrgTrend.vue'
-import MethodStats from '@/components/analytics/MethodStats.vue'
+import DashboardSummaryCards from '@/components/analytics/DashboardSummaryCards.vue'
 import { ref, onMounted } from 'vue'
 import userApi from '@/api/user'
+import analyticsApi from '@/api/analytics'
+import type { AdminDashboardTaskStats } from '@/types/core'
 
 const isOrganizationAdmin = ref(false)
+const dashboardStats = ref<AdminDashboardTaskStats | null>(null)
 
 onMounted(async () => {
   try {
@@ -51,6 +55,12 @@ onMounted(async () => {
     isOrganizationAdmin.value = res.data.admin_type === 'organization_admin'
   } catch (error) {
     console.error('获取用户信息失败:', error)
+  }
+  try {
+    const dash = await analyticsApi.getAdminDashboard()
+    dashboardStats.value = dash.data.task_stats ?? null
+  } catch (error) {
+    console.error('加载仪表盘摘要失败:', error)
   }
 })
 </script>
