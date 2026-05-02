@@ -10,6 +10,8 @@ from django.db.models import Q
 from datetime import datetime
 from django.core.paginator import Paginator
 
+TASK_STATUS_WHITELIST = {"pending", "in_progress", "completed", "failed"}
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_detection_result(request, image_id):
@@ -638,6 +640,8 @@ def get_user_tasks(request):
     tasks = DetectionTask.objects.filter(user=request.user).order_by('-upload_time')
     
     if status:
+        if status not in TASK_STATUS_WHITELIST:
+            return Response({'error': 'Invalid status filter'}, status=400)
         tasks = tasks.filter(status=status)
     if start_time:
         tasks = tasks.filter(upload_time__gte=start_time)
@@ -671,6 +675,55 @@ def get_user_tasks(request):
         'has_next': page_obj.has_next(),
         'has_previous': page_obj.has_previous()
     })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_task_detail_unified(request, task_id):
+    try:
+        task = DetectionTask.objects.get(id=task_id, user=request.user)
+    except DetectionTask.DoesNotExist:
+        return Response({"detail": "任务不存在。"}, status=404)
+
+    payload = {
+        "task_id": task.id,
+        "task_name": task.task_name,
+        "task_type": task.task_type or "image_detection",
+        "status": task.status,
+        "upload_time": timezone.localtime(task.upload_time).strftime("%Y-%m-%d %H:%M:%S"),
+        "completion_time": timezone.localtime(task.completion_time).strftime("%Y-%m-%d %H:%M:%S") if task.completion_time else None,
+        "error_message": task.error_message or "",
+    }
+
+    if payload["task_type"] == "image_detection":
+        results = task.detection_results.select_related("image_upload").all()
+        payload["result"] = {
+            "total_images": results.count(),
+            "completed_images": results.filter(status="completed").count(),
+            "fake_count": results.filter(is_fake=True).count(),
+            "normal_count": results.filter(is_fake=False).count(),
+            "items": [
+                {
+                    "result_id": dr.id,
+                    "image_id": dr.image_upload_id,
+                    "status": dr.status,
+                    "is_fake": dr.is_fake,
+                    "confidence_score": dr.confidence_score,
+                }
+                for dr in results
+            ],
+        }
+    elif payload["task_type"] in ("paper_aigc", "resource_check", "review_detection"):
+        payload["result"] = {
+            "paper_file_id": task.paper_file_id,
+            "detail_endpoint": "paper/aigc/{taskId}/result" if payload["task_type"] == "paper_aigc"
+            else ("paper/resource-check/{taskId}/result" if payload["task_type"] == "resource_check"
+                  else "review/tasks/{taskId}/status"),
+        }
+    else:
+        payload["result"] = {}
+
+    return Response(payload)
 
 
 @api_view(['GET'])
