@@ -85,7 +85,18 @@ export default defineConfig({
     preprocessorOptions: {
       sass: {
         api: 'modern-compiler',
+        quietDeps: true,
       },
     },
+  },
+  optimizeDeps: {
+    exclude: [
+      'axios',
+      'marked',
+      'pinia',
+      'vue',
+      'vue-router',
+      'vuetify',
+    ],
   },
 })

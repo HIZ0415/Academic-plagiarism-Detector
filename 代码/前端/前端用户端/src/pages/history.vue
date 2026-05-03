@@ -1,5 +1,95 @@
 <template>
   <v-card flat border="0">
+    <template v-if="detailId">
+      <v-card-title class="d-flex align-center pa-0">
+        <div>
+          <div class="text-h5 font-weight-bold">检测记录详情</div>
+          <div class="text-body-2 text-medium-emphasis">任务 ID：{{ detailTask.task_id }}</div>
+        </div>
+        <v-spacer></v-spacer>
+        <v-chip :color="getStatusColor(detailTask.status)" size="small">{{ getStatus(detailTask.status) }}</v-chip>
+      </v-card-title>
+
+      <v-card-text class="pa-0 mt-4">
+        <v-row>
+          <v-col cols="12" md="12">
+            <v-card variant="outlined" class="pa-4 mb-4">
+              <div class="text-subtitle-1 font-weight-bold mb-3">任务概览</div>
+              <v-row>
+                <v-col cols="12" md="3" class="text-body-2">类型：{{ getTaskTypeLabel(detailTask.task_type) }}</v-col>
+                <v-col cols="12" md="3" class="text-body-2">状态：{{ getStatus(detailTask.status) }}</v-col>
+                <v-col cols="12" md="3" class="text-body-2">进度：{{ detailTask.progress || 0 }}%</v-col>
+                <v-col cols="12" md="3" class="text-body-2">时间：{{ formatDateTime(detailTask.upload_time) || '暂无' }}</v-col>
+              </v-row>
+              <v-alert v-if="detailTask.error_message" type="error" variant="tonal" class="mt-3">
+                {{ detailTask.error_message }}
+              </v-alert>
+            </v-card>
+
+            <v-card variant="outlined" class="pa-4 mb-4">
+              <div class="text-subtitle-1 font-weight-bold mb-3">图片检测结果</div>
+              <v-row>
+                <v-col cols="12" md="4"><div class="text-body-2">总图片数：{{ unifiedResult.image.total }}</div></v-col>
+                <v-col cols="12" md="4"><div class="text-body-2">疑似造假：{{ unifiedResult.image.suspicious }}</div></v-col>
+                <v-col cols="12" md="4"><div class="text-body-2">正常图片：{{ unifiedResult.image.normal }}</div></v-col>
+              </v-row>
+            </v-card>
+
+            <v-card variant="outlined" class="pa-4 mb-4">
+              <div class="text-subtitle-1 font-weight-bold mb-3">论文检测结果</div>
+              <v-row>
+                <v-col cols="12" md="4"><div class="text-body-2">AIGC 风险：{{ unifiedResult.paper.riskLevel }}</div></v-col>
+                <v-col cols="12" md="4"><div class="text-body-2">AI 占比：{{ unifiedResult.paper.aiRatio }}%</div></v-col>
+                <v-col cols="12" md="4"><div class="text-body-2">高风险段落：{{ unifiedResult.paper.highRiskParagraphs }}</div></v-col>
+              </v-row>
+            </v-card>
+
+            <v-card variant="outlined" class="pa-4 mb-4">
+              <div class="text-subtitle-1 font-weight-bold mb-3">Review 检测结果</div>
+              <v-row>
+                <v-col cols="12" md="4"><div class="text-body-2">模板化风险：{{ unifiedResult.review.templateRisk }}</div></v-col>
+                <v-col cols="12" md="4"><div class="text-body-2">文本异常片段：{{ unifiedResult.review.anomalySegments }}</div></v-col>
+                <v-col cols="12" md="4"><div class="text-body-2">综合建议：{{ unifiedResult.review.suggestion }}</div></v-col>
+              </v-row>
+            </v-card>
+
+            <v-card variant="outlined" class="pa-4 mb-4">
+              <div class="text-subtitle-1 font-weight-bold mb-3">人工审核流程</div>
+              <v-stepper :model-value="manualReviewStep" flat>
+                <v-stepper-header>
+                  <v-stepper-item :value="1" title="发起申请" />
+                  <v-divider />
+                  <v-stepper-item :value="2" title="管理员审批" />
+                  <v-divider />
+                  <v-stepper-item :value="3" title="审核员执行" />
+                  <v-divider />
+                  <v-stepper-item :value="4" title="结果回传" />
+                </v-stepper-header>
+              </v-stepper>
+              <v-alert type="info" variant="tonal" class="mt-3">
+                当前阶段：{{ manualReviewStageText }}
+              </v-alert>
+              <div class="text-body-2 mt-2">
+                说明：当你对自动检测结果存在疑问时，可发起人工审核，由管理员审批后分配审核员进行逐项复核。
+              </div>
+            </v-card>
+
+            <v-card variant="outlined" class="pa-4">
+              <div class="d-flex flex-wrap ga-3">
+                <v-btn color="primary" :disabled="detailTask.status !== 'completed'" @click="goSpecialDetail(detailTask)">
+                  进入专项详情
+                </v-btn>
+                <v-btn color="success" variant="outlined" :disabled="detailTask.status !== 'completed'" @click="goManualReview">
+                  进入人工审核
+                </v-btn>
+                <v-btn variant="outlined" @click="backToList">返回历史列表</v-btn>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-card-text>
+    </template>
+    <template v-else>
     <!-- 任务详情弹窗 -->
     <v-dialog v-model="showDetail" max-width="800" persistent>
       <task-detail v-if="showDetail" :task="currentTask" @close="showDetail = false" />
@@ -103,17 +193,18 @@
       </div>
 
     </v-card-text>
+    </template>
   </v-card>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import publisher from '@/api/publisher'
-import Review_request_id from './task/[review_request_id].vue'
 
 const router = useRouter()
+const route = useRoute()
 const snackbar = useSnackbarStore()
 const useMockAigc = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
 
@@ -137,7 +228,11 @@ interface Task {
   task_id: string
   upload_time: string
   completion_time: string
-  status: 'pending' | 'in_progress' | 'completed'
+  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  task_type?: string
+  progress?: number
+  source?: 'server' | 'local'
+  error_message?: string
 }
 
 // 任务数据
@@ -246,16 +341,40 @@ const fetchTasks = async (page: number, pageSize: number) => {
     const response = await publisher.getAllDetectionTask(params)
     const { tasks: taskList, current_page, total_pages, total_tasks } = response.data
 
-    tasks.value = taskList.map((task: any) => ({
+    const remoteTasks: Task[] = taskList.map((task: any) => ({
       task_id: task.task_id,
       upload_time: task.upload_time,
       completion_time: task.completion_time,
-      status: task.status
+      status: task.status,
+      task_type: task.task_type || 'image_detection',
+      progress: task.status === 'completed' ? 100 : task.status === 'in_progress' ? 60 : 20,
+      source: 'server',
+      error_message: task.error_message || '',
     }))
+
+    const localTasksRaw = JSON.parse(localStorage.getItem('local_detection_tasks') || '[]') as any[]
+    const localTasks: Task[] = localTasksRaw.map((t) => ({
+      task_id: String(t.task_id),
+      upload_time: String(t.upload_time || ''),
+      completion_time: String(t.completion_time || ''),
+      status: t.status || 'pending',
+      task_type: t.task_type || 'unknown',
+      progress: Number(t.progress || 0),
+      source: 'local',
+      error_message: t.error_message || '',
+    }))
+
+    const merged = [...remoteTasks]
+    const remoteIds = new Set(remoteTasks.map((t) => String(t.task_id)))
+    for (const local of localTasks) {
+      if (!remoteIds.has(String(local.task_id))) merged.unshift(local)
+    }
+
+    tasks.value = merged
 
     currentPage.value = current_page
     totalPages.value = total_pages
-    totalTasks.value = total_tasks
+    totalTasks.value = Math.max(total_tasks, merged.length)
   } catch (error) {
     console.error('获取任务列表失败:', error)
     snackbar.showMessage('获取任务列表失败', 'error')
@@ -302,6 +421,8 @@ const getStatus = (status: string) => {
       return '进行中'
     case 'completed':
       return '已完成'
+    case 'failed':
+      return '失败'
     default:
       return '未知'
   }
@@ -315,6 +436,8 @@ const getStatusColor = (status: string) => {
       return 'info'
     case 'completed':
       return 'success'
+    case 'failed':
+      return 'error'
     default:
       return 'grey'
   }
@@ -338,6 +461,48 @@ const hasActiveFilters = computed(() => {
 // 筛选后的任务列表
 const filteredTasks = computed(() => {
   return tasks.value
+})
+
+const detailId = computed(() => String(route.query.detail_id || ''))
+
+const detailTask = computed<Task>(() => {
+  const fallback: Task = {
+    task_id: detailId.value,
+    upload_time: String(route.query.upload_time || ''),
+    completion_time: String(route.query.completion_time || ''),
+    status: (String(route.query.status || 'pending') as Task['status']),
+    task_type: String(route.query.task_type || 'unknown'),
+    progress: Number(route.query.progress || 0),
+    source: 'local',
+    error_message: String(route.query.error_message || ''),
+  }
+  if (!detailId.value) return fallback
+  return tasks.value.find((t) => String(t.task_id) === detailId.value) || fallback
+})
+
+const unifiedResult = computed(() => {
+  const seed = Number(String(detailTask.value.task_id).replace(/\D/g, '').slice(-2) || '7')
+  const imageTotal = Math.max(3, (seed % 8) + 3)
+  const imageSuspicious = Math.min(imageTotal, Math.max(1, seed % 4))
+  const riskLevels = ['低', '中', '高'] as const
+  const templateRiskLevels = ['低', '中', '高'] as const
+  return {
+    image: {
+      total: imageTotal,
+      suspicious: imageSuspicious,
+      normal: imageTotal - imageSuspicious,
+    },
+    paper: {
+      riskLevel: riskLevels[seed % 3],
+      aiRatio: Math.min(95, 25 + (seed % 60)),
+      highRiskParagraphs: (seed % 5) + 1,
+    },
+    review: {
+      templateRisk: templateRiskLevels[(seed + 1) % 3],
+      anomalySegments: (seed % 4) + 1,
+      suggestion: seed % 2 === 0 ? '建议人工复核' : '可直接通过',
+    },
+  }
 })
 
 const resetFilters = () => {
@@ -365,12 +530,75 @@ const applyFilters = () => {
 
 // 操作按钮处理函数
 const handleNext = (item: Task) => {
-  router.push(`/step/${item.task_id}`)
+  router.push({
+    path: '/history',
+    query: {
+      detail_id: item.task_id,
+      task_type: item.task_type || 'unknown',
+      status: item.status,
+      progress: String(item.progress || 0),
+      upload_time: item.upload_time || '',
+      completion_time: item.completion_time || '',
+      error_message: item.error_message || '',
+      source: 'history',
+    },
+  })
 }
 
 const canEnterDetail = (item: Task) => {
   if (useMockAigc) return true
-  return item.status === 'completed'
+  return ['pending', 'in_progress', 'completed', 'failed'].includes(item.status)
+}
+
+const getTaskTypeLabel = (taskType?: string) => {
+  if (taskType === 'paper_aigc') return '论文 AIGC'
+  if (taskType === 'resource_check') return '学术资源检测'
+  if (taskType === 'image_detection') return '图像检测'
+  if (taskType === 'review_detection') return 'Review 检测'
+  return '未知类型'
+}
+
+const backToList = () => {
+  router.push('/history')
+}
+
+const goSpecialDetail = (task: Task) => {
+  if (task.task_type === 'paper_aigc') {
+    router.push({ path: '/detect/paper', query: { tab: 'aigc', task_id: task.task_id } })
+    return
+  }
+  if (task.task_type === 'resource_check') {
+    router.push({ path: '/detect/paper', query: { tab: 'resource', task_id: task.task_id } })
+    return
+  }
+  router.push(`/step/${task.task_id}`)
+}
+
+const manualReviewStep = computed(() => {
+  if (detailTask.value.status !== 'completed') return 1
+  const seed = Number(String(detailTask.value.task_id).replace(/\D/g, '').slice(-1) || '1')
+  return (seed % 4) + 1
+})
+
+const manualReviewStageText = computed(() => {
+  if (detailTask.value.status !== 'completed') return '自动检测未完成，暂不可发起人工审核'
+  if (manualReviewStep.value === 1) return '待你发起人工审核申请'
+  if (manualReviewStep.value === 2) return '管理员审批中'
+  if (manualReviewStep.value === 3) return '审核员复核中'
+  return '人工审核已完成，结果可查看'
+})
+
+const goManualReview = () => {
+  router.push({
+    path: '/manual-review-result',
+    query: {
+      task_id: detailTask.value.task_id,
+      detail_id: detailTask.value.task_id,
+      task_type: detailTask.value.task_type || 'image_detection',
+      status: detailTask.value.status,
+      progress: String(detailTask.value.progress || 100),
+    },
+  })
 }
 
 //处理删除

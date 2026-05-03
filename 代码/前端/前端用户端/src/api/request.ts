@@ -1,6 +1,5 @@
 //引入axios
 import axios from 'axios'
-import router from '@/router'
 
 // 创建axios实例
 const instance = axios.create({
@@ -40,7 +39,10 @@ instance.interceptors.response.use(response => {
         // 刷新token失败，跳转到登录页
         localStorage.removeItem('2-token')
         localStorage.removeItem('2-refresh')
-        router.push('/login')
+        localStorage.setItem('2-isLoggedIn', 'false')
+        if (typeof window !== 'undefined') {
+          window.location.assign('/login')
+        }
         return Promise.reject(err)
       })
     }

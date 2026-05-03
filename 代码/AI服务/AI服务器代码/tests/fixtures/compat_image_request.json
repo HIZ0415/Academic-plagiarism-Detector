@@ -1,0 +1,15 @@
+{
+  "schema_version": "backend-ai-request-v1",
+  "task_type": "image",
+  "batch_id": "fixture_batch_0",
+  "parameters": {
+    "cmd_block_size": 64,
+    "urn_k": 0.3,
+    "if_use_llm": false,
+    "model_version": "image-detector-fixture-2026-04"
+  },
+  "image_names": [
+    "00000123.jpg"
+  ],
+  "images_zip_base64": "UEsDBBQAAAAIAKiGl1zuQOUFCQAAAAcAAAAMAAAAMDAwMDAxMjMuanBnS8usKCktSgUAUEsBAhQAFAAAAAgAqIaXXO5A5QUJAAAABwAAAAwAAAAAAAAAAAAAAIABAAAAADAwMDAwMTIzLmpwZ1BLBQYAAAAAAQABADoAAAAzAAAAAAA="
+}

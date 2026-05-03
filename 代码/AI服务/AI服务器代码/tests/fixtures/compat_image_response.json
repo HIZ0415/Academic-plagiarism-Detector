@@ -1,0 +1,47 @@
+{
+  "schema_version": "image-detection-v1",
+  "task_type": "image",
+  "model_version": "image-detector-fixture-2026-04",
+  "batch_id": "fixture_batch_0",
+  "results": [
+    {
+      "schema_version": "image-detection-v1",
+      "task_type": "image",
+      "model_version": "image-detector-fixture-2026-04",
+      "image_name": "00000123.jpg",
+      "image_id": 123,
+      "overall_is_fake": true,
+      "overall_confidence": 0.91,
+      "llm_text": "无",
+      "llm_img": null,
+      "ela": [[0.0, 1.0], [1.0, 0.0]],
+      "exif_flags": {
+        "photoshop": false,
+        "time_modified": false
+      },
+      "sub_method_results": [
+        {"method": "splicing", "probability": 0.91, "mask": [[0.0, 1.0], [1.0, 0.0]]},
+        {"method": "blurring", "probability": 0.1, "mask": [[0.0, 0.0], [0.0, 0.0]]},
+        {"method": "bruteforce", "probability": 0.1, "mask": [[0.0, 0.0], [0.0, 0.0]]},
+        {"method": "contrast", "probability": 0.1, "mask": [[0.0, 0.0], [0.0, 0.0]]},
+        {"method": "inpainting", "probability": 0.1, "mask": [[0.0, 0.0], [0.0, 0.0]]}
+      ],
+      "evidences": [
+        {
+          "schema_version": "standard-evidence-v1",
+          "evidence_id": "00000123.jpg:splicing",
+          "method": "splicing",
+          "category": "segmentation",
+          "evidence_type": "mask",
+          "suspicious": true,
+          "confidence": 0.91,
+          "summary": "splicing detector probability: 0.910",
+          "artifacts": {
+            "mask": [[0.0, 1.0], [1.0, 0.0]]
+          },
+          "metadata": {}
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import http from './request'
 import { ref } from 'vue'
+import type { AdminUserInfo, UserListResponse } from '@/types/core'
 
 // 使用ref直接管理登录状态
 export const isLoggedIn = ref(localStorage.getItem("1-isLoggedIn") === "true")
@@ -22,7 +23,7 @@ export default {
     })
   },
   getUserInfo() {
-    return http.get('/admin/details/');
+    return http.get<AdminUserInfo>('/admin/details/');
   },
 
   // 请求重置密码邮件
@@ -43,7 +44,7 @@ export default {
     startTime?: string;
     endTime?: string;
   }) {
-    return http.get('/get_users/', { params });
+    return http.get<UserListResponse>('/get_users/', { params });
   },
   // 删除用户
   deleteUser(userId: number) {

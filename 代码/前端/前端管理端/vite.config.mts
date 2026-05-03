@@ -88,4 +88,15 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    exclude: [
+      'axios',
+      'echarts',
+      'marked',
+      'pinia',
+      'vue',
+      'vue-router',
+      'vuetify',
+    ],
+  },
 })

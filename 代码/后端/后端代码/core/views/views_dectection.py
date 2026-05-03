@@ -9,6 +9,9 @@ from ..models import DetectionResult, ImageUpload, Log, User
 from django.db.models import Q
 from datetime import datetime
 from django.core.paginator import Paginator
+from ..utils.image_preprocessing import DetectionBatchImage, build_detection_batch_artifacts
+
+TASK_STATUS_WHITELIST = {"pending", "in_progress", "completed", "failed"}
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -168,6 +171,7 @@ def submit_detection2(request):
     detection_task = DetectionTask.objects.create(
         organization=user.organization,
         user=request.user,
+        task_type='image_detection',
         task_name=task_name,  # 使用用户提交的任务名称
         status='pending',  # 初始状态为"排队中"
         cmd_block_size=cmd_block_size,
@@ -203,6 +207,35 @@ def submit_detection2(request):
     batch_size = 20
     for idx in range(0, len(detection_results), batch_size):
         batch_drs = detection_results[idx: idx + batch_size]
+
+        batch_dir = temp_root / f"task_{detection_task.id}_batch_{idx // batch_size}"
+        batch_images = [
+            DetectionBatchImage(
+                image_id=int(dr.image_upload.id),
+                image_path=Path(dr.image_upload.image.path),
+            )
+            for dr in batch_drs
+        ]
+        build_detection_batch_artifacts(
+            batch_dir,
+            batch_images,
+            cmd_block_size=cmd_block_size,
+            urn_k=urn_k,
+            if_use_llm=if_use_llm,
+        )
+
+        celery_time = time.time()
+        print('浠庢彁浜ゅ埌璋冪敤celery鑰楁椂', celery_time - submit_time)
+        if mode == 2:
+            pri = 0
+        else:
+            pri = 1
+        fetch_batch.apply_async(
+            args=[[dr.id for dr in batch_drs], str(batch_dir), len(image_ids), detection_task.pk],
+            queue='ai',
+            priority=pri
+        )
+        continue
 
         # ——— ① 为该批创建专属子目录 temp/task_<task_id>_batch_<n>/ ———
         batch_dir = temp_root / f"task_{detection_task.id}_batch_{idx // batch_size}"
@@ -309,6 +342,7 @@ def image2dr(request, image_id):
     try:
         detection_result = DetectionResult.objects.select_related('detection_task').get(
             image_upload_id=image_id,
+            detection_task__user=request.user,
         )
     except DetectionResult.DoesNotExist:
         return Response({"detail": "Image or task not found, or permission denied."}, status=404)
@@ -329,7 +363,7 @@ def download_image_report(request, image_id):
         # 获取与image_id关联且属于当前用户的DetectionResult及其关联的DetectionTask
         detection_result = DetectionResult.objects.select_related('detection_task').get(
             image_upload_id=image_id,
-            # detection_task__user=request.user
+            detection_task__user=request.user
         )
     except DetectionResult.DoesNotExist:
         return Response({"detail": "Image or task not found, or permission denied."}, status=404)
@@ -474,9 +508,10 @@ from ..utils.serializers_safe import serialize_value
 @permission_classes([IsAuthenticated])
 def detection_result_detail(request, result_id):
     dr = get_object_or_404(
-        DetectionResult,
+        DetectionResult.objects.filter(
+            Q(detection_task__user=request.user) | Q(image_upload__file_management__user=request.user)
+        ),
         id=result_id,
-        # image_upload__file_management__user=request.user
     )
 
     # -------- 解析 fields & include_matrix ------------------------------
@@ -526,9 +561,10 @@ def detection_result_detail(request, result_id):
 def detection_result_by_image(request, image_id):
     # 通过image_id获取对应的DetectionResult
     dr = get_object_or_404(
-        DetectionResult,
+        DetectionResult.objects.filter(
+            Q(detection_task__user=request.user) | Q(image_upload__file_management__user=request.user)
+        ),
         image_upload__id=image_id,
-        # image_upload__file_management__user=request.user
     )
 
     # -------- 解析 fields & include_matrix ------------------------------
@@ -577,7 +613,7 @@ def detection_result_by_image(request, image_id):
 def get_detection_task_status_normal(request, task_id):
     try:
         # 获取任务和关联的检测结果
-        detection_task = DetectionTask.objects.get(id=task_id)
+        detection_task = DetectionTask.objects.get(id=task_id, user=request.user)
         detection_results = DetectionResult.objects.filter(detection_task=detection_task)
 
         # 收集任务相关的图像和状态信息
@@ -619,6 +655,7 @@ class CustomPagination(PageNumberPagination):
             'tasks': data
         })
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_tasks(request):
@@ -633,6 +670,8 @@ def get_user_tasks(request):
     tasks = DetectionTask.objects.filter(user=request.user).order_by('-upload_time')
     
     if status:
+        if status not in TASK_STATUS_WHITELIST:
+            return Response({'error': 'Invalid status filter'}, status=400)
         tasks = tasks.filter(status=status)
     if start_time:
         tasks = tasks.filter(upload_time__gte=start_time)
@@ -650,9 +689,11 @@ def get_user_tasks(request):
         {
             'task_id': task.id,
             'task_name': task.task_name,
+            'task_type': task.task_type or 'image_detection',
             'upload_time': timezone.localtime(task.upload_time).strftime('%Y-%m-%d %H:%M:%S'),
             'status': task.status,
-            'completion_time': timezone.localtime(task.completion_time).strftime('%Y-%m-%d %H:%M:%S') if task.completion_time else None
+            'completion_time': timezone.localtime(task.completion_time).strftime('%Y-%m-%d %H:%M:%S') if task.completion_time else None,
+            'error_message': task.error_message or '',
         } for task in page_obj.object_list
     ]
 
@@ -664,6 +705,55 @@ def get_user_tasks(request):
         'has_next': page_obj.has_next(),
         'has_previous': page_obj.has_previous()
     })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_task_detail_unified(request, task_id):
+    try:
+        task = DetectionTask.objects.get(id=task_id, user=request.user)
+    except DetectionTask.DoesNotExist:
+        return Response({"detail": "任务不存在。"}, status=404)
+
+    payload = {
+        "task_id": task.id,
+        "task_name": task.task_name,
+        "task_type": task.task_type or "image_detection",
+        "status": task.status,
+        "upload_time": timezone.localtime(task.upload_time).strftime("%Y-%m-%d %H:%M:%S"),
+        "completion_time": timezone.localtime(task.completion_time).strftime("%Y-%m-%d %H:%M:%S") if task.completion_time else None,
+        "error_message": task.error_message or "",
+    }
+
+    if payload["task_type"] == "image_detection":
+        results = task.detection_results.select_related("image_upload").all()
+        payload["result"] = {
+            "total_images": results.count(),
+            "completed_images": results.filter(status="completed").count(),
+            "fake_count": results.filter(is_fake=True).count(),
+            "normal_count": results.filter(is_fake=False).count(),
+            "items": [
+                {
+                    "result_id": dr.id,
+                    "image_id": dr.image_upload_id,
+                    "status": dr.status,
+                    "is_fake": dr.is_fake,
+                    "confidence_score": dr.confidence_score,
+                }
+                for dr in results
+            ],
+        }
+    elif payload["task_type"] in ("paper_aigc", "resource_check", "review_detection"):
+        payload["result"] = {
+            "paper_file_id": task.paper_file_id,
+            "detail_endpoint": "paper/aigc/{taskId}/result" if payload["task_type"] == "paper_aigc"
+            else ("paper/resource-check/{taskId}/result" if payload["task_type"] == "resource_check"
+                  else "review/tasks/{taskId}/status"),
+        }
+    else:
+        payload["result"] = {}
+
+    return Response(payload)
 
 
 @api_view(['GET'])
@@ -703,7 +793,7 @@ class DetectionTaskDeleteView(APIView):
 
     def delete(self, request, task_id, *args, **kwargs):
         try:
-            task = DetectionTask.objects.get(pk=task_id)
+            task = DetectionTask.objects.get(pk=task_id, user=request.user)
         except DetectionTask.DoesNotExist:
             return Response(
                 {"detail": "任务不存在"},

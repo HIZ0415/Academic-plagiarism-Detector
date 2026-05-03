@@ -1,487 +1,375 @@
 <template>
-  <!-- 上传页面内容 -->
-  <div v-show="!showProgress">
-    <v-row>
-      <v-col cols="12" lg="11">
-        <v-row>
-          <v-col cols="12" md="4">
-            <v-card class="h-100" :class="{ 'border border-primary': selectedVersion === 1 }"
-              @click="selectedVersion = 1">
-              <v-card-title class="text-h6">基础版</v-card-title>
-              <v-card-subtitle>0元/张</v-card-subtitle>
-              <v-card-text>
-                <div class="text-body-2 mb-4">适用于个人图片检测</div>
-                <v-list density="compact">
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div class="text-primary">AI模型</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="text-primary">基础版</div>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>支持格式</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="text-warning">JPG/PNG</div>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>免费额度</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="text-warning">每天5张</div>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>检测精度</div>
-                    </template>
-                    <template v-slot:append>
-                      <v-icon color="warning">mdi-star</v-icon>
-                    </template>
-                  </v-list-item>
-                </v-list>
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <v-col cols="12" md="4">
-            <v-card class="h-100" :class="{ 'border border-primary': selectedVersion === 2 }"
-              @click="selectedVersion = 2">
-              <v-card-title class="text-h6">专业版</v-card-title>
-              <v-card-subtitle>1元/张</v-card-subtitle>
-              <v-card-text>
-                <div class="text-body-2 mb-4">适用于批量图片检测</div>
-                <v-list density="compact">
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div class="text-primary">AI模型</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="text-primary">专业版</div>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>支持格式</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="text-warning">全格式</div>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>极速检测</div>
-                    </template>
-                    <template v-slot:append>
-                      <v-icon color="success">mdi-check</v-icon>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>检测精度</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="d-flex">
-                        <v-icon color="warning">mdi-star</v-icon>
-                        <v-icon color="warning">mdi-star</v-icon>
-                      </div>
-                    </template>
-                  </v-list-item>
-                </v-list>
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <v-col cols="12" md="4">
-            <v-card class="h-100" :class="{ 'border border-primary': selectedVersion === 3 }"
-              @click="selectedVersion = 3">
-              <v-card-title class="text-h6">至尊版</v-card-title>
-              <v-card-subtitle>定制价格</v-card-subtitle>
-              <v-card-text>
-                <div class="text-body-2 mb-4">适用于工业级图片检测</div>
-                <v-list density="compact">
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div class="text-primary">AI模型</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="text-primary">尊贵定制</div>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>支持格式</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="text-warning">全格式</div>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>检测极速</div>
-                    </template>
-                    <template v-slot:append>
-                      <v-icon color="success">mdi-check</v-icon>
-                      <v-icon color="success">mdi-check</v-icon>
-                    </template>
-                  </v-list-item>
-                  <v-list-item>
-                    <template v-slot:prepend>
-                      <div>检测精度</div>
-                    </template>
-                    <template v-slot:append>
-                      <div class="d-flex">
-                        <v-icon color="warning">mdi-star</v-icon>
-                        <v-icon color="warning">mdi-star</v-icon>
-                        <v-icon color="warning">mdi-star</v-icon>
-                      </div>
-                    </template>
-                  </v-list-item>
-                </v-list>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-
-        <v-row class="mt-6">
-          <v-col cols="12">
-            <v-card>
-              <v-card-text class="text-center">
-                <div v-if="!selectedFiles.length" class="upload-area pa-8" @dragover.prevent @drop.prevent="handleDrop"
-                  @click="triggerFileInput">
-                  <v-icon size="64" color="grey">mdi-cloud-upload</v-icon>
-                  <div class="text-h6 mt-4">点击或拖拽图片/文件到此处上传</div>
-                  <div class="text-caption text-grey">支持格式：JPG、PNG、PDF、ZIP等常见文件格式，单个文件不超过100MB</div>
-                  <input type="file" ref="fileInput" style="display: none" @change="handleFileSelect"
-                    accept=".jpg,.jpeg,.png,.pdf,.zip">
-                </div>
-                <div v-else class="file-preview pa-4">
-                  <v-row>
-                    <v-col cols="12" md="6" class="mx-auto">
-                      <v-card>
-                        <v-card-text class="d-flex align-center">
-                          <v-icon size="48" color="primary" class="mr-4">mdi-file</v-icon>
-                          <div>
-                            <div class="text-h6">{{ selectedFiles[0].name }}</div>
-                            <div class="text-caption text-grey">
-                              {{ formatFileSize(selectedFiles[0].size) }}
-                            </div>
-                          </div>
-                          <v-spacer></v-spacer>
-                          <v-btn icon="mdi-close" variant="text" @click="selectedFiles = []"></v-btn>
-                        </v-card-text>
-                      </v-card>
-                    </v-col>
-                  </v-row>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-
-        <v-row class="mt-4">
-          <v-col cols="12" class="d-flex justify-end">
-            <v-btn color="primary" size="large" :loading="loading" @click="handleSubmit">
-              {{ loading ? '处理中...' : '查看图片' }}
-              <template v-slot:loader>
-                <v-progress-circular indeterminate color="white" size="24"></v-progress-circular>
-              </template>
-              <v-icon v-if="!loading" end>mdi-arrow-right</v-icon>
-            </v-btn>
-          </v-col>
-        </v-row>
+  <div class="upload-page">
+    <v-row class="mb-6" align="center">
+      <v-col cols="12" md="8">
+        <div class="text-h4 font-weight-bold mb-1">学术检测</div>
+        <div class="text-body-2 text-medium-emphasis">
+          统一入口：支持图像 / 论文(PDF/DOCX/TXT) / Review 文本的上传与批量检测（可用 Mock 模式演示流程）。
+        </div>
       </v-col>
-
-      <!-- <v-col cols="12" lg="3">
-        <v-card>
-          <v-card-title class="d-flex align-center">
-            实时检测动态
-            <v-spacer></v-spacer>
-            <v-btn icon="mdi-chevron-left" variant="text" density="compact"></v-btn>
-            <v-btn icon="mdi-chevron-right" variant="text" density="compact"></v-btn>
-          </v-card-title>
-          <v-card-text>
-            <v-timeline density="compact" align="start">
-              <v-timeline-item v-for="(item, index) in timelineItems" :key="index" dot-color="primary" size="small">
-                <div class="d-flex align-center">
-                  <v-avatar size="32" class="mr-3">
-                    <v-img :src="item.avatar" cover></v-img>
-                  </v-avatar>
-                  <div>
-                    <div class="d-flex align-center">
-                      <span class="text-body-2">{{ item.name }}</span>
-                      <v-chip size="x-small" :color="item.tagColor" class="ml-2" label>{{ item.tag }}</v-chip>
-                    </div>
-                    <div class="text-caption text-grey">
-                      {{ item.count }}张图片 平均造假率: {{ item.rate }}
-                    </div>
-                  </div>
-                </div>
-              </v-timeline-item>
-            </v-timeline>
-          </v-card-text>
-        </v-card>
-      </v-col> -->
+      <v-col cols="12" md="4" class="d-flex justify-end">
+        <v-chip :color="USE_MOCK ? 'warning' : 'success'" variant="tonal">
+          {{ USE_MOCK ? 'Mock 模式' : '后端模式' }}
+        </v-chip>
+      </v-col>
     </v-row>
-  </div>
 
-  <!-- 进度页面内容 -->
-  <div v-show="showProgress" class="upload-progress">
-    <!-- 返回按钮 -->
-    <div class="d-flex align-center mb-6">
-      <v-btn icon="mdi-arrow-left" variant="text" @click="returnToUpload" class="mr-2 return-btn">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
-      <span class="text-h6 font-weight-medium">返回上传</span>
-    </div>
+    <v-card class="pa-4" variant="outlined">
+      <v-row>
+        <v-col cols="12" md="8">
+          <v-file-input
+            v-model="files"
+            multiple
+            show-size
+            counter
+            prepend-icon="mdi-paperclip"
+            label="选择文件（支持：图片、PDF、DOCX、TXT、ZIP、RAR）"
+            accept="image/*,.pdf,.docx,.txt,.zip,.rar"
+            :disabled="running"
+          />
+        </v-col>
+        <v-col cols="12" md="4">
+          <v-select
+            v-model="mode"
+            :items="modeItems"
+            label="检测模式"
+            prepend-icon="mdi-tune"
+            :disabled="running"
+          />
+        </v-col>
+      </v-row>
 
-    <v-card>
+      <v-row class="mt-2">
+        <v-col cols="12" class="d-flex gap-3">
+          <v-btn color="primary" prepend-icon="mdi-play" :loading="running" :disabled="!files.length" @click="start">
+            开始批量检测
+          </v-btn>
+          <v-btn variant="outlined" prepend-icon="mdi-refresh" :disabled="running" @click="reset">
+            重置表单
+          </v-btn>
+        </v-col>
+      </v-row>
+    </v-card>
+
+    <v-card v-if="rows.length" class="mt-6" variant="outlined">
+      <v-card-title class="text-subtitle-1 font-weight-bold">任务队列</v-card-title>
+      <v-divider />
       <v-card-text>
-        <ImageSelectionStep v-if="fileId" :fileId="fileId" @update="updateSelectedImages"
-          @tagChanged="handleSelectedTag" @add-name="handleName" />
+        <v-data-table :headers="headers" :items="rows" item-key="id" hide-default-footer>
+          <template #item.type="{ item }">
+            <v-chip size="small" variant="tonal" :color="typeColor(item.type)">
+              {{ typeLabel(item.type) }}
+            </v-chip>
+          </template>
+
+          <template #item.progress="{ item }">
+            <v-progress-linear :model-value="item.progress" height="18" rounded>
+              <template #default>
+                <span class="text-caption">{{ item.progress }}%</span>
+              </template>
+            </v-progress-linear>
+          </template>
+
+          <template #item.status="{ item }">
+            <v-chip size="small" variant="tonal" :color="statusColor(item.status)">
+              {{ statusLabel(item.status) }}
+            </v-chip>
+          </template>
+
+          <template #item.actions="{ item }">
+            <v-btn
+              v-if="item.taskId && item.type !== 'image'"
+              size="small"
+              variant="text"
+              color="primary"
+              @click="openResult(item)"
+            >
+              查看
+            </v-btn>
+          </template>
+        </v-data-table>
       </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <v-btn color="primary" variant="elevated" @click="handleNext" :disabled="!canProceed"
-          append-icon="mdi-arrow-right">
-          提交检测
-        </v-btn>
-      </v-card-actions>
     </v-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import uploadApi from '@/api/upload'
 import { useSnackbarStore } from '@/stores/snackbar'
-import ImageSelectionStep from '@/components/steps/ImageSelectionStep.vue'
-import publisher from '@/api/publisher'
-import axios from 'axios'
-import { modes } from 'vuetify/components/VColorPicker/util'
+import paperApi from '@/api/paper'
 
+type DetectMode = 'fast' | 'accurate'
+type ResourceType = 'image' | 'paper' | 'review' | 'unknown'
+type RowStatus = 'pending' | 'running' | 'completed' | 'failed'
+
+type QueueRow = {
+  id: string
+  file: File
+  name: string
+  size: number
+  type: ResourceType
+  status: RowStatus
+  progress: number
+  taskId?: string
+  error?: string
+}
+
+type LocalTaskRecord = {
+  task_id: string
+  task_type: string
+  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  progress: number
+  upload_time: string
+  completion_time: string
+  source: 'local'
+}
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
 const router = useRouter()
-const selectedVersion = ref<1 | 2 | 3 | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
-const selectedFiles = ref<File[]>([])
-const fileId = ref()
-const loading = ref<boolean>(false)
 const snackbar = useSnackbarStore()
 
-// 进度页面相关状态
-const showProgress = ref(false)
-const extractedImages = ref<Image[]>([])
-const selectedImages = ref<Image[]>([])
-const currentTag = ref<string>('')
-const currentTaskName = ref('')
+const files = ref<File[]>([])
+const mode = ref<DetectMode>('fast')
+const running = ref(false)
 
-interface Image {
-  image_id: number
-  image_url: string
-  page_number?: number
-  extracted_from_pdf: boolean
-  selected: boolean
+const modeItems = computed(() => ([
+  { title: '快速', value: 'fast' as const },
+  { title: '精准', value: 'accurate' as const },
+]))
+
+const headers = [
+  { title: '文件名', key: 'name', align: 'start' as const },
+  { title: '类型', key: 'type', align: 'center' as const, width: 120 },
+  { title: '进度', key: 'progress', align: 'center' as const, width: 220 },
+  { title: '状态', key: 'status', align: 'center' as const, width: 140 },
+  { title: '操作', key: 'actions', align: 'center' as const, sortable: false, width: 100 },
+] as const
+
+const rows = ref<QueueRow[]>([])
+
+function detectType(file: File): ResourceType {
+  const name = file.name.toLowerCase()
+  if (file.type.startsWith('image/')) return 'image'
+  if (name.includes('review') || name.includes('rebuttal') || name.includes('评审')) return 'review'
+  if (name.endsWith('.pdf') || name.endsWith('.docx') || name.endsWith('.txt')) return 'paper'
+  if (name.endsWith('.zip') || name.endsWith('.rar')) return 'unknown'
+  return 'unknown'
 }
 
-const handleDrop = (event: DragEvent) => {
-  event.preventDefault()
-  const files = event.dataTransfer?.files
-  if (files && files.length > 0) {
-    const file = files[0]
-    if (isValidFile(file)) {
-      selectedFiles.value = [file]
-    } else {
-      snackbar.showMessage('不支持的文件格式，请上传 JPG、PNG 、PDF或 ZIP 文件', 'error')
-    }
+function typeLabel(t: ResourceType) {
+  switch (t) {
+    case 'image':
+      return '图像'
+    case 'paper':
+      return '论文/文本'
+    case 'review':
+      return 'Review'
+    default:
+      return '未知'
   }
 }
 
-const handleFileSelect = (event: Event) => {
-  const files = (event.target as HTMLInputElement).files
-  if (files && files.length > 0) {
-    const file = files[0]
-    if (isValidFile(file)) {
-      selectedFiles.value = [file]
-    } else {
-      snackbar.showMessage('不支持的文件格式，请上传 JPG、PNG 、PDF或 ZIP 文件', 'error')
-    }
+function typeColor(t: ResourceType) {
+  switch (t) {
+    case 'image':
+      return 'indigo'
+    case 'paper':
+      return 'teal'
+    case 'review':
+      return 'deep-purple'
+    default:
+      return 'grey'
   }
 }
 
-const handleName = async (newName: string) => {
-  console.log(newName)
-  currentTaskName.value = newName
+function statusLabel(s: RowStatus) {
+  switch (s) {
+    case 'pending':
+      return '待开始'
+    case 'running':
+      return '进行中'
+    case 'completed':
+      return '已完成'
+    case 'failed':
+      return '失败'
+  }
 }
 
-const handleSelectedTag = async (newTag: string) => {
-  console.log(newTag)
-  currentTag.value = newTag
+function statusColor(s: RowStatus) {
+  switch (s) {
+    case 'pending':
+      return 'grey'
+    case 'running':
+      return 'info'
+    case 'completed':
+      return 'success'
+    case 'failed':
+      return 'error'
+  }
 }
 
-const isValidFile = (file: File): boolean => {
-  const validTypes = ['image/jpeg', 'image/png', 'application/pdf', 'application/zip', 'application/x-zip-compressed']
-  const maxSize = 10 * 1024 * 1024 // 10MB
-  return validTypes.includes(file.type) && file.size <= maxSize
+function reset() {
+  files.value = []
+  rows.value = []
+  running.value = false
 }
 
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+function toTaskType(t: ResourceType) {
+  if (t === 'paper') return 'paper_aigc'
+  if (t === 'image') return 'image_detection'
+  if (t === 'review') return 'review_detection'
+  return 'unknown'
 }
 
-const handleSubmit = async () => {
-  if (!selectedVersion.value) {
-    snackbar.showMessage('请选择检测版本', 'error')
+function nowString() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${y}-${m}-${day} ${h}:${mi}:${s}`
+}
+
+function saveLocalTasks(rowsToSave: QueueRow[]) {
+  try {
+    const key = 'local_detection_tasks'
+    const existing = JSON.parse(localStorage.getItem(key) || '[]') as LocalTaskRecord[]
+    const mapped: LocalTaskRecord[] = rowsToSave
+      .filter((r) => !!r.taskId)
+      .map((r) => ({
+        task_id: String(r.taskId),
+        task_type: toTaskType(r.type),
+        status: r.status === 'running' ? 'in_progress' : r.status,
+        progress: r.progress,
+        upload_time: nowString(),
+        completion_time: r.status === 'completed' ? nowString() : '',
+        source: 'local',
+      }))
+    localStorage.setItem(key, JSON.stringify([...mapped, ...existing].slice(0, 200)))
+  } catch {
+    // ignore
+  }
+}
+
+async function mockRun(row: QueueRow) {
+  row.status = 'running'
+  row.progress = 0
+
+  const steps = [15, 35, 60, 85, 100]
+  for (const p of steps) {
+    await new Promise((r) => setTimeout(r, mode.value === 'fast' ? 250 : 450))
+    row.progress = p
+  }
+  row.status = 'completed'
+  row.taskId = String(Math.floor(Math.random() * 90000) + 10000)
+}
+
+async function backendRun(row: QueueRow) {
+  row.status = 'running'
+  row.progress = 10
+
+  if (row.type === 'paper') {
+    // 论文/文本：复用 `paper.vue` 的上传+提交逻辑（AIGC tab）
+    const taskName = `${mode.value}-${row.name}`
+    const submitRes = await paperApi.uploadAndSubmitAigcTask(row.file, taskName)
+    row.taskId = String(submitRes.data.task_id)
+    row.progress = 100
+    row.status = 'completed'
     return
   }
 
-  if (!selectedFiles.value.length) {
-    snackbar.showMessage('请选择要上传的文件', 'error')
-    return
+  // 图像与 Review：目前用户端现有 API 未提供统一上传接口，这里先提示不阻塞演示
+  if (!row.taskId) {
+    row.taskId = `local-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
   }
-
-  loading.value = true
-  try {
-    const formData = new FormData()
-    formData.append('file', selectedFiles.value[0])
-    const { data } = await uploadApi.uploadFile(formData)
-    fileId.value = data.file_id
-    snackbar.showMessage('文件上传成功，正在处理中...', 'success')
-
-    // 获取提取的图片
-    // const { data: imagesData } = await uploadApi.getExtractedImages(data.file_id)
-    // extractedImages.value = imagesData.images.map((img: any) => ({
-    //   image_id: img.image_id,
-    //   image_url: import.meta.env.VITE_API_URL + img.image_url,
-    //   page_number: img.page_number,
-    //   extracted_from_pdf: img.extracted_from_pdf,
-    //   selected: false
-    // }))
-
-    // 显示进度页面
-    showProgress.value = true
-  } catch (error: any) {
-    let message = '提交图片失败'
-    if (axios.isAxiosError(error)) {
-      const status = error?.code
-      if (status === 'ERR_NETWORK') {
-        message = '用户无权限'
-      }
-    }
-    snackbar.showMessage(message, 'error')
-  } finally {
-    loading.value = false
-  }
+  row.progress = 100
+  row.status = 'failed'
+  row.error = '该类型暂未接入后端接口（可先开启 Mock 模式演示流程）。'
+  throw new Error(row.error)
 }
 
-const triggerFileInput = () => {
-  fileInput.value?.click()
-}
+async function start() {
+  if (!files.value.length) return
 
-// 进度页面相关方法
-const canProceed = computed(() => {
-  return selectedImages.value.length > 0 && (!currentTaskName.value || currentTaskName.value.length <= 10)
-})
+  running.value = true
+  rows.value = files.value.map((f) => ({
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    file: f,
+    name: f.name,
+    size: f.size,
+    type: detectType(f),
+    status: 'pending',
+    progress: 0,
+  }))
 
-const updateSelectedImages = (images: typeof extractedImages.value) => {
-  selectedImages.value = images
-}
-
-const handleTag = async (tag: string) => {
-  console.log("parent: " + tag)
-  try {
-    await uploadApi.addTag({ fileId: fileId.value, tag: currentTag.value })
-    console.log('标签已保存')
-  } catch (error) {
-    console.error('保存失败:', error)
-    snackbar.showMessage("标签无效", "error")
-  }
-}
-
-const handleNext = async () => {
-  handleTag(currentTag.value)
-  if (canProceed.value) {
+  for (const row of rows.value) {
     try {
-      const task_id = (await publisher.submitDetection({ image_ids: selectedImages.value.map(img => img.image_id), task_name: currentTaskName.value, mode: selectedVersion.value })).data.task_id
-      router.push(`/history`)
-    } catch (error: any) {
-      const message = error?.response?.data?.message || '图片上传失败'
-      snackbar.showMessage(message, 'error')
+      if (USE_MOCK) {
+        await mockRun(row)
+      } else {
+        await backendRun(row)
+      }
+    } catch (e) {
+      row.status = row.status === 'completed' ? 'completed' : 'failed'
     }
   }
+
+  running.value = false
+
+  const okCount = rows.value.filter((r) => r.status === 'completed').length
+  const failCount = rows.value.length - okCount
+  snackbar.showMessage(`批量检测完成：成功 ${okCount}，失败 ${failCount}`, failCount ? 'warning' : 'success')
+  saveLocalTasks(rows.value)
+
+  // 无论成功/失败，都统一进入结果页，保证不依赖后端也能看到本次检测详情
+  const row = rows.value.find((r) => r.status === 'completed' && !!r.taskId) || rows.value[0]
+  if (row) {
+    if (!row.taskId) {
+      row.taskId = `local-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+    }
+    router.push({
+      path: '/history',
+      query: {
+        detail_id: row.taskId,
+        task_type: toTaskType(row.type),
+        status: row.status === 'running' ? 'in_progress' : row.status,
+        progress: String(row.progress),
+        upload_time: nowString(),
+        completion_time: row.status === 'completed' ? nowString() : '',
+        error_message: row.error || '',
+        source: 'upload',
+      },
+    })
+    return
+  }
+  router.push('/history')
 }
 
-// 添加返回上传页面的方法
-const returnToUpload = () => {
-  showProgress.value = false
-  // 清空文件
-  selectedFiles.value = []
-  // 重置其他状态
-  selectedVersion.value = null
-  fileId.value = ''
-  extractedImages.value = []
-  selectedImages.value = []
+function openResult(row: QueueRow) {
+  if (!row.taskId) {
+    row.taskId = `local-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+  }
+  const taskType = toTaskType(row.type)
+  router.push({
+    path: '/history',
+    query: {
+      detail_id: row.taskId,
+      task_type: taskType,
+      status: row.status === 'running' ? 'in_progress' : row.status,
+      progress: String(row.progress),
+      upload_time: nowString(),
+      completion_time: row.status === 'completed' ? nowString() : '',
+      source: 'upload',
+    },
+  })
 }
 </script>
 
 <style scoped>
-.upload-area {
-  border: 2px dashed #ccc;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.upload-area:hover {
-  border-color: var(--v-primary-base);
-  background-color: rgba(var(--v-primary-base), 0.05);
-}
-
-.border {
-  border-width: 2px !important;
-  border-style: solid !important;
-}
-
-.border-primary {
-  border-color: rgb(var(--v-theme-primary)) !important;
-}
-
-.v-timeline-item {
-  margin-bottom: 16px;
-}
-
-.v-timeline-item:last-child {
-  margin-bottom: 0;
-}
-
-.file-preview {
-  border: 2px solid rgb(var(--v-theme-primary));
-  border-radius: 8px;
-  background-color: rgba(var(--v-theme-primary), 0.05);
-}
-
-.v-btn--loading {
-  opacity: 1;
-}
-
-.upload-progress {
-  position: relative;
-  min-height: 100vh;
-  max-height: 300vh;
-  background-color: rgb(var(--v-theme-surface));
-  overflow: hidden;
-}
-
-.v-stepper {
-  box-shadow: none;
+.gap-3 {
+  gap: 12px;
 }
 </style>
