@@ -4,7 +4,7 @@
       <v-col cols="12" md="8">
         <div class="text-h4 font-weight-bold mb-1">学术检测</div>
         <div class="text-body-2 text-medium-emphasis">
-          统一入口：支持图像 / 论文(PDF/DOCX/TXT) / Review 文本的上传与批量检测（可用 Mock 模式演示流程）。
+          统一入口：支持图像 / 论文（PDF、DOCX、TXT 等）/ Review 文本的上传与批量检测；检测模式仅<strong>快速</strong>与<strong>精准</strong>（见需求 FR-YHZS-0007）。登录时可选的「专家」为<strong>审稿人角色</strong>，用于人工审核阶段，见《前后端对接-用户端专家模式》。
         </div>
       </v-col>
       <v-col cols="12" md="4" class="d-flex justify-end">
@@ -259,8 +259,9 @@ async function mockRun(row: QueueRow) {
   row.progress = 0
 
   const steps = [15, 35, 60, 85, 100]
+  const stepMs = mode.value === 'fast' ? 250 : 450
   for (const p of steps) {
-    await new Promise((r) => setTimeout(r, mode.value === 'fast' ? 250 : 450))
+    await new Promise((r) => setTimeout(r, stepMs))
     row.progress = p
   }
   row.status = 'completed'

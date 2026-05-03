@@ -1,12 +1,30 @@
 <template>
   <div class="task-detail pa-4">
     <!-- 返回按钮 -->
-    <div class="d-flex align-center mb-6">
-      <v-btn icon="mdi-arrow-left" variant="text" @click="router.back()" class="mr-2 return-btn">
+    <div class="d-flex align-center mb-4 flex-wrap ga-2">
+      <v-btn icon="mdi-arrow-left" variant="text" @click="router.push('/review')" class="mr-2 return-btn">
         <v-icon>mdi-arrow-left</v-icon>
       </v-btn>
-      <span class="text-h6 font-weight-medium">返回我的任务</span>
+      <span class="text-h6 font-weight-medium">返回人工审核任务池</span>
+      <v-spacer />
+      <v-btn color="primary" variant="tonal" prepend-icon="mdi-file-chart" @click="showAiReportDialog = true">
+        查看 AI 检测报告摘要
+      </v-btn>
     </div>
+
+    <v-alert v-if="reviewRequestMeta" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
+      <strong>协作上下文：</strong>
+      审核申请单 <code>#{{ reviewRequestMeta.id }}</code> —
+      流程状态 {{ requestFlowLabel(reviewRequestMeta.status) }}，
+      管理端门闸 {{ adminGateLabel(reviewRequestMeta.admin_gate_status) }}，
+      申请时间 {{ reviewRequestMeta.request_time }}。
+      <span v-if="manualReviewStatus === 'completed'">您已完成本轮图像审核提交。</span>
+    </v-alert>
+
+    <v-alert type="warning" variant="tonal" density="compact" class="mb-4 text-caption">
+      鉴定结论（FR-YHSH-0002）：每张图请选择「造假图片 / 真实图片」对应需求中的「确认造假或疑似倾向 / 未发现异常」表述；细分维度评分与理由用于支撑您的结论。
+      评论点赞与举报（FR-YHSH-0003 / 0004）待后端开放统一接口后接入。
+    </v-alert>
 
     <!-- 主要内容区域 -->
     <div class="main-content rounded-lg">
@@ -44,8 +62,8 @@
                       <div class="text-h6 font-weight-medium mb-4">审核进度</div>
                     </v-col>
                     <v-col class="d-flex align-center ml-4" cols="auto">
-                      <v-btn color="primary" @click="handleSubmit">
-                        提交
+                      <v-btn color="primary" :disabled="manualReviewStatus === 'completed'" @click="handleSubmit">
+                        {{ manualReviewStatus === 'completed' ? '已提交' : '提交审核' }}
                       </v-btn>
                     </v-col>
                   </v-row>
@@ -181,6 +199,27 @@
     <!-- 绘制弹窗 -->
     <DrawingDialog v-model="showDrawingDialog" :image-url="currentImage ? getImageUrl(currentImage.url) : ''"
       :initial-paths="currentDimensionPaths" @save="handleDrawingSave" />
+
+    <v-dialog v-model="showAiReportDialog" max-width="560">
+      <v-card>
+        <v-card-title class="text-h6">AI 检测报告摘要</v-card-title>
+        <v-card-text v-if="aiDetectionSummary">
+          <v-list density="compact">
+            <v-list-item title="判定为造假" :subtitle="aiDetectionSummary.is_fake ? '是' : '否'" />
+            <v-list-item title="置信度" :subtitle="formatNumber(aiDetectionSummary.confidence_score)" />
+            <v-list-item title="检测时间" :subtitle="aiDetectionSummary.detection_time || '—'" />
+          </v-list>
+          <p class="text-caption text-medium-emphasis mt-2">
+            完整报告可由发布者在检测任务结果中查看；此处仅摘要供人工审核参考（FR-YHSH-0002）。
+          </p>
+        </v-card-text>
+        <v-card-text v-else>暂无 AI 摘要数据</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showAiReportDialog = false">关闭</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -192,6 +231,7 @@ import type { RouteParams } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import DrawingDialog from '@/components/DrawingDialog.vue'
 import publisher from '@/api/publisher'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 const router = useRouter()
 const snackbar = useSnackbarStore()
@@ -214,7 +254,49 @@ interface SubMethod {
 const currentImageIndex = ref(0)
 const images = ref<Image[]>([])
 
-const manual_review_id = computed(() => (route.params as RouteParams & { manual_review_id: number }).manual_review_id)
+const manual_review_id = computed(() => Number((route.params as RouteParams & { manual_review_id: string }).manual_review_id))
+
+const reviewRequestMeta = ref<{
+  id: number
+  status: string
+  admin_gate_status: string
+  request_time: string
+} | null>(null)
+
+const aiDetectionSummary = ref<{
+  is_fake: boolean
+  confidence_score: number
+  detection_time?: string
+} | null>(null)
+
+const manualReviewStatus = ref<string>('undo')
+const showAiReportDialog = ref(false)
+
+function requestFlowLabel(s: string) {
+  switch (s) {
+    case 'pending':
+      return '待处理'
+    case 'in_progress':
+      return '进行中'
+    case 'completed':
+      return '已完成'
+    default:
+      return s
+  }
+}
+
+function adminGateLabel(s: string) {
+  switch (s) {
+    case 'pending':
+      return '待审批'
+    case 'accepted':
+      return '已通过'
+    case 'refused':
+      return '已拒绝'
+    default:
+      return s
+  }
+}
 const imageJudgements = ref<(boolean | null)[]>([])
 const dimensionsPerImage = ref<Dimension[][]>([])
 const urn = ref<SubMethod[]>([])
@@ -267,8 +349,25 @@ const formatNumber = (result: number) => {
 
 onMounted(async () => {
   try {
-    const response = (await reviewer.getReviewTaskDetail({ manual_review_id: manual_review_id.value })).data
-    images.value = response.imgs
+    const response = (await reviewer.getReviewTaskDetail(manual_review_id.value)).data
+
+    const rawImgs = response.imgs?.length
+      ? response.imgs
+      : (response.image_urls || []).map((url: string, i: number) => ({
+          id: response.image_ids?.[i],
+          url,
+        }))
+
+    images.value = rawImgs.filter((x: Image) => x && x.id != null && x.url)
+    if (!images.value.length) {
+      snackbar.showMessage('未获取到任务图片，请确认管理端已审批通过且任务已分配', 'error')
+      return
+    }
+
+    reviewRequestMeta.value = response.review_request ?? null
+    aiDetectionSummary.value = response.ai_detection_result ?? null
+    manualReviewStatus.value = response.manual_review_status || 'undo'
+
     imageJudgements.value = new Array(images.value.length).fill(null)
 
     // 为每个图片的每个维度初始化独立的数据
@@ -301,9 +400,7 @@ const currentImage = computed(() => {
   return null;
 });
 
-const getImageUrl = (url: string) => {
-  return import.meta.env.VITE_API_URL + url
-}
+const getImageUrl = (url: string) => resolveBackendMediaUrl(url)
 
 const fetchMaskImage = async () => {
   try {
@@ -336,7 +433,7 @@ const handleDisplayFake = (dimension: SubMethod) => {
   // 显示当前覆盖层
   dimension.visible = true
   isOverlayVisible.value = true
-  activeOverlay.value = dimension.mask_image
+  activeOverlay.value = resolveBackendMediaUrl(dimension.mask_image)
 }
 
 const handleImageSelect = (index: number) => {
@@ -532,18 +629,22 @@ const constructData = () => {
 }
 
 const handleSubmit = async () => {
+  if (manualReviewStatus.value === 'completed') {
+    snackbar.showMessage('该任务已提交，无需重复提交', 'info')
+    return
+  }
   const result = checkAnswerCompletion()
   if (!result.complete) {
-    // 显示错误提示
     snackbar.showMessage(result.message, 'error')
     return
-  } else {
-    try {
-      await reviewer.submitReview(manual_review_id.value, constructData())
-      snackbar.showMessage("提交成功", 'success')
-    } catch (error) {
-      snackbar.showMessage('提交失败', 'error')
-    }
+  }
+  try {
+    await reviewer.submitReview(manual_review_id.value, constructData())
+    snackbar.showMessage('提交成功，发布者将收到进度更新', 'success')
+    manualReviewStatus.value = 'completed'
+    router.push('/review')
+  } catch {
+    snackbar.showMessage('提交失败', 'error')
   }
 }
 

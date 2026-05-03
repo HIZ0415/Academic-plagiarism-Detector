@@ -3,7 +3,7 @@
     <!-- 左侧功能介绍区域 -->
     <div class="feature-section">
       <div class="feature-content">
-        <h1 class="text-h4 font-weight-bold mb-12">学术图像造假检测平台</h1>
+        <h1 class="text-h4 font-weight-bold mb-12">学术内容诚信检测平台</h1>
         <div class="feature-grid">
           <div class="feature-item">
             <div class="feature-icon">
@@ -11,7 +11,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">AI精准检测</div>
-              <div class="text-body-2 text-grey">基于深度学习与图像分析技术，精准识别重复、篡改、拼接等学术图像异常。</div>
+              <div class="text-body-2 text-grey">面向图像、论文与评审等多类学术内容，结合深度学习与流程化审核，识别篡改与异常风险。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -80,6 +80,18 @@
             <v-btn value="reviewer" :class="{ 'active-role': selectedRole === 'reviewer' }" class="role-btn">专家</v-btn>
           </v-btn-toggle>
         </div>
+
+        <v-alert
+          v-if="loginType === 'register'"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-6 text-body-2"
+        >
+          <strong>注册说明：</strong>账号角色由<strong>邀请码</strong>决定，必须与上方选择的身份一致。
+          「专家」需使用组织下发的 <strong>审稿人（reviewer）邀请码</strong>；仅用「编辑」邀请码无法注册为专家。
+          邀请码可向组织管理员索取，或在组织审批通过后随邮件/管理流程分配（见概要设计：邀请码与角色绑定）。
+        </v-alert>
 
         <v-form ref="form" @submit.prevent="handleSubmit">
           <!-- 登录表单 -->
@@ -451,21 +463,29 @@ const isFormValid = computed(() => {
       /.+@.+\..+/.test(email.value) &&
       password.value.length >= 6
   } else {
-    return registerFormData.value.email &&
-      registerFormData.value.inviteCode &&
-      /.+@.+\..+/.test(registerFormData.value.email) &&
-      registerFormData.value.inviteCode.length >= 6
+    const r = registerFormData.value
+    return !!(
+      r.username &&
+      r.email &&
+      r.password &&
+      r.password.length >= 6 &&
+      r.confirmPassword === r.password &&
+      r.inviteCode &&
+      r.inviteCode.length >= 6 &&
+      /.+@.+\..+/.test(r.email)
+    )
   }
 })
 
 const handleSubmit = async () => {
   if (!validateCaptcha()) {
+    snackbar.showMessage(captchaError.value || '请先完成图形验证码', 'warning')
     return
   }
   // 继续登录/注册流程...
   if (loginType.value === 'login') {
     const response = await user.login({
-      email: email.value,
+      email: email.value.trim().toLowerCase(),
       password: password.value,
       role: selectedRole.value
     }).then(async res => {
@@ -478,18 +498,40 @@ const handleSubmit = async () => {
 
       snackbar.showMessage('登录成功', 'success')
       router.push('/')
-    }).catch(error => {
-      console.log(error)
-      let errorMessage = '网络错误，请稍后重试'
-      if (error.response) {
-        switch (error.response.status) {
-          case 401:
-            errorMessage = '账号/密码错误'
+    }).catch((error: unknown) => {
+      console.error(error)
+      let errorMessage = '无法连接后端'
+      const ax = error as { response?: { status: number; data?: unknown }; code?: string; message?: string }
+      if (ax.response) {
+        switch (ax.response.status) {
+          case 401: {
+            const d = ax.response.data as Record<string, unknown> | undefined
+            errorMessage =
+              typeof d?.message === 'string'
+                ? d.message
+                : typeof d?.detail === 'string'
+                  ? d.detail
+                  : '账号或密码错误'
             break
-          default://400
-            errorMessage = '请联系管理员'
+          }
+          case 400: {
+            const d = ax.response.data as Record<string, unknown> | undefined
+            const nfe = d?.non_field_errors
+            const msg =
+              d?.message ??
+              d?.detail ??
+              (Array.isArray(nfe) && typeof nfe[0] === 'string' ? nfe[0] : null)
+            errorMessage = typeof msg === 'string' ? msg : '登录请求被拒绝，请检查账号角色是否与账号类型一致'
             break
+          }
+          default:
+            errorMessage = `服务器返回 ${ax.response.status}，请稍后重试`
         }
+      } else if (ax.code === 'ECONNABORTED') {
+        errorMessage = '请求超时，请确认 Django 已启动且地址正确'
+      } else if (ax.code === 'ERR_NETWORK' || ax.message === 'Network Error') {
+        errorMessage =
+          '无法连接后端：请在浏览器打开 http://127.0.0.1:8000/admin/ 若打不开说明 Django 未启动或已崩溃；查看仓库下 `.local-dev/logs/django.stderr.log`。一键脚本启动的用户端请确认 `.env` 里为 `VITE_API_URL=http://127.0.0.1:8000`，网页也请用 http://127.0.0.1:3000 访问'
       }
       snackbar.showMessage(errorMessage, 'error')
     })
@@ -506,17 +548,30 @@ const handleSubmit = async () => {
       loginType.value = 'login'
     } catch (error: any) {
       let errorMessage = '注册失败，请稍后重试'
-      if (error.response) {
-        if (error.response.status === 400) {
-          // 处理字段验证错误
-          const errors = error.response.data
-          const errorMessages = []
-
-          if (errors.email) errorMessages.push(`邮箱已存在`)
-          if (errors.inviteCode) errorMessages.push(`邀请码已存在`)
-
-          errorMessage = errorMessages.length > 0 ? errorMessages.join(';') : '请检查输入信息'
+      if (error.response?.status === 400) {
+        const data = error.response.data
+        const parts: string[] = []
+        const pushArr = (key: string, label: string) => {
+          const v = data[key]
+          if (!v) return
+          const msg = Array.isArray(v) ? v.join(' ') : String(v)
+          parts.push(`${label}: ${msg}`)
         }
+        pushArr('email', '邮箱')
+        pushArr('username', '用户名')
+        pushArr('invitation_code', '邀请码')
+        pushArr('inviteCode', '邀请码')
+        pushArr('role', '角色')
+        pushArr('non_field_errors', '提示')
+        if (typeof data === 'object' && data !== null) {
+          for (const k of Object.keys(data)) {
+            if (['email', 'username', 'invitation_code', 'inviteCode', 'role', 'non_field_errors'].includes(k)) continue
+            const v = data[k]
+            if (Array.isArray(v)) parts.push(`${k}: ${v.join(' ')}`)
+            else if (typeof v === 'string') parts.push(`${k}: ${v}`)
+          }
+        }
+        errorMessage = parts.length ? parts.join('；') : '请检查输入信息或与邀请码是否匹配当前身份'
       }
       snackbar.showMessage(errorMessage, 'error')
     }

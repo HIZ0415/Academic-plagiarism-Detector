@@ -22,7 +22,7 @@
           @click="goToHistory"></v-list-item>
         <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-gavel" title="人工审核" value="annual"
           @click="gotoAnnual"></v-list-item>
-        <v-list-item v-if="userStore.role === 'reviewer'" prepend-icon="mdi-book-open-page-variant" title="审阅"
+        <v-list-item v-if="userStore.role === 'reviewer'" prepend-icon="mdi-clipboard-check-multiple" title="人工审核"
           value="review" @click="goToReview"></v-list-item>
         <v-list-item v-if="isLoggedIn" prepend-icon="mdi-account" title="个人主页" value="profile"
           @click="goToProfile"></v-list-item>
@@ -32,7 +32,7 @@
 
     <v-app-bar class="app-bar">
       <v-app-bar-nav-icon @click="drawer = !drawer" v-if="!isMobile"></v-app-bar-nav-icon>
-      <v-toolbar-title>学术图像检测系统</v-toolbar-title>
+      <v-toolbar-title>学术内容诚信检测系统</v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn :icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'" @click="toggleTheme"></v-btn>
       <v-btn v-if="isLoggedIn" :color="hasUnreadNotifications ? 'red' : ''"
@@ -64,8 +64,8 @@
         <span>人工审核</span>
       </v-btn>
       <v-btn v-if="userStore.role === 'reviewer'" to="/review" value="review">
-        <v-icon>mdi-book-open-page-variant</v-icon>
-        <span>审阅</span>
+        <v-icon>mdi-clipboard-check-multiple</v-icon>
+        <span>人工审核</span>
       </v-btn>
       <v-btn v-if="isLoggedIn" to="/profile" value="profile">
         <v-icon>mdi-account</v-icon>

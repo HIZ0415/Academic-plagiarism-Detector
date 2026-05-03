@@ -11,8 +11,9 @@ export default {
     return http.get('/get_publisher_review_tasks/', { params })
   },
 
-  getReviewTaskDetail(data: any) {
-    return http.get(`/get_review_request_detail/${data.manual_review_id}/`)
+  /** 审稿人查看本人 ManualReview 详情（含 imgs、AI 摘要、协作流程字段） */
+  getReviewTaskDetail(manualReviewId: number | string) {
+    return http.get(`/get_review_detail/${manualReviewId}/`)
   },
 
   getMaskImage(data: any) {

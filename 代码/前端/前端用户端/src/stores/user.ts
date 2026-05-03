@@ -1,6 +1,7 @@
 // stores/user.ts
 import { defineStore } from 'pinia';
 import user from '@/api/user';
+import { resolveBackendMediaUrl } from '@/utils/backendUrl';
 
 interface UserState {
   username: string;
@@ -13,8 +14,6 @@ interface UserState {
   organization_name: string;
   organization: number
 }
-
-const API_BASE_URL = 'http://122.9.45.122';
 
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
@@ -37,10 +36,10 @@ export const useUserStore = defineStore('user', {
         this.email = response.data.email || '';
         this.role = response.data.role || '';
         this.profile = response.data.profile || '';
-        this.avatar = response.data.avatar ? `${API_BASE_URL}${response.data.avatar}` : './192.png';
+        this.avatar = response.data.avatar ? resolveBackendMediaUrl(response.data.avatar) : './192.png';
         this.isLoaded = true;
         this.id = response.data.id;
-        this.organization = response.data.organizatio
+        this.organization = response.data.organization
         this.organization_name = response.data.organization_name
         return true;
       } catch (error) {
@@ -57,7 +56,7 @@ export const useUserStore = defineStore('user', {
 
         const response = await user.updateUserAvatar(formData);
         if (response.data.avatar) {
-          this.avatar = `${API_BASE_URL}${response.data.avatar}`;
+          this.avatar = resolveBackendMediaUrl(response.data.avatar);
           this.fetchUserInfo();
         }
         return true;
