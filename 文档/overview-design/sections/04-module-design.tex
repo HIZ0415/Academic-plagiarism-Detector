@@ -11,6 +11,16 @@
     \item \textbf{兼顾现有实现与后续演进}。模块设计既要能映射当前 Django 后端、Vue 前端、Celery 任务和 AI 服务实现，也要能支撑下一阶段新增论文与评审能力。
 \end{itemize}
 
+\subsubsection{已落地的文件预处理约束}
+
+结合当前代码实现，资源管理模块在论文和 Review 两类文本资源上采用以下预处理约束：
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{论文预处理：} 当前仅支持 PDF 论文文件。后端在上传阶段使用 PyMuPDF 提取 PDF 正文文本，随后执行文本清洗、段落切分，并持久化原始文本、清洗后文本、段落 JSON 和面向 AI 的 \texttt{paper-preprocess-v1} 输入。
+    \item \textbf{Review 预处理：} 当前仅支持在线文本和 \texttt{.txt} 文件。后端在提交阶段执行编码标准化、UTF-8 BOM 清理、控制字符清理和空白归一化，并持久化原始文本、清洗后文本和面向 AI 的 \texttt{review-preprocess-v1} 输入。
+    \item \textbf{格式边界：} 本阶段不新增论文 DOCX/TXT、Review PDF/DOCX 等格式支持，前端和接口文档均应保持与后端格式校验一致。
+\end{itemize}
+
 \subsection{模块总体关系类图}
 \begin{figure}[H]
     \centering
@@ -404,7 +414,7 @@
 
 \subsubsection{模块职责}
 \begin{itemize}[leftmargin=2em]
-    \item 对论文文件或论文文本进行格式校验、文本抽取、结构化解析和段落切分；
+    \item 对 PDF 论文文件进行格式校验、文本抽取、结构化解析和段落切分；
     \item 调用论文 AIGC 检测模型，输出全文级 AI 贡献占比、整体风险结论和结果摘要；
     \item 生成段落级 AI 生成概率、疑似 AI 生成段落列表、事实性鉴伪子结论及原因说明；
     \item 将论文检测结果写入统一检测任务，并为结果展示、综合报告和人工审核提供数据。
@@ -422,7 +432,7 @@
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 用户上传的论文文件或论文文本，包含 PDF、DOCX、TXT 等系统支持格式；
+    \item 用户上传的 PDF 论文文件。本阶段不新增 DOCX、TXT 等论文格式支持；
     \item 论文资源元数据，包括标题、文件名、上传用户、所属组织、学科标签和任务编号；
     \item 论文检测参数，包括是否启用事实性鉴伪、段落切分策略、模型版本和阈值配置。
 \end{itemize}
@@ -503,7 +513,7 @@
 \subsubsection{输入与输出}
 输入：
 \begin{itemize}[leftmargin=2em]
-    \item 用户上传的 Review 文本文件或在线输入内容，包含 TXT、DOCX、PDF 等系统支持格式；
+    \item 用户上传的 Review TXT 文件或在线输入内容。本阶段不新增 Review DOCX、PDF 等格式支持；
     \item Review 元数据，包括上传用户、所属组织、任务编号、语言类型和可选的论文关联信息；
     \item 评审检测参数，包括 AI 生成阈值、模板短语库、相似度比对策略和模型版本。
 \end{itemize}
