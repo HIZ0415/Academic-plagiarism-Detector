@@ -1,4 +1,3 @@
-import { da } from 'vuetify/locale'
 import http from './request'
 import { ref } from 'vue'
 

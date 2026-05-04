@@ -13,37 +13,75 @@
 
       <v-divider></v-divider>
 
-      <v-list density="compact" nav>
-        <v-list-item prepend-icon="mdi-home" title="主页" value="home" @click="goToHome"></v-list-item>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-chart-bar" title="统计分析" value="analytics"
-          @click="goToAnalytics"></v-list-item>
-        <v-list-item v-if="isLoggedIn && userStore.admin_type === 'software_admin'" 
-          prepend-icon="mdi-office-building" title="组织管理" value="organizations"
-          @click="goToOrganizations"></v-list-item>
-        <v-list-item v-if="isLoggedIn && userStore.admin_type === 'organization_admin'" 
-          prepend-icon="mdi-account-circle" title="组织信息" value="organization_profile"
-          @click="goToOrganizationProfile"></v-list-item>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-folder" title="图像管理" value="files"
-          @click="goToFiles"></v-list-item>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-clipboard-list-outline" title="任务列表" value="tasks"
-          @click="goToTasks"></v-list-item>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-account-group" title="用户管理" value="users"
-          @click="goToUsers"></v-list-item>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-clipboard-text-clock" title="日志记录" value="logs"
-          @click="goToLogs"></v-list-item>
-        <v-list-item v-if="isLoggedIn && userStore.admin_type === 'organization_admin'" 
-          prepend-icon="mdi-gavel" title="人工审核" value="reviewRequests"
-          @click="goToReviews"></v-list-item>
+      <v-list density="compact" nav class="admin-nav-list">
+        <v-list-subheader class="text-caption font-weight-bold text-medium-emphasis">工作台</v-list-subheader>
+        <v-list-item
+          prepend-icon="mdi-view-dashboard-outline"
+          title="工作台"
+          subtitle="总览、快捷入口与数据看板"
+          lines="two"
+          value="home"
+          @click="goToHome"
+        />
+
+        <v-list-subheader v-if="isLoggedIn" class="text-caption font-weight-bold text-medium-emphasis">检测与资源</v-list-subheader>
+        <v-list-item
+          v-if="isLoggedIn"
+          prepend-icon="mdi-clipboard-text-outline"
+          title="检测与资源"
+          subtitle="任务监控与资源文件（页内可切换）"
+          lines="two"
+          value="tasks"
+          @click="goToTasks"
+        />
+
+        <v-list-subheader v-if="isLoggedIn" class="text-caption font-weight-bold text-medium-emphasis">用户与组织</v-list-subheader>
+        <v-list-item
+          v-if="isLoggedIn"
+          prepend-icon="mdi-account-group-outline"
+          title="用户与组织"
+          subtitle="账号与平台或本组织档案（标签切换）"
+          lines="two"
+          value="members"
+          @click="goToMembers"
+        />
+
+        <v-list-subheader v-if="isLoggedIn && userStore.admin_type === 'organization_admin'" class="text-caption font-weight-bold text-medium-emphasis">协作审核</v-list-subheader>
+        <v-list-item
+          v-if="isLoggedIn && userStore.admin_type === 'organization_admin'"
+          prepend-icon="mdi-gavel"
+          title="人工审核申请"
+          subtitle="审批用户端申请，通过后进入专家池"
+          lines="two"
+          value="reviewRequests"
+          @click="goToReviews"
+        />
+
+        <v-list-subheader v-if="isLoggedIn" class="text-caption font-weight-bold text-medium-emphasis">审计</v-list-subheader>
+        <v-list-item
+          v-if="isLoggedIn"
+          prepend-icon="mdi-clipboard-text-clock"
+          title="操作与审计日志"
+          subtitle="关键操作留痕、检索与导出"
+          lines="two"
+          value="logs"
+          @click="goToLogs"
+        />
+
         <v-divider class="my-2"></v-divider>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-logout" title="退出登录" value="logout"
-          @click="handleLogout"></v-list-item>
-        <v-list-item v-else prepend-icon="mdi-login" title="登录" value="login" @click="goToLogin"></v-list-item>
+        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-logout" title="退出登录" value="logout" @click="handleLogout" />
+        <v-list-item v-else prepend-icon="mdi-login" title="登录" value="login" @click="goToLogin" />
       </v-list>
     </v-navigation-drawer>
 
     <v-app-bar class="app-bar">
       <v-app-bar-nav-icon @click="drawer = !drawer" v-if="!isMobile"></v-app-bar-nav-icon>
-      <v-toolbar-title>学术检测管理平台</v-toolbar-title>
+      <v-toolbar-title class="d-flex flex-column align-start justify-center py-1" style="max-width: min(100%, 520px)">
+        <span class="text-h6 font-weight-bold text-truncate w-100">学术内容诚信 · 管理后台</span>
+        <span class="text-caption text-medium-emphasis font-weight-regular d-none d-md-block text-wrap">
+          工作台 · 检测与资源 · 用户与组织 · 协作审核 · 审计
+        </span>
+      </v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn :icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'" @click="toggleTheme"></v-btn>
       <!-- <v-btn v-if="isAdmin" :color="hasUnreadNotifications ? 'red' : ''"
@@ -58,54 +96,53 @@
       </v-container>
     </v-main>
 
-    <!-- 移动端底部导航栏 -->
-    <v-bottom-navigation v-if="isMobile">
+    <!-- 移动端：高频入口 +「更多」抽屉 -->
+    <v-bottom-navigation v-if="isMobile" grow>
       <v-btn to="/" value="home">
-        <v-icon>mdi-home</v-icon>
-        <span>主页</span>
-      </v-btn>
-      <v-btn v-if="isLoggedIn" to="/analytics" value="analytics">
-        <v-icon>mdi-chart-bar</v-icon>
-        <span>统计分析</span>
-      </v-btn>
-      
-      <v-btn v-if="isLoggedIn && userStore.admin_type === 'software_admin'" to="/organizations" value="organizations">
-        <v-icon>mdi-office-building</v-icon>
-        <span>组织管理</span>
-      </v-btn>
-      <v-btn v-if="isLoggedIn && userStore.admin_type === 'organization_admin'" to="/organization_profile" value="organization_profile">
-        <v-icon>mdi-account-circle</v-icon>
-        <span>组织信息</span>
-      </v-btn>
-      <v-btn v-if="isLoggedIn" to="/files" value="files">
-        <v-icon>mdi-folder</v-icon>
-        <span>图像管理</span>
+        <v-icon>mdi-view-dashboard-outline</v-icon>
+        <span>工作台</span>
       </v-btn>
       <v-btn v-if="isLoggedIn" to="/tasks" value="tasks">
-        <v-icon>mdi-clipboard-list-outline</v-icon>
-        <span>任务</span>
+        <v-icon>mdi-clipboard-text-outline</v-icon>
+        <span>检测</span>
       </v-btn>
-      <v-btn v-if="isLoggedIn" to="/users" value="users">
-        <v-icon>mdi-account-group</v-icon>
-        <span>用户管理</span>
+      <v-btn v-if="isLoggedIn" to="/members" value="members">
+        <v-icon>mdi-account-group-outline</v-icon>
+        <span>成员</span>
       </v-btn>
-      <v-btn v-if="isLoggedIn" to="/logs" value="logs">
-        <v-icon>mdi-clipboard-text-clock</v-icon>
-        <span>日志记录</span>
+      <v-btn v-if="isLoggedIn" value="more" @click="mobileMoreOpen = true">
+        <v-icon>mdi-dots-horizontal</v-icon>
+        <span>更多</span>
       </v-btn>
-      <v-btn v-if="isLoggedIn && userStore.admin_type === 'organization_admin'" to="/reviews" value="reviews">
-        <v-icon>mdi-gavel</v-icon>
-        <span>人工审核</span>
-      </v-btn>
-      <v-btn v-if="isLoggedIn" @click="handleLogout" value="logout">
-        <v-icon>mdi-logout</v-icon>
-        <span>退出登录</span>
-      </v-btn>
-      <v-btn v-else @click="goToLogin" value="login">
+      <v-btn v-if="!isLoggedIn" @click="goToLogin" value="login">
         <v-icon>mdi-login</v-icon>
         <span>登录</span>
       </v-btn>
     </v-bottom-navigation>
+
+    <v-bottom-sheet v-if="isMobile" v-model="mobileMoreOpen">
+      <v-card>
+        <v-card-title class="text-subtitle-1">更多功能</v-card-title>
+        <v-list density="comfortable">
+          <v-list-item
+            v-if="isLoggedIn"
+            prepend-icon="mdi-folder-cog-outline"
+            title="资源与文件"
+            subtitle="与检测任务同模块"
+            @click="navigate('/files')"
+          />
+          <v-list-item
+            v-if="isLoggedIn && userStore.admin_type === 'organization_admin'"
+            prepend-icon="mdi-gavel"
+            title="人工审核申请审批"
+            @click="navigate('/reviews')"
+          />
+          <v-list-item v-if="isLoggedIn" prepend-icon="mdi-clipboard-text-clock" title="操作与审计日志" @click="navigate('/logs')" />
+          <v-divider class="my-1" />
+          <v-list-item v-if="isLoggedIn" prepend-icon="mdi-logout" title="退出登录" @click="mobileLogout" />
+        </v-list>
+      </v-card>
+    </v-bottom-sheet>
 
     <!-- 通知抽屉 -->
     <v-navigation-drawer v-model="showNotifications" temporary location="right" width="400">
@@ -213,6 +250,17 @@ const broadcastContent = ref('')
 const broadcastTitle = ref('')
 const showBroadcastDialog = ref(false)
 const previewContent = ref('')
+const mobileMoreOpen = ref(false)
+
+function navigate(path: string) {
+  mobileMoreOpen.value = false
+  router.push(path)
+}
+
+function mobileLogout() {
+  mobileMoreOpen.value = false
+  handleLogout()
+}
 
 // 标记通知为已读
 const markAsRead = (index: number) => {
@@ -220,12 +268,10 @@ const markAsRead = (index: number) => {
   updateUnreadStatus()
 }
 
-const getSubTitle = (admin_type : string) =>{
-  if(admin_type === 'software_admin'){
-    return '软件管理员'
-  }else if(admin_type === 'organization_admin'){
-    return '组织管理员'
-  }
+const getSubTitle = (admin_type: string) => {
+  if (admin_type === 'software_admin') return '软件管理员'
+  if (admin_type === 'organization_admin') return '组织管理员'
+  return ''
 }
 
 // 更新未读状态
@@ -291,24 +337,12 @@ const toggleTheme = () => {
   themeStore.toggleTheme()
 }
 
-const goToAnalytics = () => {
-  router.push('/analytics')
-}
-
-const goToFiles = () => {
-  router.push('/files')
-}
-
 const goToTasks = () => {
   router.push('/tasks')
 }
 
-const goToOrganizations = () => {
-  router.push('/organizations')
-}
-
-const goToUsers = () => {
-  router.push('/users')
+const goToMembers = () => {
+  router.push('/members')
 }
 
 const goToLogs = () => {
@@ -317,10 +351,6 @@ const goToLogs = () => {
 
 const goToReviews = () => {
   router.push('/reviews')
-}
-
-const goToOrganizationProfile = () => {
-  router.push('/organization_profile')
 }
 
 onMounted(async () => {
@@ -388,5 +418,11 @@ onMounted(async () => {
   border-radius: 4px;
   min-height: 200px;
   background-color: rgb(var(--v-theme-surface));
+}
+
+.admin-nav-list :deep(.v-list-item-subtitle) {
+  white-space: normal;
+  line-height: 1.35;
+  opacity: 0.85;
 }
 </style>

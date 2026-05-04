@@ -1,9 +1,17 @@
 <template>
   <v-container>
+    <v-row class="mb-3">
+      <v-col cols="12">
+        <DetectionResourceTabs />
+      </v-col>
+    </v-row>
     <!-- 标题 -->
     <v-row class="mb-6">
       <v-col>
-        <h1 class="text-h4 font-weight-bold">图像管理</h1>
+        <h1 class="text-h4 font-weight-bold">学术资源与文件</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
+          检索、筛选与维护已上传的学术资源（图像/文件列表）；与用户端检测产生的资源对应。与「检测任务」同属检测与资源模块，可用上方切换。
+        </p>
       </v-col>
     </v-row>
 
@@ -392,9 +400,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import DetectionResourceTabs from '@/components/admin/DetectionResourceTabs.vue'
 import { useSnackbarStore } from '@/stores/snackbar'
 import fileApi from '@/api/file'
 import userApi from '@/api/user'
+import type { UserListItem } from '@/types/core'
 
 const snackbar = useSnackbarStore()
 
@@ -413,13 +423,6 @@ interface Image {
   isDetect: string
   isReview: string
   isFake: string | null
-}
-
-interface User {
-  id: number
-  username: string
-  email: string
-  avatar: string
 }
 
 const headers = computed(() => {
@@ -446,9 +449,9 @@ const totalFiles = ref(0)
 const totalPages = ref(1)
 
 // 搜索相关
-const searchSelectedUser = ref<User | null>(null)
+const searchSelectedUser = ref<UserListItem | null>(null)
 const searchSelectedOrg = ref<string | null>(null)
-const searchUsersList = ref<User[]>([])
+const searchUsersList = ref<UserListItem[]>([])
 const loadingSearchUsers = ref(false)
 const searchQuery = ref('')
 
@@ -710,8 +713,8 @@ const openDeleteDialog = (file: File) => {
 }
 
 
-const getImageUrl =(url:string)=>{
-  return import.meta.env.VITE_API_URL + url
+const getImageUrl = (url?: string) => {
+  return import.meta.env.VITE_API_URL + (url ?? '')
 }
 
 

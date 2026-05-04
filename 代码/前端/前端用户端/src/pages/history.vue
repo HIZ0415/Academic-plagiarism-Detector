@@ -20,6 +20,14 @@
                 <v-col cols="12" md="3" class="text-body-2">状态：{{ getStatus(detailTask.status) }}</v-col>
                 <v-col cols="12" md="3" class="text-body-2">进度：{{ detailTask.progress || 0 }}%</v-col>
                 <v-col cols="12" md="3" class="text-body-2">时间：{{ formatDateTime(detailTask.upload_time) || '暂无' }}</v-col>
+                <v-col v-if="detailTask.batch_session_id" cols="12" class="text-body-2 mt-2">
+                  统一检测批次：<code>{{ detailTask.batch_session_id }}</code>（与同批其他子任务逻辑关联）
+                </v-col>
+                <v-col v-if="manualReviewWorkflowPayload?.found" cols="12" class="text-body-2 mt-2">
+                  人工审核申请单：<code>{{ manualReviewWorkflowPayload.review_request_id }}</code>；
+                  管理端：<span class="font-weight-medium">{{ manualReviewAdminLabel }}</span>；
+                  专家进度：<span class="font-weight-medium">{{ manualReviewExpertLabel }}</span>
+                </v-col>
               </v-row>
               <v-alert v-if="detailTask.error_message" type="error" variant="tonal" class="mt-3">
                 {{ detailTask.error_message }}
@@ -75,14 +83,28 @@
             </v-card>
 
             <v-card variant="outlined" class="pa-4">
-              <div class="d-flex flex-wrap ga-3">
-                <v-btn color="primary" :disabled="detailTask.status !== 'completed'" @click="goSpecialDetail(detailTask)">
+              <div class="d-flex flex-wrap align-center ga-3">
+                <v-btn
+                  color="primary"
+                  prepend-icon="mdi-gavel"
+                  class="text-none"
+                  :disabled="detailTask.status !== 'completed'"
+                  @click="goManualReviewRequest"
+                >
+                  人工审核申请
+                </v-btn>
+                <v-btn color="primary" variant="tonal" class="text-none" :disabled="detailTask.status !== 'completed'" @click="goSpecialDetail(detailTask)">
                   进入专项详情
                 </v-btn>
-                <v-btn color="success" variant="outlined" :disabled="detailTask.status !== 'completed'" @click="goManualReview">
-                  进入人工审核
+                <v-btn
+                  variant="outlined"
+                  class="text-none"
+                  :disabled="!canViewManualReviewResult"
+                  @click="goManualReview"
+                >
+                  查看人工审核结果
                 </v-btn>
-                <v-btn variant="outlined" @click="backToList">返回历史列表</v-btn>
+                <v-btn variant="text" class="text-none" @click="backToList">返回历史列表</v-btn>
               </div>
             </v-card>
           </v-col>
@@ -105,6 +127,12 @@
       </v-btn>
       <!-- <v-btn variant="outlined">新建</v-btn> -->
     </v-card-title>
+
+    <v-alert v-if="batchSessionFilter" type="info" variant="tonal" density="compact" class="mt-3 mb-2">
+      当前按<strong>统一检测批次</strong>筛选：<code>{{ batchSessionFilter }}</code>。列表仅显示该批次在本地记录的子任务；清除地址栏中的
+      <code>batch_session_id</code> 查询参数可恢复完整列表。
+      <v-btn size="small" variant="text" class="ms-2" @click="clearBatchFilter">清除批次筛选</v-btn>
+    </v-alert>
 
     <!-- 筛选对话框 -->
     <v-dialog v-model="showFilter" max-width="500">
@@ -172,10 +200,14 @@
           </div>
         </template>
 
+        <template v-slot:item.batch_session_id="{ item }">
+          <span class="text-caption text-medium-emphasis">{{ shortBatchId(item.batch_session_id) }}</span>
+        </template>
+
         <template v-slot:top>
           <div class="d-flex align-center pa-4">
             <div class="text-caption text-medium-emphasis">
-              共 {{ totalTasks }} 条记录
+              共 {{ listRecordCount }} 条记录{{ batchSessionFilter ? '（批次筛选后）' : '' }}
             </div>
           </div>
         </template>
@@ -198,10 +230,11 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import publisher from '@/api/publisher'
+import { getManualReviewApplicationByDetectionTask } from '@/api/manualReviewWorkflow'
 
 const router = useRouter()
 const route = useRoute()
@@ -218,6 +251,7 @@ const loading = ref(false)
 // 表格列定义
 const headers = [
   { title: '任务ID', key: 'task_id', align: 'center' as const, width: '120px' },
+  { title: '批次', key: 'batch_session_id', align: 'center' as const, width: '130px' },
   { title: '上传时间', key: 'upload_time', align: 'center' as const, width: '180px' },
   { title: '完成时间', key: 'completion_time', align: 'center' as const, width: '180px' },
   { title: '检测状态', key: 'status', align: 'center' as const, width: '200px' },
@@ -233,6 +267,8 @@ interface Task {
   progress?: number
   source?: 'server' | 'local'
   error_message?: string
+  /** 与 /upload 同批送检关联（本地记录为主） */
+  batch_session_id?: string
 }
 
 // 任务数据
@@ -362,6 +398,7 @@ const fetchTasks = async (page: number, pageSize: number) => {
       progress: Number(t.progress || 0),
       source: 'local',
       error_message: t.error_message || '',
+      batch_session_id: t.batch_session_id ? String(t.batch_session_id) : undefined,
     }))
 
     const merged = [...remoteTasks]
@@ -458,14 +495,32 @@ const hasActiveFilters = computed(() => {
     filters.value.status !== null
 })
 
-// 筛选后的任务列表
+const batchSessionFilter = computed(() => String(route.query.batch_session_id || '').trim())
+
+function shortBatchId(id?: string) {
+  if (!id) return '—'
+  return id.length > 18 ? `${id.slice(0, 10)}…${id.slice(-6)}` : id
+}
+
+function clearBatchFilter() {
+  const q = { ...route.query } as Record<string, string | string[] | undefined>
+  delete q.batch_session_id
+  router.replace({ path: '/history', query: q })
+}
+
+// 筛选后的任务列表（含统一检测入口的批次筛选）
 const filteredTasks = computed(() => {
-  return tasks.value
+  const b = batchSessionFilter.value
+  if (!b) return tasks.value
+  return tasks.value.filter((t) => (t.batch_session_id || '') === b)
 })
+
+const listRecordCount = computed(() => (batchSessionFilter.value ? filteredTasks.value.length : totalTasks.value))
 
 const detailId = computed(() => String(route.query.detail_id || ''))
 
 const detailTask = computed<Task>(() => {
+  const qBatch = String(route.query.batch_session_id || '').trim()
   const fallback: Task = {
     task_id: detailId.value,
     upload_time: String(route.query.upload_time || ''),
@@ -475,9 +530,12 @@ const detailTask = computed<Task>(() => {
     progress: Number(route.query.progress || 0),
     source: 'local',
     error_message: String(route.query.error_message || ''),
+    batch_session_id: qBatch || undefined,
   }
   if (!detailId.value) return fallback
-  return tasks.value.find((t) => String(t.task_id) === detailId.value) || fallback
+  const found = tasks.value.find((t) => String(t.task_id) === detailId.value)
+  if (found) return { ...found, batch_session_id: found.batch_session_id || qBatch || undefined }
+  return fallback
 })
 
 const unifiedResult = computed(() => {
@@ -541,6 +599,7 @@ const handleNext = (item: Task) => {
       completion_time: item.completion_time || '',
       error_message: item.error_message || '',
       source: 'history',
+      ...(item.batch_session_id ? { batch_session_id: item.batch_session_id } : {}),
     },
   })
 }
@@ -571,24 +630,86 @@ const goSpecialDetail = (task: Task) => {
     router.push({ path: '/detect/paper', query: { tab: 'resource', task_id: task.task_id } })
     return
   }
+  if (task.task_type === 'review_detection') {
+    router.push({ path: '/detect/review', query: { task_id: task.task_id } })
+    return
+  }
   router.push(`/step/${task.task_id}`)
 }
 
+const manualReviewWorkflowPayload = ref<{
+  found: boolean
+  review_request_id?: number
+  admin_state?: string
+  manual_review_status?: string
+  admin_reject_reason?: string
+} | null>(null)
+
+async function loadManualReviewWorkflow() {
+  manualReviewWorkflowPayload.value = null
+  if (!detailId.value || detailTask.value.status !== 'completed') return
+  try {
+    const res = await getManualReviewApplicationByDetectionTask(detailId.value)
+    manualReviewWorkflowPayload.value = res.data as typeof manualReviewWorkflowPayload.value
+  } catch {
+    manualReviewWorkflowPayload.value = null
+  }
+}
+
+watch(
+  () => [detailId.value, detailTask.value.status] as const,
+  () => {
+    loadManualReviewWorkflow()
+  },
+  { immediate: true },
+)
+
 const manualReviewStep = computed(() => {
   if (detailTask.value.status !== 'completed') return 1
-  const seed = Number(String(detailTask.value.task_id).replace(/\D/g, '').slice(-1) || '1')
-  return (seed % 4) + 1
+  const w = manualReviewWorkflowPayload.value
+  if (!w || !w.found) return 1
+  if (w.admin_state === 'refused') return 2
+  if (w.admin_state === 'pending') return 2
+  if (w.manual_review_status === 'completed') return 4
+  return 3
 })
 
 const manualReviewStageText = computed(() => {
   if (detailTask.value.status !== 'completed') return '自动检测未完成，暂不可发起人工审核'
-  if (manualReviewStep.value === 1) return '待你发起人工审核申请'
-  if (manualReviewStep.value === 2) return '管理员审批中'
-  if (manualReviewStep.value === 3) return '审核员复核中'
-  return '人工审核已完成，结果可查看'
+  const w = manualReviewWorkflowPayload.value
+  if (!w || !w.found) return '尚未发起人工审核申请，请点击「人工审核申请」填写表单提交'
+  if (w.admin_state === 'refused') return `管理端已拒绝：${w.admin_reject_reason || '—'}`
+  if (w.admin_state === 'pending') return '管理端审批中，可在侧栏「人工审核申请」列表查看进度'
+  if (w.manual_review_status === 'completed') return '专家已完成审核，可查看汇总结果'
+  return '已分配专家，审核进行中'
+})
+
+const manualReviewAdminLabel = computed(() => {
+  const w = manualReviewWorkflowPayload.value
+  if (!w?.found) return '—'
+  if (w.admin_state === 'pending') return '待审批'
+  if (w.admin_state === 'refused') return '已拒绝'
+  if (w.admin_state === 'accepted') return '已通过'
+  return String(w.admin_state)
+})
+
+const manualReviewExpertLabel = computed(() => {
+  const w = manualReviewWorkflowPayload.value
+  if (!w?.found || w.admin_state !== 'accepted') return '—'
+  if (w.manual_review_status === 'completed') return '已完成'
+  return '进行中'
+})
+
+const canViewManualReviewResult = computed(() => {
+  if (detailTask.value.status !== 'completed') return false
+  const w = manualReviewWorkflowPayload.value
+  if (!w?.found || !w.review_request_id) return false
+  if (w.admin_state === 'refused') return false
+  return w.manual_review_status === 'completed'
 })
 
 const goManualReview = () => {
+  const w = manualReviewWorkflowPayload.value
   router.push({
     path: '/manual-review-result',
     query: {
@@ -597,7 +718,16 @@ const goManualReview = () => {
       task_type: detailTask.value.task_type || 'image_detection',
       status: detailTask.value.status,
       progress: String(detailTask.value.progress || 100),
+      ...(w?.found && w.review_request_id ? { review_request_id: String(w.review_request_id) } : {}),
     },
+  })
+}
+
+/** 发布者侧发起/跟踪人工审核（文档 `/annual`，与侧栏「人工审核申请」一致） */
+const goManualReviewRequest = () => {
+  router.push({
+    path: '/annual',
+    query: { task_id: String(detailTask.value.task_id) },
   })
 }
 

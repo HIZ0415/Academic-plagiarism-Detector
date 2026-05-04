@@ -1,10 +1,15 @@
 <template>
   <v-container>
+    <v-row class="mb-3">
+      <v-col cols="12">
+        <DetectionResourceTabs />
+      </v-col>
+    </v-row>
     <v-row class="mb-4 align-center">
       <v-col cols="12" md="6">
-        <h1 class="text-h4 font-weight-bold">检测任务</h1>
+        <h1 class="text-h4 font-weight-bold">检测任务监控</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          展示权限范围内的统一检测任务；开启自动刷新后对进行中任务轮询，并尝试通过 WebSocket 接收通知以刷新列表。
+          查看权限范围内<strong>图像 / 论文 / Review</strong> 等检测任务的队列与状态；可自动刷新并订阅通知，便于运维与异常发现。与「资源与文件」为同一模块下的两类视图。
         </p>
       </v-col>
       <v-col cols="12" md="6" class="d-flex flex-wrap justify-end gap-2">
@@ -165,6 +170,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import DetectionResourceTabs from '@/components/admin/DetectionResourceTabs.vue'
 import taskApi from '@/api/task'
 import userApi from '@/api/user'
 import type { AdminTaskItem, AdminTaskStatusDetail } from '@/types/core'

@@ -68,7 +68,7 @@ import publisher from '@/api/publisher'
 import { useSnackbarStore } from '@/stores/snackbar'
 import type { TaskStatus } from '@/types/core'
 
-type UnifiedTaskType = 'paper_aigc' | 'resource_check' | 'image_detection' | 'unknown'
+type UnifiedTaskType = 'paper_aigc' | 'resource_check' | 'image_detection' | 'review_detection' | 'unknown'
 
 type TaskDetail = {
   task_id: string
@@ -102,6 +102,7 @@ function typeLabel(t: UnifiedTaskType) {
   if (t === 'paper_aigc') return '论文 AIGC'
   if (t === 'resource_check') return '学术资源检测'
   if (t === 'image_detection') return '图像检测'
+  if (t === 'review_detection') return 'Review 检测'
   return '未知类型'
 }
 
@@ -164,6 +165,10 @@ function goSpecialDetail() {
   }
   if (task.value.task_type === 'resource_check') {
     router.push({ path: '/detect/paper', query: { tab: 'resource', task_id: taskId.value } })
+    return
+  }
+  if (task.value.task_type === 'review_detection') {
+    router.push({ path: '/detect/review', query: { task_id: taskId.value } })
     return
   }
   router.push(`/step/${taskId.value}`)
