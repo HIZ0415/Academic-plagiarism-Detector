@@ -3,7 +3,7 @@
       <!-- 左侧功能介绍区域 -->
       <div class="feature-section">
         <div class="feature-content">
-          <h1 class="text-h4 font-weight-bold mb-12">学术图像造假检测平台</h1>
+          <h1 class="text-h4 font-weight-bold mb-12">学术内容诚信 · 管理端</h1>
           <div class="feature-grid">
             <div class="feature-item">
               <div class="feature-icon">

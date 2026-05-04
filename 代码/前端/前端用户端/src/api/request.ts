@@ -74,7 +74,8 @@ instance.interceptors.response.use(
         localStorage.removeItem('2-token')
         localStorage.removeItem('2-refresh')
         localStorage.setItem('2-isLoggedIn', 'false')
-        if (typeof window !== 'undefined') {
+        // 界面预览（无登录盲改）时不得整页跳回登录，否则专家预览无法停留 /review
+        if (typeof window !== 'undefined' && localStorage.getItem('2-ui-preview') !== '1') {
           window.location.assign('/login')
         }
         return Promise.reject(err)

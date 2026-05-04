@@ -1,9 +1,12 @@
 <template>
-  <v-container>
+  <component :is="embed ? 'div' : 'v-container'" class="w-100">
     <!-- 标题 -->
-    <v-row class="mb-6">
+    <v-row v-if="!embed" class="mb-6">
       <v-col>
         <h1 class="text-h4 font-weight-bold">用户管理</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
+          在授权范围内检索、筛选与维护平台或本组织用户账号；与检测、审核等业务身份区分。
+        </p>
       </v-col>
     </v-row>
 
@@ -351,13 +354,15 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </v-container>
+  </component>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import userApi from '@/api/user'
 import { useSnackbarStore } from '@/stores/snackbar'
+
+withDefaults(defineProps<{ embed?: boolean }>(), { embed: false })
 
 const snackbar = useSnackbarStore()
 
@@ -767,6 +772,7 @@ const fetchUsers = async (page: number, pageSize: number) => {
       role: user.role,
       permission: user.permission,
       registerTime: new Date(user.date_joined).getTime(),
+      lastLoginTime: user.last_login ? new Date(user.last_login).getTime() : 0,
       avatar: import.meta.env.VITE_API_URL + user.avatar || '',
       admin_type: user.admin_type,
       organization: user.organization

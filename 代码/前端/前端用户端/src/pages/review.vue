@@ -1,17 +1,37 @@
 <template>
-  <div class="review-page">
+  <div class="review-page pb-12">
     <v-row class="mb-4" align="center">
       <v-col cols="12" md="8">
         <h1 class="text-h4 font-weight-bold mb-2">人工审核任务池</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          对应需求 <strong>FR-YHSH-0001</strong>：按时间展示待您处理的图像类人工审核任务；详情页完成 <strong>FR-YHSH-0002</strong> 鉴定结论提交。
+          路由 <code>/review</code>：<strong>审稿人人工复核</strong>（FR-YHSH-0001 任务池、FR-YHSH-0002 鉴定）。任务材料可含图像 / 论文 / Review 等，以 <code>task_kind</code> 区分；与发布者侧 Review 文本<strong>自动检测</strong>（统一入口 <code>/upload</code>，FR-PLJC）不是同一功能。
         </p>
       </v-col>
     </v-row>
 
-    <v-alert type="info" variant="tonal" density="compact" class="mb-6 text-body-2">
-      <strong>与发布端、管理端协作：</strong>发布者在「人工审核」中发起申请并经<strong>管理端审批通过</strong>（<code>admin_gate_status = accepted</code>）后，系统为您生成
-      <code>ManualReview</code> 任务；此处列表仅展示<strong>分配给您</strong>的记录。论文 / Review 类人工审核接口就绪后将扩展 <code>task_kind</code> 字段。
+    <v-alert type="info" variant="tonal" density="compact" class="mb-4 review-intro-alert text-body-2">
+      <div v-if="isPreviewMode" class="d-flex flex-column flex-sm-row flex-wrap align-sm-center ga-3">
+        <span><strong>预览：</strong>未调接口时列表可能为空；可打开占位详情。</span>
+        <v-btn
+          color="primary"
+          variant="flat"
+          size="small"
+          class="text-none"
+          prepend-icon="mdi-open-in-new"
+          @click="router.push('/task/detail/0')"
+        >
+          审核详情（图像）
+        </v-btn>
+        <v-btn size="small" variant="tonal" class="text-none" @click="router.push('/task/detail/0?preview_kind=paper')">
+          论文工作台
+        </v-btn>
+        <v-btn size="small" variant="tonal" class="text-none" @click="router.push('/task/detail/0?preview_kind=review')">
+          Review 工作台
+        </v-btn>
+      </div>
+      <div v-else>
+        <strong>流程：</strong>发布者「人工审核申请」→ 管理端 <code>admin_gate_status</code> → 分配至本页 → 进入详情提交结论。
+      </div>
     </v-alert>
 
     <v-row class="mb-4" align="center">
@@ -41,7 +61,7 @@
       <v-data-table
         :headers="headers"
         :items="tasks"
-        class="elevation-0"
+        class="elevation-0 review-task-table"
         :items-per-page="pageSize"
         hover
         :loading="loading"
@@ -49,7 +69,7 @@
       >
         <template #top>
           <div class="d-flex align-center pa-4">
-            <span class="text-caption text-medium-emphasis">共 {{ totalTasks }} 条审核任务（分页口径为 ReviewRequest）</span>
+            <span class="text-caption text-medium-emphasis">共 {{ totalTasks }} 条审核任务（分页按 ReviewRequest；类型含图像 / 论文 / Review 等）</span>
           </div>
         </template>
 
@@ -61,6 +81,10 @@
           <v-avatar size="40">
             <v-img :src="avatarSrc(item.publisher_avatar)" :alt="item.publisher_username" />
           </v-avatar>
+        </template>
+
+        <template #item.image_count="{ item }">
+          <span class="text-body-2 text-no-wrap">{{ materialScaleText(item) }}</span>
         </template>
 
         <template #item.review_request_status="{ item }">
@@ -124,7 +148,7 @@
             <v-select
               v-model="filters.taskKind"
               :items="taskKindOptions"
-              label="审核类型（任务种类）"
+              label="任务类型（图像 / 论文 / Review）"
               hide-details
             />
             <v-select
@@ -177,7 +201,7 @@
               />
             </div>
             <v-alert type="warning" variant="tonal" density="compact" class="text-caption">
-              学科分类、紧急程度、风险等级等维度需后端在列表接口扩展字段后方可筛选；当前版本优先保证流程协作字段可用。
+              需求中的学科分类、紧急程度、风险等级等维度需后端在 <code>get_reviewer_tasks</code> 中扩展字段后方可筛选；当前优先支持流程状态、管理门闸、时间范围与<strong>任务类型（图像 / 论文 / Review）</strong>等协作字段。
             </v-alert>
           </div>
         </v-card-text>
@@ -197,32 +221,39 @@ import { useRouter } from 'vue-router'
 import reviewerApi from '@/api/reviewer'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { resolveBackendMediaUrl } from '@/utils/backendUrl'
+import { useEffectiveRole } from '@/composables/useEffectiveRole'
 
 const router = useRouter()
 const snackbar = useSnackbarStore()
+const { isPreviewMode } = useEffectiveRole()
 
 interface Task {
   manual_review_id: number
   manual_review_time: string
   publisher_username: string
   publisher_avatar: string | null
-  image_count: number
+  /** 图像类：待审图张数；其它类型后端可复用或另给 scale 字段 */
+  image_count?: number
   status: string
   review_request_id?: number
   review_request_status?: string
   admin_gate_status?: string
   task_kind?: string
+  /** 论文类：可选页数/段数（后端扩展） */
+  paper_unit_count?: number
+  /** Review 类：可选字符数（后端扩展） */
+  review_text_units?: number
 }
 
 const headers = [
-  { title: '类型', key: 'task_kind', align: 'center', width: 100 },
+  { title: '类型', key: 'task_kind', align: 'center', minWidth: 96 },
   { title: '头像', key: 'publisher_avatar', align: 'center', sortable: false, width: 72 },
-  { title: '发布者', key: 'publisher_username', align: 'start' },
-  { title: '图片数', key: 'image_count', align: 'center', width: 88 },
-  { title: '流程状态', key: 'review_request_status', align: 'center', width: 120 },
-  { title: '管理审批', key: 'admin_gate_status', align: 'center', width: 120 },
-  { title: '我的进度', key: 'status', align: 'center', width: 100 },
-  { title: '分配时间', key: 'manual_review_time', align: 'center', width: 180 },
+  { title: '发布者', key: 'publisher_username', align: 'start', minWidth: 112 },
+  { title: '审核规模', key: 'image_count', align: 'center', minWidth: 120 },
+  { title: '流程状态', key: 'review_request_status', align: 'center', minWidth: 120 },
+  { title: '管理审批', key: 'admin_gate_status', align: 'center', minWidth: 120 },
+  { title: '我的进度', key: 'status', align: 'center', minWidth: 112 },
+  { title: '分配时间', key: 'manual_review_time', align: 'center', minWidth: 176 },
   { title: '操作', key: 'actions', align: 'center', sortable: false, width: 72 },
 ] as const
 
@@ -236,7 +267,7 @@ const searchQuery = ref('')
 const showFilterDialog = ref(false)
 
 const filters = ref({
-  taskKind: 'image',
+  taskKind: null as string | null,
   status: null as string | null,
   reviewRequestStatus: null as string | null,
   adminGateStatus: null as string | null,
@@ -245,7 +276,12 @@ const filters = ref({
   endDate: null as string | null,
 })
 
-const taskKindOptions = [{ title: '图像（当前主线）', value: 'image' }]
+const taskKindOptions = [
+  { title: '全部类型', value: null },
+  { title: '学术图像', value: 'image' },
+  { title: '全篇论文', value: 'paper' },
+  { title: '同行评审 Review', value: 'review' },
+]
 
 const statusOptions = [
   { title: '未完成', value: 'undo' },
@@ -279,8 +315,29 @@ function avatarSrc(path: string | null | undefined) {
 }
 
 function taskKindLabel(kind?: string) {
-  if (kind === 'image') return '图像'
+  const k = (kind || '').toLowerCase()
+  if (k === 'image' || k === 'image_detection') return '学术图像'
+  if (k === 'paper' || k === 'paper_aigc' || k === 'paper_manual') return '论文'
+  if (k === 'review' || k === 'review_detection' || k === 'review_manual') return 'Review'
   return kind || '—'
+}
+
+/** 列表「审核规模」列：按任务类型展示张数 / 段数 / 字数等 */
+function materialScaleText(item: Task): string {
+  const k = (item.task_kind || 'image').toLowerCase()
+  if (k === 'image' || k === 'image_detection' || !item.task_kind) {
+    const n = item.image_count
+    return typeof n === 'number' ? `${n} 张` : '—'
+  }
+  if (k === 'paper' || k === 'paper_aigc' || k === 'paper_manual') {
+    const n = item.paper_unit_count ?? item.image_count
+    return typeof n === 'number' ? `${n} 段` : '论文 · 见详情'
+  }
+  if (k === 'review' || k === 'review_detection' || k === 'review_manual') {
+    const n = item.review_text_units
+    return typeof n === 'number' ? `约 ${n} 字` : 'Review · 见详情'
+  }
+  return '—'
 }
 
 function requestStatusLabel(s?: string) {
@@ -382,7 +439,7 @@ function handleCustomTimeChange() {
 
 function resetFilters() {
   filters.value = {
-    taskKind: 'image',
+    taskKind: null,
     status: null,
     reviewRequestStatus: null,
     adminGateStatus: null,
@@ -451,6 +508,9 @@ async function fetchTasks(page: number, size: number) {
       review_request_status: filters.value.reviewRequestStatus || '',
       admin_gate_status: filters.value.adminGateStatus || '',
     }
+    if (filters.value.taskKind) {
+      params.task_kind = filters.value.taskKind
+    }
 
     const response = await reviewerApi.getReviewerTasks(params)
     const {
@@ -490,6 +550,7 @@ function handlePageSizeChange(size: number) {
 }
 
 onMounted(() => {
+  if (isPreviewMode.value) return
   fetchTasks(currentPage.value, pageSize.value)
 })
 </script>
@@ -499,8 +560,9 @@ onMounted(() => {
   max-width: 420px;
 }
 
-:deep(.v-data-table-header th) {
+.review-task-table :deep(th) {
   font-weight: 600;
-  white-space: nowrap;
+  white-space: nowrap !important;
 }
+
 </style>

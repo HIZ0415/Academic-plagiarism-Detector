@@ -57,6 +57,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@workflow-mock': fileURLToPath(new URL('../shared/manualReviewWorkflowMock.ts', import.meta.url)),
     },
     extensions: [
       '.js',

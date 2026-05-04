@@ -8,7 +8,8 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@workflow-mock": ["../shared/manualReviewWorkflowMock.ts"]
     }
   }
 }

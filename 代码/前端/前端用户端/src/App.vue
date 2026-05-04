@@ -7,37 +7,61 @@
       location="left" class="navigation-drawer" @mouseenter="rail = false" @mouseleave="rail = true"
       :width="rail ? 56 : 200">
       <v-list>
-        <v-list-item :prepend-avatar="isLoggedIn ? userStore.avatar : undefined" :subtitle="userStore.role"
-          :title="userStore.displayName">
-        </v-list-item>
+        <v-list-item
+          v-if="isLoggedIn"
+          :prepend-avatar="userStore.avatar"
+          :subtitle="drawerSubtitle"
+          :title="userStore.displayName"
+        />
+        <v-list-item
+          v-else-if="isPreviewMode"
+          prepend-icon="mdi-account-badge"
+          :subtitle="drawerSubtitle"
+          :title="`界面预览（${roleLabel}）`"
+        />
+        <v-list-item
+          v-else
+          prepend-icon="mdi-login"
+          subtitle="请登录以使用全部功能"
+          title="未登录"
+        />
       </v-list>
 
       <v-divider></v-divider>
 
       <v-list density="compact" nav>
         <v-list-item prepend-icon="mdi-home" title="主页" value="home" @click="goToHome"></v-list-item>
-        <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-image" title="学术检测" value="upload"
+        <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-image" title="统一学术检测" value="upload"
           @click="goToUpload"></v-list-item>
-        <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-history" title="检测历史" value="history"
+        <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-history" title="检测历史" value="history"
           @click="goToHistory"></v-list-item>
-        <v-list-item v-if="userStore.role === 'publisher'" prepend-icon="mdi-gavel" title="人工审核" value="annual"
+        <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-gavel" title="人工审核申请" value="annual"
           @click="gotoAnnual"></v-list-item>
-        <v-list-item v-if="userStore.role === 'reviewer'" prepend-icon="mdi-clipboard-check-multiple" title="人工审核"
+        <v-list-item v-if="effectiveRole === 'reviewer'" prepend-icon="mdi-clipboard-check-multiple" title="人工审核"
           value="review" @click="goToReview"></v-list-item>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-account" title="个人主页" value="profile"
+        <v-list-item v-if="isLoggedIn || isPreviewMode" prepend-icon="mdi-account" title="个人主页" value="profile"
           @click="goToProfile"></v-list-item>
-        <v-list-item v-else prepend-icon="mdi-login" title="登录" value="login" @click="goToLogin"></v-list-item>
+        <v-list-item v-if="!isLoggedIn && !isPreviewMode" prepend-icon="mdi-login" title="登录" value="login" @click="goToLogin"></v-list-item>
+        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-logout" title="退出登录" value="logout" @click="handleLogout"></v-list-item>
+        <v-list-item v-if="isPreviewMode" prepend-icon="mdi-exit-run" title="退出预览" value="exit-preview" @click="handleExitPreview"></v-list-item>
       </v-list>
     </v-navigation-drawer>
 
     <v-app-bar class="app-bar">
       <v-app-bar-nav-icon @click="drawer = !drawer" v-if="!isMobile"></v-app-bar-nav-icon>
       <v-toolbar-title>学术内容诚信检测系统</v-toolbar-title>
+      <v-chip v-if="isPreviewMode" class="ms-2 d-none d-sm-flex" size="small" color="warning" variant="flat">界面预览</v-chip>
       <v-spacer></v-spacer>
+      <v-btn v-if="isLoggedIn" variant="text" prepend-icon="mdi-logout" class="d-none d-sm-flex text-none" @click="handleLogout">退出</v-btn>
+      <v-btn v-if="isPreviewMode" variant="text" prepend-icon="mdi-exit-run" class="d-none d-sm-flex text-none" @click="handleExitPreview">退出预览</v-btn>
       <v-btn :icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'" @click="toggleTheme"></v-btn>
       <v-btn v-if="isLoggedIn" :color="hasUnreadNotifications ? 'red' : ''"
         :icon="hasUnreadNotifications ? 'mdi-bell-badge' : 'mdi-bell-outline'" @click="toggleNotification()"></v-btn>
     </v-app-bar>
+
+    <v-alert v-if="isPreviewMode" type="warning" variant="tonal" density="compact" class="preview-banner ma-0 rounded-0" prominent>
+      当前为<strong>界面预览</strong>（未登录）。导航与页面可盲改，接口调用需后端可用；正式使用请「退出预览」后登录。
+    </v-alert>
 
     <v-main>
       <v-container fluid>
@@ -51,29 +75,37 @@
         <v-icon>mdi-home</v-icon>
         <span>主页</span>
       </v-btn>
-      <v-btn v-if="userStore.role === 'publisher'" to="/upload" value="upload">
+      <v-btn v-if="effectiveRole === 'publisher'" to="/upload" value="upload">
         <v-icon>mdi-image</v-icon>
-        <span>学术检测</span>
+        <span>统一检测</span>
       </v-btn>
-      <v-btn v-if="userStore.role === 'publisher'" to="/history" value="history">
+      <v-btn v-if="effectiveRole === 'publisher'" to="/history" value="history">
         <v-icon>mdi-history</v-icon>
         <span>检测历史</span>
       </v-btn>
-      <v-btn v-if="userStore.role === 'publisher'" to="/annual" value="annual">
+      <v-btn v-if="effectiveRole === 'publisher'" to="/annual" value="annual">
         <v-icon>mdi-gavel</v-icon>
-        <span>人工审核</span>
+        <span>审核申请</span>
       </v-btn>
-      <v-btn v-if="userStore.role === 'reviewer'" to="/review" value="review">
+      <v-btn v-if="effectiveRole === 'reviewer'" to="/review" value="review">
         <v-icon>mdi-clipboard-check-multiple</v-icon>
         <span>人工审核</span>
       </v-btn>
-      <v-btn v-if="isLoggedIn" to="/profile" value="profile">
+      <v-btn v-if="isLoggedIn || isPreviewMode" to="/profile" value="profile">
         <v-icon>mdi-account</v-icon>
-        <span>个人主页</span>
+        <span>我的</span>
       </v-btn>
-      <v-btn v-else @click="goToLogin" value="login">
+      <v-btn v-if="!isLoggedIn && !isPreviewMode" @click="goToLogin" value="login">
         <v-icon>mdi-login</v-icon>
         <span>登录</span>
+      </v-btn>
+      <v-btn v-if="isLoggedIn" @click="handleLogout" value="logout">
+        <v-icon>mdi-logout</v-icon>
+        <span>退出</span>
+      </v-btn>
+      <v-btn v-if="isPreviewMode" @click="handleExitPreview" value="exit-preview">
+        <v-icon>mdi-exit-run</v-icon>
+        <span>退预览</span>
       </v-btn>
     </v-bottom-navigation>
 
@@ -168,6 +200,8 @@ import user from '@/api/user'
 import Snackbar from '@/components/Snackbar.vue'
 import { useUserStore } from '@/stores/user';
 const userStore = useUserStore();
+import { useEffectiveRole } from '@/composables/useEffectiveRole'
+const { effectiveRole, isPreviewMode, roleLabel, drawerSubtitle, previewStore } = useEffectiveRole()
 
 import { useSnackbarStore } from '@/stores/snackbar';
 import notification from './api/notification'
@@ -268,11 +302,11 @@ const markAsRead = async (item: Notification) => {
 
 
 const goToHome = () => {
-  if (userStore.role === 'publisher') {
+  if (effectiveRole.value === 'publisher') {
     router.push('/upload')
     return
   }
-  if (userStore.role === 'reviewer') {
+  if (effectiveRole.value === 'reviewer') {
     router.push('/review')
     return
   }
@@ -300,20 +334,26 @@ const goToLogin = () => {
 }
 
 const handleLogout = async () => {
+  const refresh = localStorage.getItem('2-refresh')
   try {
-    //localStorage.clear()
-    let refresh = localStorage.getItem("2-refresh")
-    const response = await user.logout({ refresh })
-    localStorage.removeItem("2-refresh")
-    localStorage.removeItem("2-token")
+    if (refresh) await user.logout({ refresh })
+  } catch {
+    // 后端不可用时仍清理本地登录态
+  } finally {
+    localStorage.removeItem('2-refresh')
+    localStorage.removeItem('2-token')
     isLoggedIn.value = false
-    localStorage.setItem("2-isLoggedIn", "false")
-    userStore.clearUserInfo() // 清除用户信息
-    snackbar.showMessage('退出成功', 'success')
+    localStorage.setItem('2-isLoggedIn', 'false')
+    userStore.clearUserInfo()
+    snackbar.showMessage('已退出登录', 'success')
     router.push('/login')
-  } catch (error: any) {
-    snackbar.showMessage('请联系管理员', 'error')
   }
+}
+
+const handleExitPreview = () => {
+  previewStore.disable()
+  snackbar.showMessage('已退出界面预览', 'success')
+  router.push('/login')
 }
 
 const toggleTheme = () => {
@@ -369,9 +409,8 @@ onMounted(async () => {
     theme.value = savedTheme
   }
 
-  // 如果已登录，获取用户信息
   if (isLoggedIn.value) {
-    await userStore.fetchUserInfo();
+    await userStore.fetchUserInfo()
     fetchUnRead()
     timer = window.setInterval(fetchUnRead, 60000)
   }

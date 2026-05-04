@@ -10,8 +10,8 @@
               <v-icon size="32" color="primary">mdi-magnify</v-icon>
             </div>
             <div class="feature-text">
-              <div class="text-subtitle-1 font-weight-medium">AI精准检测</div>
-              <div class="text-body-2 text-grey">面向图像、论文与评审等多类学术内容，结合深度学习与流程化审核，识别篡改与异常风险。</div>
+              <div class="text-subtitle-1 font-weight-medium">精准检测模式</div>
+              <div class="text-body-2 text-grey">学术检测策略之一（需求 FR-YHZS-0007：仅<strong>快速</strong>与<strong>精准</strong>两档，与登录角色「编辑/专家」无关）。面向图像、论文 PDF、Review 文本等多类对象，由对应适配链路执行模型分析。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -19,8 +19,8 @@
               <v-icon size="32" color="primary">mdi-compare</v-icon>
             </div>
             <div class="feature-text">
-              <div class="text-subtitle-1 font-weight-medium">秒级快速筛查</div>
-              <div class="text-body-2 text-grey">AI预检测可在数秒内完成初筛，大幅降低人工审核成本，提升出版社工作效率</div>
+              <div class="text-subtitle-1 font-weight-medium">快速检测模式</div>
+              <div class="text-body-2 text-grey">学术检测另一策略（FR-YHZS-0007），用于更快得到初筛结论；论文输入须为 PDF（FR-LWJC），Review 须为在线文本或 TXT（FR-PLJC）。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -174,6 +174,15 @@
             </template>
           </div>
         </v-form>
+
+        <v-divider class="my-8" />
+        <div class="text-subtitle-2 font-weight-medium mb-2">本地前端调试（无后端联调）</div>
+        <v-alert type="warning" variant="tonal" density="compact" class="mb-4 text-body-2">
+          使用上方 <strong>编辑 / 专家</strong> 切换后，点击下方可进入对应角色的界面预览（不调用登录接口）。数据与通知需登录后才会真实加载。
+        </v-alert>
+        <v-btn block color="secondary" variant="tonal" prepend-icon="mdi-eye-outline" @click="enterUiPreview">
+          进入界面预览
+        </v-btn>
       </div>
     </div>
 
@@ -335,12 +344,14 @@ const snackbar = useSnackbarStore();
 import user from '@/api/user'
 import { useUserStore } from '@/stores/user';
 const userStore = useUserStore();
+import { useUiPreviewStore } from '@/stores/uiPreview'
+const uiPreview = useUiPreviewStore()
 import VerificationCodeInput from '@/components/VerificationCodeInput.vue'
 
 const router = useRouter()
 const captchaRef = ref()
 const loginType = ref('login')
-const selectedRole = ref('reviewer')
+const selectedRole = ref<'publisher' | 'reviewer'>('publisher')
 const email = ref('')
 const password = ref('')
 const agreement = ref(false)
@@ -454,6 +465,14 @@ const validateCaptcha = () => {
   return true
 }
 
+const enterUiPreview = () => {
+  const role = selectedRole.value as 'publisher' | 'reviewer'
+  uiPreview.enable(role)
+  const label = role === 'publisher' ? '编辑' : '专家'
+  snackbar.showMessage(`已进入界面预览（${label}）`, 'success')
+  router.push(role === 'publisher' ? '/upload' : '/review')
+}
+
 const isFormValid = computed(() => {
   if (!agreement.value) return false
   if (!captchaInput.value) return false
@@ -488,7 +507,8 @@ const handleSubmit = async () => {
       email: email.value.trim().toLowerCase(),
       password: password.value,
       role: selectedRole.value
-    }).then(async res => {
+    }).then(async (res) => {
+      uiPreview.disable()
       localStorage.setItem("2-token", res.data.access)
       localStorage.setItem("2-refresh", res.data.refresh)
       localStorage.setItem("2-isLoggedIn", "true")
