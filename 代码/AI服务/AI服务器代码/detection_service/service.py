@@ -24,8 +24,8 @@ class DetectionService:
         self._reload_lock = threading.RLock()
         self._model_registry = model_registry or DetectionModelRegistry.load()
         self._task_handlers = build_task_handlers(self._model_registry)
-        self._implemented_tasks = {"image"}
-        self._reserved_tasks = {"paper", "review"}
+        self._implemented_tasks = {"image", "paper", "review"}
+        self._reserved_tasks = set()
         self._reload_count = 0
         self._last_reload_at: str | None = None
         self._last_reload_error: str | None = None
@@ -67,6 +67,9 @@ class DetectionService:
                 return self._task_handlers[request.task_type].detect(
                     request, context, extracted_inputs
                 ).to_dict()
+
+        if request.task_type in {"paper", "review"}:
+            extracted_inputs = self._extract_json_payload(request)
 
         return self._task_handlers[request.task_type].detect(request, context, extracted_inputs).to_dict()
 
@@ -135,6 +138,8 @@ class DetectionService:
 
         if task_type == "image" and not images_zip_base64:
             raise ValidationError("images_zip_base64 is required")
+        if task_type in {"paper", "review"} and not payload_base64:
+            raise ValidationError("payload_base64 is required")
 
         return DetectionRequest(
             schema_version=schema_version,
@@ -164,6 +169,29 @@ class DetectionService:
             profile = self._model_registry.resolve_image_profile(model_profile)
             return profile.model_version
         return f"{request.task_type}-detector-service-2026-04"
+
+    def _extract_json_payload(self, request: DetectionRequest) -> Dict[str, Any]:
+        try:
+            payload_bytes = base64.b64decode(request.payload_base64 or "")
+        except ValueError as exc:
+            raise ValidationError("payload_base64 is not valid base64") from exc
+
+        try:
+            payload = json.loads(payload_bytes.decode("utf-8"))
+        except UnicodeDecodeError as exc:
+            raise ValidationError("payload_base64 must decode to UTF-8 JSON") from exc
+        except json.JSONDecodeError as exc:
+            raise ValidationError("payload_base64 must contain JSON") from exc
+
+        if not isinstance(payload, dict):
+            raise ValidationError("payload_base64 JSON must be an object")
+
+        expected_schema = f"{request.task_type}-preprocess-v1"
+        if payload.get("schema_version") != expected_schema:
+            raise ValidationError(f"unsupported {request.task_type} preprocessing schema_version")
+        if not isinstance(payload.get("text"), str) or not payload.get("text", "").strip():
+            raise ValidationError(f"{request.task_type} payload text is required")
+        return payload
 
     def _refresh_registry_if_needed(self) -> bool:
         with self._reload_lock:

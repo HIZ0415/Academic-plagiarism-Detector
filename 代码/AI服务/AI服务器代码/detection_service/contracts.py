@@ -9,6 +9,7 @@ import numpy as np
 
 BACKEND_REQUEST_SCHEMA_VERSION = "backend-ai-request-v1"
 IMAGE_RESULT_SCHEMA_VERSION = "image-detection-v1"
+TEXT_RESULT_SCHEMA_VERSION = "text-detection-v1"
 STANDARD_EVIDENCE_SCHEMA_VERSION = "standard-evidence-v1"
 ERROR_RESPONSE_SCHEMA_VERSION = "ai-service-error-v1"
 
@@ -86,6 +87,33 @@ class DetectionRequest:
 
 
 @dataclass(slots=True)
+class StandardTextResult:
+    task_type: str
+    source_name: str
+    model_version: str
+    overall_is_fake: bool
+    overall_confidence: float
+    summary: str
+    text_length: int
+    evidences: list[DetectionEvidence]
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "schema_version": TEXT_RESULT_SCHEMA_VERSION,
+            "task_type": self.task_type,
+            "model_version": self.model_version,
+            "source_name": self.source_name,
+            "overall_is_fake": bool(self.overall_is_fake),
+            "overall_confidence": float(self.overall_confidence),
+            "summary": self.summary,
+            "text_length": int(self.text_length),
+            "details": _serialize_value(self.details),
+            "evidences": [evidence.to_dict() for evidence in self.evidences],
+        }
+
+
+@dataclass(slots=True)
 class StandardImageResult:
     image_name: str
     image_id: Optional[int]
@@ -123,7 +151,7 @@ class DetectionResponse:
     task_type: str
     model_version: str
     batch_id: Optional[str]
-    results: list[StandardImageResult]
+    results: list[StandardImageResult | StandardTextResult]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
