@@ -174,8 +174,6 @@ MEDIA_URL = '/media/'  # 图像文件的公开访问URL前缀
 MEDIA_ROOT = BASE_DIR / 'media'  # 存储图像文件的本地目录
 
 # Celery配置
-CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Redis作为任务队列
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'  # Redis作为结果存储
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     "priority_steps": list(range(10)),       # 0..9
     "sep": ":",
@@ -202,3 +200,8 @@ EMAIL_HOST_USER = '2406854677@qq.com'
 EMAIL_HOST_PASSWORD = 'wvuwcljhdsvfebcj'
 
 DEFAULT_FROM_EMAIL = '2406854677@qq.com'  # 发件人邮箱
+
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_BROKER_URL = 'memory://'
+CELERY_RESULT_BACKEND = 'cache+memory://'
