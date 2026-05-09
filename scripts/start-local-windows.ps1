@@ -5,9 +5,17 @@ param(
     [int]$AdminPort = 3001,
     [int]$BackendPort = 8000,
     [int]$AiPort = 8010,
-    [string]$AdminUser = 'localadmin',
-    [string]$AdminEmail = 'localadmin@example.com',
-    [string]$AdminPassword = 'Admin123456',
+    [string]$LocalOrganizationName = 'Local Demo Organization',
+    [string]$LocalOrganizationEmail = 'local-org@example.com',
+    [string]$AdminUser = 'admin',
+    [string]$AdminEmail = 'admin@mail.com',
+    [string]$AdminPassword = 'Admin123!',
+    [string]$PublisherUser = 'publisher_test',
+    [string]$PublisherEmail = 'publisher_test@example.com',
+    [string]$PublisherPassword = 'Publisher123!',
+    [string]$ReviewerUser = 'reviewer_test',
+    [string]$ReviewerEmail = 'reviewer_test@example.com',
+    [string]$ReviewerPassword = 'Reviewer123!',
     [switch]$ForceDependencyRefresh
 )
 
@@ -587,14 +595,19 @@ function Ensure-BackendDependencies {
 }
 
 function Ensure-LocalSettings {
-    param([string]$LocalSettingsPath)
+    param(
+        [string]$LocalSettingsPath,
+        [string]$BindHost,
+        [int]$AiPort
+    )
 
     if (Test-Path -LiteralPath $LocalSettingsPath) {
         return
     }
 
     Write-Step 'Creating local Django settings'
-    $content = @'
+    $aiServiceUrl = "http://$BindHost`:$AiPort"
+    $content = @"
 import os
 
 from .settings import *
@@ -619,10 +632,10 @@ CELERY_RESULT_BACKEND = "cache+memory://"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://127.0.0.1:8010")
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "$aiServiceUrl")
 AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT", "1200"))
 AI_SERVICE_API_TOKEN = os.getenv("AI_SERVICE_API_TOKEN", "")
-'@
+"@
     Set-Content -LiteralPath $LocalSettingsPath -Value $content -Encoding UTF8
 }
 
@@ -739,57 +752,107 @@ function Ensure-BackendDatabase {
     $env:AI_SERVICE_TIMEOUT = '1200'
     $env:AI_SERVICE_TIMEOUT_SECONDS = '120'
     Invoke-CommandChecked -Executable $BackendPython -Arguments @('manage.py', 'migrate', '--run-syncdb', '--noinput') -WorkingDirectory $BackendDir
+    Invoke-CommandChecked -Executable $BackendPython -Arguments @('manage.py', 'migrate_detection_task_v2') -WorkingDirectory $BackendDir
+    Invoke-CommandChecked -Executable $BackendPython -Arguments @('manage.py', 'backfill_detection_task_v2') -WorkingDirectory $BackendDir
 }
 
-function Ensure-LocalAdminUser {
+function ConvertTo-PythonJsonLiteral {
+    param([hashtable]$Value)
+
+    return ($Value | ConvertTo-Json -Compress)
+}
+
+function Ensure-LocalDemoAccounts {
     param(
         [string]$BackendPython,
         [string]$BackendDir,
+        [string]$OrganizationName,
+        [string]$OrganizationEmail,
         [string]$AdminUser,
         [string]$AdminEmail,
-        [string]$AdminPassword
+        [string]$AdminPassword,
+        [string]$PublisherUser,
+        [string]$PublisherEmail,
+        [string]$PublisherPassword,
+        [string]$ReviewerUser,
+        [string]$ReviewerEmail,
+        [string]$ReviewerPassword
     )
 
-    Write-Step 'Ensuring local admin account'
+    Write-Step 'Ensuring local demo accounts'
+    $payload = ConvertTo-PythonJsonLiteral -Value @{
+        organization_name  = $OrganizationName
+        organization_email = $OrganizationEmail
+        admin_user         = $AdminUser
+        admin_email        = $AdminEmail
+        admin_password     = $AdminPassword
+        publisher_user     = $PublisherUser
+        publisher_email    = $PublisherEmail
+        publisher_password = $PublisherPassword
+        reviewer_user      = $ReviewerUser
+        reviewer_email     = $ReviewerEmail
+        reviewer_password  = $ReviewerPassword
+    }
     $bootstrap = @"
+import json
 from django.contrib.auth import get_user_model
+from core.models import Organization, PublisherReviewerRelationship
 
+cfg = json.loads(r'''$payload''')
 User = get_user_model()
-username = '$AdminUser'
-email = '$AdminEmail'
-password = '$AdminPassword'
 
-user, created = User.objects.get_or_create(
-    username=username,
-    defaults={
-        'email': email,
-        'role': 'admin',
-        'is_staff': True,
-        'is_superuser': True,
-    },
+org = (
+    Organization.objects.filter(email=cfg['organization_email']).first()
+    or Organization.objects.filter(name=cfg['organization_name']).first()
+    or Organization()
 )
+org.name = cfg['organization_name']
+org.email = cfg['organization_email']
+org.save()
 
-if created:
+def ensure_user(username, email, password, role, *, staff=False, superuser=False):
+    user = User.objects.filter(username=username).first()
+    if user is None:
+        user = User(username=username)
+    user.email = email
+    user.role = role
+    user.organization = org
+    user.is_staff = staff
+    user.is_superuser = superuser
     user.set_password(password)
     user.save()
-else:
-    changed = False
-    if user.email != email:
-        user.email = email
-        changed = True
-    if getattr(user, 'role', '') != 'admin':
-        user.role = 'admin'
-        changed = True
-    if not user.is_staff:
-        user.is_staff = True
-        changed = True
-    if not user.is_superuser:
-        user.is_superuser = True
-        changed = True
-    user.set_password(password)
-    changed = True
-    if changed:
-        user.save()
+    return user
+
+admin = ensure_user(
+    cfg['admin_user'],
+    cfg['admin_email'],
+    cfg['admin_password'],
+    'admin',
+    staff=True,
+    superuser=True,
+)
+publisher = ensure_user(
+    cfg['publisher_user'],
+    cfg['publisher_email'],
+    cfg['publisher_password'],
+    'publisher',
+)
+reviewer = ensure_user(
+    cfg['reviewer_user'],
+    cfg['reviewer_email'],
+    cfg['reviewer_password'],
+    'reviewer',
+)
+
+if org.admin_user_id != admin.id:
+    org.admin_user = admin
+    org.save(update_fields=['admin_user'])
+
+PublisherReviewerRelationship.objects.update_or_create(
+    publisher=publisher,
+    reviewer=reviewer,
+    defaults={'is_active': True},
+)
 
 print('ready')
 "@
@@ -1015,13 +1078,26 @@ if ($env:Path -notlike "*$nodeBinDir*") {
     $env:Path = "$nodeBinDir;$env:Path"
 }
 
-Ensure-LocalSettings -LocalSettingsPath $LocalSettingsPath
+Ensure-LocalSettings -LocalSettingsPath $LocalSettingsPath -BindHost $BindHost -AiPort $AiPort
 Ensure-FrontendEnvFiles -UserEnvPath $UserEnvPath -AdminEnvPath $AdminEnvPath -BindHost $BindHost -BackendPort $BackendPort
 Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName 'user' -FrontendDir $UserFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
 Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName 'admin' -FrontendDir $AdminFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
 Ensure-AiModelArtifact -AiArtifactPath $AiArtifactPath -BackendPython $BackendPython -AiDir $AiDir
 Ensure-BackendDatabase -BackendPython $BackendPython -BackendDir $BackendDir -BindHost $BindHost -AiPort $AiPort
-Ensure-LocalAdminUser -BackendPython $BackendPython -BackendDir $BackendDir -AdminUser $AdminUser -AdminEmail $AdminEmail -AdminPassword $AdminPassword
+Ensure-LocalDemoAccounts `
+    -BackendPython $BackendPython `
+    -BackendDir $BackendDir `
+    -OrganizationName $LocalOrganizationName `
+    -OrganizationEmail $LocalOrganizationEmail `
+    -AdminUser $AdminUser `
+    -AdminEmail $AdminEmail `
+    -AdminPassword $AdminPassword `
+    -PublisherUser $PublisherUser `
+    -PublisherEmail $PublisherEmail `
+    -PublisherPassword $PublisherPassword `
+    -ReviewerUser $ReviewerUser `
+    -ReviewerEmail $ReviewerEmail `
+    -ReviewerPassword $ReviewerPassword
 
 Write-Step 'Starting local services'
 $env:PYTHONIOENCODING = 'utf-8'
@@ -1048,6 +1124,8 @@ Write-Host "  Django:         http://$BindHost`:$BackendPort/admin/"
 Write-Host "  AI service:     http://$BindHost`:$AiPort/health"
 Write-Host ''
 Write-Host "Node toolchain: $($NodeToolchain.Source) $($NodeToolchain.Version)"
-Write-Host "Local admin:    $AdminUser / $AdminPassword"
+Write-Host "Admin login:    $AdminEmail / $AdminPassword"
+Write-Host "Publisher:      $PublisherEmail / $PublisherPassword"
+Write-Host "Reviewer:       $ReviewerEmail / $ReviewerPassword"
 Write-Host "Logs:           $LogsDir"
 Write-Host "Stop with:      .\scripts\stop-local-windows.ps1"

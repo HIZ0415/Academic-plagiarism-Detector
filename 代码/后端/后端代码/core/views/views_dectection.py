@@ -748,7 +748,7 @@ def get_task_detail_unified(request, task_id):
             "paper_file_id": task.paper_file_id,
             "detail_endpoint": "paper/aigc/{taskId}/result" if payload["task_type"] == "paper_aigc"
             else ("paper/resource-check/{taskId}/result" if payload["task_type"] == "resource_check"
-                  else "review/tasks/{taskId}/status"),
+                  else "review/tasks/{taskId}/result"),
         }
     else:
         payload["result"] = {}
