@@ -308,22 +308,30 @@ from ..utils.report_generator import generate_detection_task_report
 def download_task_report(request, task_id):
     """
     GET /api/tasks/<task_id>/report/
-    下载检测报告 PDF
+    下载检测报告 PDF（支持所有任务类型：图像/论文/Review）
     """
     try:
         task = DetectionTask.objects.get(id=task_id, user=request.user)
-        # generate_detection_task_report(task)
     except DetectionTask.DoesNotExist:
         return Response({"detail": "Task not found."}, status=404)
 
     if task.status != "completed":
         return Response({"detail": "Task not completed yet."}, status=400)
 
-    if not task.report_file:
-        # generate_detection_task_report(task)
-        return Response({"detail": "Report is still being generated."}, status=202)
+    # 如果报告文件不存在或已丢失，自动重新生成（任务 019）
+    abs_path = None
+    if task.report_file:
+        abs_path = os.path.join(settings.MEDIA_ROOT, task.report_file.name)
 
-    abs_path = os.path.join(settings.MEDIA_ROOT, task.report_file.name)
+    if not abs_path or not os.path.exists(abs_path):
+        try:
+            from ..utils.report_generator import generate_unified_task_report
+            generate_unified_task_report(task)
+            task.refresh_from_db(fields=["report_file"])
+            abs_path = os.path.join(settings.MEDIA_ROOT, task.report_file.name)
+        except Exception as exc:
+            return Response({"detail": f"Report generation failed: {exc}"}, status=500)
+
     if not os.path.exists(abs_path):
         return Response({"detail": "Report file missing."}, status=410)
 

@@ -324,6 +324,260 @@ def generate_manual_review_report(review: ManualReview) -> str:
     review.save(update_fields=["report_file"])
     return rel_path
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  任务 019 – 统一报告生成（论文 / Review）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 安全字体选择：有 SimSun 就用，没有用 Helvetica
+def _font(bold=False):
+    try:
+        name = 'SimSun-Bold' if bold else 'SimSun'
+        pdfmetrics.getFont(name)
+        return name
+    except Exception:
+        return 'Helvetica-Bold' if bold else 'Helvetica'
+
+
+def _load_result_json(task, result_type=None):
+    """读取 Celery 落盘的检测结果 JSON。"""
+    media = Path(settings.MEDIA_ROOT)
+    if task.task_type in ('paper_aigc', 'resource_check'):
+        fname = f"{task.paper_file_id}_{result_type or task.task_type.split('_', 1)[-1]}_result.json"
+        if task.task_type == 'paper_aigc':
+            fname = f"{task.paper_file_id}_aigc_result.json"
+        else:
+            fname = f"{task.paper_file_id}_resource_result.json"
+        p = media / "paper_uploads" / fname
+    elif task.task_type == 'review_detection':
+        p = media / "review_uploads" / f"{task.paper_file_id}_detection_result.json"
+    else:
+        return None
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _risk_label(level):
+    return {"high": "高风险", "medium": "中风险", "low": "低风险"}.get(level, level or "未知")
+
+
+def generate_paper_aigc_report(task: DetectionTask) -> str:
+    """生成论文 AIGC 检测 PDF 报告。"""
+    result = _load_result_json(task)
+    rel_path = f"reports/task_{task.id}_paper_aigc_report.pdf"
+    abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+    c = canvas.Canvas(abs_path, pagesize=A4)
+    W, H = A4
+    MARGIN = 40
+
+    # 封面
+    y = H - 100
+    c.setFont(_font(bold=True), 28)
+    c.drawCentredString(W / 2, y, 'AIGC Detection Report')
+    y -= 60
+
+    c.setFont(_font(), 14)
+    info = [
+        f"Task ID: {task.id}",
+        f"Task Name: {task.task_name}",
+        f"User: {task.user.username}",
+        f"Created: {timezone.localtime(task.upload_time).strftime('%Y-%m-%d %H:%M')}",
+    ]
+    if task.completion_time:
+        info.append(f"Completed: {timezone.localtime(task.completion_time).strftime('%Y-%m-%d %H:%M')}")
+    for line in info:
+        c.drawString(MARGIN, y, line)
+        y -= 24
+
+    if result:
+        y -= 20
+        c.setFont(_font(bold=True), 16)
+        c.drawString(MARGIN, y, 'Overall')
+        y -= 28
+        c.setFont(_font(), 12)
+        ratio = result.get("ai_contribution_ratio", 0)
+        c.drawString(MARGIN, y, f"AI Contribution: {round(ratio * 100, 1)}%")
+        y -= 20
+        c.drawString(MARGIN, y, f"Risk Level: {_risk_label(result.get('overall_risk_level'))}")
+        y -= 20
+        summary = result.get("summary", "")
+        if summary:
+            y = _draw_multiline(c, MARGIN, y, summary, max_chars=70, font=_font(), size=11)
+        y -= 30
+
+        # 段落详情
+        paragraphs = result.get("paragraphs", [])
+        if paragraphs:
+            c.setFont(_font(bold=True), 14)
+            c.drawString(MARGIN, y, f'Paragraph Analysis ({len(paragraphs)} paragraphs)')
+            y -= 24
+            for p in paragraphs:
+                y = _check_and_create_new_page(c, y, H, MARGIN)
+                c.setFont(_font(), 10)
+                c.drawString(MARGIN + 10, y,
+                             f"P{p.get('index', '?')}: score={p.get('risk_score', 0):.3f} "
+                             f"[{_risk_label(p.get('risk_level'))}]")
+                y -= 16
+                excerpt = p.get("excerpt", "")[:120]
+                if excerpt:
+                    y = _draw_multiline(c, MARGIN + 20, y, excerpt, max_chars=65, font=_font(), size=9)
+                    y -= 8
+    else:
+        y -= 20
+        c.setFont(_font(), 12)
+        c.drawString(MARGIN, y, "No result data available.")
+
+    c.showPage()
+    c.save()
+    task.report_file = rel_path
+    task.save(update_fields=["report_file"])
+    return rel_path
+
+
+def generate_resource_check_report(task: DetectionTask) -> str:
+    """生成学术资源检测 PDF 报告。"""
+    result = _load_result_json(task)
+    rel_path = f"reports/task_{task.id}_resource_check_report.pdf"
+    abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+    c = canvas.Canvas(abs_path, pagesize=A4)
+    W, H = A4
+    MARGIN = 40
+
+    y = H - 100
+    c.setFont(_font(bold=True), 28)
+    c.drawCentredString(W / 2, y, 'Resource Check Report')
+    y -= 60
+
+    c.setFont(_font(), 14)
+    for line in [f"Task ID: {task.id}", f"Task Name: {task.task_name}",
+                 f"User: {task.user.username}"]:
+        c.drawString(MARGIN, y, line)
+        y -= 24
+
+    if result:
+        y -= 20
+        c.setFont(_font(bold=True), 16)
+        c.drawString(MARGIN, y, 'Summary')
+        y -= 28
+        c.setFont(_font(), 12)
+        c.drawString(MARGIN, y, f"References found: {result.get('total_references', 0)}")
+        y -= 20
+        c.drawString(MARGIN, y, f"DOI found: {result.get('doi_found_count', 0)}")
+        y -= 20
+        c.drawString(MARGIN, y, f"Suspected risks: {result.get('suspected_risk_count', 0)}")
+        y -= 30
+
+        issues = result.get("issues", [])
+        if issues:
+            c.setFont(_font(bold=True), 14)
+            c.drawString(MARGIN, y, f'Issues ({len(issues)})')
+            y -= 24
+            for iss in issues:
+                y = _check_and_create_new_page(c, y, H, MARGIN)
+                c.setFont(_font(), 10)
+                c.drawString(MARGIN + 10, y,
+                             f"Ref#{iss.get('reference_index')}: "
+                             f"{iss.get('issue_type', '')} [{iss.get('severity', '')}]")
+                y -= 16
+                detail = iss.get("detail", "")
+                if detail:
+                    y = _draw_multiline(c, MARGIN + 20, y, detail, max_chars=65, font=_font(), size=9)
+                    y -= 8
+
+    c.showPage()
+    c.save()
+    task.report_file = rel_path
+    task.save(update_fields=["report_file"])
+    return rel_path
+
+
+def generate_review_detection_report(task: DetectionTask) -> str:
+    """生成 Review 检测 PDF 报告。"""
+    result = _load_result_json(task)
+    rel_path = f"reports/task_{task.id}_review_detection_report.pdf"
+    abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+    c = canvas.Canvas(abs_path, pagesize=A4)
+    W, H = A4
+    MARGIN = 40
+
+    y = H - 100
+    c.setFont(_font(bold=True), 28)
+    c.drawCentredString(W / 2, y, 'Review Detection Report')
+    y -= 60
+
+    c.setFont(_font(), 14)
+    for line in [f"Task ID: {task.id}", f"Task Name: {task.task_name}",
+                 f"User: {task.user.username}"]:
+        c.drawString(MARGIN, y, line)
+        y -= 24
+
+    if result:
+        y -= 20
+        c.setFont(_font(bold=True), 16)
+        c.drawString(MARGIN, y, 'Overall')
+        y -= 28
+        c.setFont(_font(), 12)
+        ai_prob = result.get("overall_ai_probability", 0)
+        c.drawString(MARGIN, y, f"AI Probability: {round(ai_prob * 100, 1)}%")
+        y -= 20
+        c.drawString(MARGIN, y, f"Risk Level: {_risk_label(result.get('overall_risk_level'))}")
+        y -= 20
+        tpl = result.get("template_score", 0)
+        c.drawString(MARGIN, y, f"Template Score: {round(tpl * 100, 1)}%  "
+                                f"({'Template-like' if result.get('is_template_like') else 'Original'})")
+        y -= 20
+        summary = result.get("summary", "")
+        if summary:
+            y = _draw_multiline(c, MARGIN, y, summary, max_chars=70, font=_font(), size=11)
+        y -= 30
+
+        sentences = result.get("sentences", [])
+        if sentences:
+            c.setFont(_font(bold=True), 14)
+            c.drawString(MARGIN, y, f'Sentence Analysis ({len(sentences)} sentences)')
+            y -= 24
+            for s in sentences:
+                y = _check_and_create_new_page(c, y, H, MARGIN)
+                c.setFont(_font(), 10)
+                c.drawString(MARGIN + 10, y,
+                             f"S{s.get('index', '?')}: prob={s.get('ai_probability', 0):.3f} "
+                             f"[{_risk_label(s.get('risk_level'))}]")
+                y -= 16
+                text = s.get("text", "")[:120]
+                if text:
+                    y = _draw_multiline(c, MARGIN + 20, y, text, max_chars=65, font=_font(), size=9)
+                    y -= 8
+
+    c.showPage()
+    c.save()
+    task.report_file = rel_path
+    task.save(update_fields=["report_file"])
+    return rel_path
+
+
+def generate_unified_task_report(task: DetectionTask) -> str:
+    """根据 task_type 分发到对应的报告生成器。"""
+    dispatch = {
+        'image_detection': generate_detection_task_report,
+        'paper_aigc': generate_paper_aigc_report,
+        'resource_check': generate_resource_check_report,
+        'review_detection': generate_review_detection_report,
+    }
+    generator = dispatch.get(task.task_type)
+    if generator is None:
+        raise ValueError(f"Unknown task_type: {task.task_type}")
+    return generator(task)
+
+
 # # utils/report_generator.py
 # import os, textwrap, json
 # from datetime import datetime

@@ -77,11 +77,32 @@ def _risk_level(score):
 
 
 def _complete_task(task: DetectionTask):
-    """公共收尾：标记完成 + 系统通知。"""
+    """公共收尾：标记完成 + 生成报告 + 记录日志 + 系统通知。"""
     task.status = "completed"
     task.completion_time = timezone.now()
     task.error_message = ""
     task.save(update_fields=["status", "completion_time", "error_message"])
+
+    # 任务 023 – 状态变更日志
+    Log.objects.create(
+        user=task.user,
+        operation_type="status_change",
+        related_model="DetectionTask",
+        related_id=task.id,
+    )
+
+    # 任务 019 – 自动生成报告
+    try:
+        from core.utils.report_generator import generate_unified_task_report
+        generate_unified_task_report(task)
+        Log.objects.create(
+            user=task.user,
+            operation_type="report_generation",
+            related_model="DetectionTask",
+            related_id=task.id,
+        )
+    except Exception as exc:
+        logger.warning("报告生成失败 (task %s): %s", task.id, exc)
 
     # 发系统通知
     try:
@@ -108,6 +129,16 @@ def _fail_task(task: DetectionTask, message: str):
     task.status = "failed"
     task.error_message = message
     task.save(update_fields=["status", "error_message"])
+    # 任务 023 – 失败状态日志
+    try:
+        Log.objects.create(
+            user=task.user,
+            operation_type="status_change",
+            related_model="DetectionTask",
+            related_id=task.id,
+        )
+    except Exception:
+        pass
     logger.error("Task %s failed: %s", task.id, message)
 
 
