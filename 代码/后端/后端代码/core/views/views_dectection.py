@@ -759,7 +759,7 @@ def get_task_detail_unified(request, task_id):
         }
         payload["result"] = {
             "paper_file_id": task.paper_file_id,
-            "detail_endpoint": detail_map.get(payload["task_type"], ""),
+            "detail_endpoint": detail_map[payload["task_type"]],
         }
     else:
         payload["result"] = {}

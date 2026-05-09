@@ -8,6 +8,8 @@ from .contracts import (
     ErrorResponse,
     ImageInput,
     StandardImageResult,
+    StandardTextResult,
+    TEXT_RESULT_SCHEMA_VERSION,
 )
 from .model_registry import DetectionModelRegistry
 from .service import DetectionService
@@ -25,6 +27,8 @@ __all__ = [
     "DetectionService",
     "ImageInput",
     "StandardImageResult",
+    "StandardTextResult",
+    "TEXT_RESULT_SCHEMA_VERSION",
     "TaskNotImplementedError",
     "ValidationError",
 ]

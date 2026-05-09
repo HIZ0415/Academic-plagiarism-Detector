@@ -1,5 +1,11 @@
 import http from './request'
 import * as workflowMock from '@workflow-mock'
+import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
+import publisher from '@/api/publisher'
+
+function reviewerSideDataMock(): boolean {
+  return workflowMock.workflowMockEnabled() || mockAigcFeaturesEnabled()
+}
 
 export default {
   submitReview(manual_review_id: number, data: any) {
@@ -33,19 +39,48 @@ export default {
   },
 
   getMaskImage(data: any) {
+    if (reviewerSideDataMock()) {
+      return publisher.getSingleImageResult(String(data.img_id ?? 9001))
+    }
     return http.get(`/results_image/${data.img_id}/`)
   },
 
   getTaskCount() {
+    if (reviewerSideDataMock()) {
+      return Promise.resolve({
+        data: {
+          total_received_tasks: 5,
+          total_completed_tasks: 3,
+        },
+      })
+    }
     return http.get('/reviewer/tasks/')
   },
 
   getRecentActivities() {
+    if (reviewerSideDataMock()) {
+      return Promise.resolve({
+        data: [
+          {
+            task_name: 'Mock 人工复核任务',
+            completion_time: '2026-05-09 11:00:00',
+            status: 'completed',
+          },
+        ],
+      })
+    }
     return http.get('/reviewer/activity_logs/')
   },
 
   getDetectionResult(data: any) {
-    return http.get(`tasks_image/${data.img_id}/report/`)
-  }
+    if (reviewerSideDataMock()) {
+      return mockBlobReport(`image_${data.img_id}_report.pdf`)
+    }
+    return http.get(`tasks_image/${data.img_id}/report/`, { responseType: 'blob' })
+  },
+}
 
+function mockBlobReport(name: string) {
+  const blob = new Blob([`Mock 报告 ${name}`], { type: 'application/pdf' })
+  return Promise.resolve({ data: blob, headers: {} } as any)
 }

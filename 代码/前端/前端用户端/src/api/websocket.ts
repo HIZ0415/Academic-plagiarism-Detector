@@ -1,6 +1,5 @@
 import { useMessageStore } from "@/stores/message"
-
-const url = 'ws://122.9.45.122:80/ws/notifications/'
+import { buildNotificationsWebSocketUrl } from '@shared/notificationsWsUrl'
 
 let ws: WebSocket | null = null
 let reconnectTimer: number | null = null
@@ -14,13 +13,27 @@ interface WebSocketMessage {
 
 const websocket = {
   Init(): void {
+    if (import.meta.env.VITE_USE_FULL_FRONTEND_MOCK === 'true') {
+      return
+    }
     if (!('WebSocket' in window)) {
       console.log('您的浏览器不支持websocket', 'error')
       return
     }
 
+    shouldReconnect = true
+    if (ws) {
+      try {
+        ws.close()
+      } catch {
+        /* ignore */
+      }
+      ws = null
+    }
+
     const token = localStorage.getItem('2-token')
-    ws = new WebSocket(url + `?token=${token}`)
+    const url = buildNotificationsWebSocketUrl(token)
+    ws = new WebSocket(url)
 
     ws.onopen = () => {
       console.log('✅ WebSocket 连接成功')
@@ -87,9 +100,11 @@ function reconnect(): void {
 
 
 // 刷新重连（不在登录页时）
-const entries = performance.getEntriesByType('navigation')
-if (entries.length > 0 && (entries[0] as PerformanceNavigationTiming).type === 'reload' && window.location.pathname !== '/login') {
-  websocket.Init()
+if (import.meta.env.VITE_USE_FULL_FRONTEND_MOCK !== 'true') {
+  const entries = performance.getEntriesByType('navigation')
+  if (entries.length > 0 && (entries[0] as PerformanceNavigationTiming).type === 'reload' && window.location.pathname !== '/login') {
+    websocket.Init()
+  }
 }
 
 export default websocket

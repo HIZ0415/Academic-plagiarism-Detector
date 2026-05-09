@@ -36,6 +36,14 @@ pip-wheel-metadata/
 .coverage.*
 htmlcov/
 coverage.xml
+.codex-test-tmp/
+.codex-smoke-media/
+.local-test-tmp/
+.tmp-tests/
+**/.codex-test-tmp/
+**/.codex-smoke-media/
+**/.local-test-tmp/
+**/.tmp-tests/
 
 # Django / backend runtime files
 db.sqlite3

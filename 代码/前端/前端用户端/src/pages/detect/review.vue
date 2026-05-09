@@ -26,6 +26,81 @@
         已从检测历史关联任务 <code>{{ linkedTaskId }}</code> 跳转；可在下方重新提交或前往历史查看原任务状态。
       </v-alert>
 
+      <v-card v-if="linkedTaskId" variant="outlined" class="pa-4 mb-5">
+        <div class="d-flex flex-wrap align-center justify-space-between ga-3 mb-3">
+          <div>
+            <div class="text-h6">Review 检测结果</div>
+            <div class="text-caption text-medium-emphasis">任务 {{ linkedTaskId }}</div>
+          </div>
+          <div class="d-flex align-center ga-2">
+            <v-chip size="small" :color="statusColor" variant="tonal">{{ linkedStatusLabel }}</v-chip>
+            <v-btn
+              size="small"
+              variant="tonal"
+              color="primary"
+              class="text-none"
+              :loading="loadingLinkedResult"
+              @click="loadLinkedResult"
+            >
+              刷新
+            </v-btn>
+          </div>
+        </div>
+
+        <v-alert v-if="linkedResultError" type="error" variant="tonal" density="compact" class="mb-3">
+          {{ linkedResultError }}
+        </v-alert>
+
+        <v-progress-linear
+          v-if="linkedStatus && linkedStatus.status !== 'completed'"
+          :model-value="linkedStatus.progress || 0"
+          color="primary"
+          height="8"
+          rounded
+          class="mb-3"
+        />
+
+        <template v-if="linkedResult">
+          <v-row>
+            <v-col cols="12" md="4">
+              <div class="text-caption text-medium-emphasis">整体风险</div>
+              <div class="text-body-1 font-weight-medium">{{ riskLabel(linkedResult.overall_risk_level) }}</div>
+            </v-col>
+            <v-col cols="12" md="4">
+              <div class="text-caption text-medium-emphasis">AI 倾向</div>
+              <div class="text-body-1 font-weight-medium">{{ scorePercent(linkedResult.ai_tendency?.score) }}</div>
+            </v-col>
+            <v-col cols="12" md="4">
+              <div class="text-caption text-medium-emphasis">模板化倾向</div>
+              <div class="text-body-1 font-weight-medium">{{ scorePercent(linkedResult.template_tendency?.score) }}</div>
+            </v-col>
+          </v-row>
+
+          <v-alert type="info" variant="tonal" density="compact" class="my-3">
+            {{ linkedResult.summary || 'Review 检测已完成。' }}
+          </v-alert>
+
+          <v-table v-if="linkedResult.suspicious_segments?.length" density="compact">
+            <thead>
+              <tr>
+                <th>片段</th>
+                <th>风险</th>
+                <th>类型</th>
+                <th>摘录</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="segment in linkedResult.suspicious_segments" :key="segment.segment_index">
+                <td>{{ segment.segment_index }}</td>
+                <td>{{ scorePercent(segment.risk_score) }}</td>
+                <td>{{ issueTypeLabel(segment.issue_type) }}</td>
+                <td>{{ segment.excerpt }}</td>
+              </tr>
+            </tbody>
+          </v-table>
+        </template>
+      </v-card>
+
       <v-row>
         <v-col cols="12" md="7">
           <v-card variant="outlined" class="pa-4">
@@ -100,15 +175,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { submitReviewDetection } from '@/api/reviewDetection'
+import {
+  getReviewDetectionResult,
+  getReviewDetectionStatus,
+  submitReviewDetection,
+  type ReviewDetectionResult,
+  type ReviewDetectionStatus,
+} from '@/api/reviewDetection'
 import { useSnackbarStore } from '@/stores/snackbar'
+import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 
 const route = useRoute()
 const router = useRouter()
 const snackbar = useSnackbarStore()
-const useMock = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
+const useMock = mockAigcFeaturesEnabled()
 
 const linkedTaskId = computed(() => {
   const q = route.query.task_id
@@ -122,6 +204,10 @@ const taskName = ref('review-task')
 const submitting = ref(false)
 const formError = ref('')
 const lastResponse = ref<Record<string, unknown> | null>(null)
+const loadingLinkedResult = ref(false)
+const linkedStatus = ref<ReviewDetectionStatus | null>(null)
+const linkedResult = ref<ReviewDetectionResult | null>(null)
+const linkedResultError = ref('')
 
 const singleFile = computed((): File | null => {
   const f = reviewFile.value
@@ -150,6 +236,67 @@ const taskIdFromResponse = computed(() => {
   return id != null ? String(id) : ''
 })
 
+const linkedStatusLabel = computed(() => {
+  const status = linkedStatus.value?.status
+  if (status === 'completed') return '已完成'
+  if (status === 'in_progress') return '检测中'
+  if (status === 'failed') return '失败'
+  return '待检测'
+})
+
+const statusColor = computed(() => {
+  const status = linkedStatus.value?.status
+  if (status === 'completed') return 'success'
+  if (status === 'failed') return 'error'
+  if (status === 'in_progress') return 'warning'
+  return 'grey'
+})
+
+function scorePercent(value?: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '—'
+  return `${Math.round(value * 1000) / 10}%`
+}
+
+function riskLabel(value?: string) {
+  if (value === 'high') return '高'
+  if (value === 'medium') return '中'
+  if (value === 'low') return '低'
+  return '—'
+}
+
+function issueTypeLabel(value?: string) {
+  if (value === 'template_tendency') return '模板化'
+  if (value === 'ai_tendency') return 'AI 倾向'
+  return value || '—'
+}
+
+async function loadLinkedResult() {
+  const taskId = linkedTaskId.value
+  if (!taskId) return
+
+  loadingLinkedResult.value = true
+  linkedResultError.value = ''
+  try {
+    const statusRes = await getReviewDetectionStatus(taskId)
+    linkedStatus.value = statusRes.data
+
+    if (statusRes.data.status !== 'completed') {
+      linkedResult.value = null
+      linkedResultError.value = statusRes.data.error_message || ''
+      return
+    }
+
+    const resultRes = await getReviewDetectionResult(taskId)
+    linkedResult.value = resultRes.data
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { detail?: string; message?: string } }; message?: string }
+    linkedResult.value = null
+    linkedResultError.value = err?.response?.data?.detail || err?.response?.data?.message || err?.message || '获取 Review 检测结果失败'
+  } finally {
+    loadingLinkedResult.value = false
+  }
+}
+
 function reset() {
   reviewText.value = ''
   reviewFile.value = null
@@ -157,6 +304,17 @@ function reset() {
   lastResponse.value = null
   taskName.value = 'review-task'
 }
+
+watch(
+  linkedTaskId,
+  () => {
+    linkedStatus.value = null
+    linkedResult.value = null
+    linkedResultError.value = ''
+    loadLinkedResult()
+  },
+  { immediate: true },
+)
 
 function goHistory() {
   const id = taskIdFromResponse.value
@@ -217,8 +375,8 @@ async function submit() {
     lastResponse.value = res.data as Record<string, unknown>
     snackbar.showMessage('Review 检测任务已提交', 'success')
   } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } }; message?: string }
-    formError.value = err?.response?.data?.message || err?.message || '提交失败'
+    const err = e as { response?: { data?: { detail?: string; message?: string } }; message?: string }
+    formError.value = err?.response?.data?.detail || err?.response?.data?.message || err?.message || '提交失败'
     snackbar.showMessage(formError.value, 'error')
   } finally {
     submitting.value = false
