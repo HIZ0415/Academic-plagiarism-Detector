@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$BindHost = '127.0.0.1',
     [int]$UserPort = 3000,
@@ -540,6 +540,51 @@ function Invoke-NpmCommandChecked {
     Invoke-CommandChecked -Executable $NodeToolchain.NpmCommand -Arguments $Arguments -WorkingDirectory $WorkingDirectory
 }
 
+function Invoke-NpmInstallWithRetry {
+    param(
+        [hashtable]$NodeToolchain,
+        [string]$WorkingDirectory
+    )
+
+    $installArgs = @('install', '--no-fund', '--no-audit')
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCAL_NPM_REGISTRY)) {
+        $installArgs += @(
+            "--registry=$env:LOCAL_NPM_REGISTRY",
+            '--replace-registry-host=always'
+        )
+    }
+    $originalRegistry = $env:npm_config_registry
+    try {
+        Invoke-NpmCommandChecked -NodeToolchain $NodeToolchain -Arguments $installArgs -WorkingDirectory $WorkingDirectory
+        return
+    }
+    catch {
+        Write-Warning "npm install failed: $($_.Exception.Message)"
+    }
+
+    $retryRegistry = if ([string]::IsNullOrWhiteSpace($env:LOCAL_NPM_REGISTRY)) { 'https://registry.npmjs.org/' } else { $env:LOCAL_NPM_REGISTRY }
+    Write-Warning "Retrying npm install with cache preference disabled and registry $retryRegistry."
+    try {
+        $env:npm_config_registry = $retryRegistry
+        Invoke-NpmCommandChecked -NodeToolchain $NodeToolchain -Arguments @(
+            'install',
+            '--no-fund',
+            '--no-audit',
+            '--prefer-online',
+            '--replace-registry-host=always',
+            "--registry=$retryRegistry"
+        ) -WorkingDirectory $WorkingDirectory
+    }
+    finally {
+        if ($null -eq $originalRegistry) {
+            Remove-Item Env:\npm_config_registry -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:npm_config_registry = $originalRegistry
+        }
+    }
+}
+
 function Ensure-BackendVenv {
     param(
         [string]$BootstrapPythonPath,
@@ -717,10 +762,19 @@ function Ensure-FrontendDependencies {
     }
 
     Write-Step "Installing $FrontendName frontend dependencies"
-    if (Test-Path -LiteralPath $nodeModulesPath) {
-        Remove-Item -LiteralPath $nodeModulesPath -Recurse -Force
+    if ($ForceRefresh -and (Test-Path -LiteralPath $nodeModulesPath)) {
+        try {
+            Remove-Item -LiteralPath $nodeModulesPath -Recurse -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Warning "Unable to remove existing node_modules for ${FrontendName}: $($_.Exception.Message)"
+            Write-Warning 'Continuing with npm install; npm will repair or replace packages where possible.'
+        }
     }
-    Invoke-NpmCommandChecked -NodeToolchain $NodeToolchain -Arguments @('install', '--no-fund', '--no-audit') -WorkingDirectory $FrontendDir
+    Invoke-NpmInstallWithRetry -NodeToolchain $NodeToolchain -WorkingDirectory $FrontendDir
+    if (-not (Test-Path -LiteralPath $viteBinary) -or -not (Test-Path -LiteralPath $viteCliPath)) {
+        throw "Frontend dependency install for $FrontendName finished, but Vite is still missing. Run this script again with -ForceDependencyRefresh after checking npm access."
+    }
     Set-Content -LiteralPath $stampPath -Value $lockHash -Encoding UTF8
 }
 

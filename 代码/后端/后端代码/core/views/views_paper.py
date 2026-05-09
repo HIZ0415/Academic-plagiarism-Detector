@@ -11,6 +11,8 @@
   * 新增 get_review_detection_result 接口
 """
 import json
+import hashlib
+import re
 import uuid
 from pathlib import Path
 
@@ -680,12 +682,12 @@ def get_aigc_result(request, task_id):
     if error_resp is not None:
         return error_resp
 
-    meta = _load_paper_meta(paper_file_id)
+    meta = _load_paper_meta(file_id)
     ai_result = _read_media_json((meta or {}).get("ai_result_path", ""))
-    if ai_result is not None:
-        return Response(_build_aigc_result_from_ai(task, ai_result))
+    if ai_result is None:
+        return Response({"detail": "检测结果文件尚未生成，请稍后重试。"}, status=202)
 
-    return Response(_build_aigc_result(task, paper_text, _load_paper_paragraphs(paper_file_id)))
+    return Response(_build_aigc_result_from_ai(task, ai_result))
 
 
 @api_view(["GET"])
@@ -700,7 +702,8 @@ def get_resource_check_result(request, task_id):
     if error_resp is not None:
         return error_resp
 
-    result = _load_json(_paper_result_path(file_id, "resource"))
+    meta = _load_paper_meta(file_id)
+    result = _read_media_json((meta or {}).get("ai_result_path", ""))
     if result is None:
         return Response({"detail": "检测结果文件尚未生成，请稍后重试。"}, status=202)
 

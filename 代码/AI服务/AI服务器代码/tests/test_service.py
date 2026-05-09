@@ -5,7 +5,6 @@ import io
 import json
 import os
 import sys
-import tempfile
 import time
 import zipfile
 from pathlib import Path
@@ -19,6 +18,10 @@ if str(ROOT) not in sys.path:
 
 from detection_service import DetectionModelRegistry, DetectionService, ValidationError
 from detection_service.contracts import DetectionResponse, StandardImageResult
+from tests.temp_utils import LocalTemporaryDirectory, TEST_TEMP_ROOT
+
+
+os.environ.setdefault("AI_SERVICE_TEMP_ROOT", str(TEST_TEMP_ROOT / "image_batches"))
 
 
 class DetectionServiceTest(unittest.TestCase):
@@ -198,7 +201,7 @@ class DetectionServiceTest(unittest.TestCase):
         )
 
     def test_registry_is_hot_reloaded_when_config_changes(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with LocalTemporaryDirectory("registry_reload") as temp_dir:
             config_path = Path(temp_dir) / "model_registry.json"
             self._write_registry_config(
                 config_path,
@@ -250,7 +253,7 @@ class DetectionServiceTest(unittest.TestCase):
             self.assertIsNone(reloaded["registry_reload"]["last_reload_error"])
 
     def test_invalid_hot_reload_keeps_previous_registry(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with LocalTemporaryDirectory("registry_invalid") as temp_dir:
             config_path = Path(temp_dir) / "model_registry.json"
             self._write_registry_config(
                 config_path,

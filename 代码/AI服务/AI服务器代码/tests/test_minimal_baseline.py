@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-import tempfile
 from pathlib import Path
 import unittest
 
@@ -15,6 +14,7 @@ from detection_service.minimal_baseline import (
     generate_procedural_seed_images,
     train_and_evaluate_minimal_baseline,
 )
+from tests.temp_utils import LocalTemporaryDirectory
 
 
 class MinimalBaselineTest(unittest.TestCase):
@@ -24,7 +24,7 @@ class MinimalBaselineTest(unittest.TestCase):
         self.assertEqual(features.shape, (12,))
 
     def test_minimal_baseline_can_train_and_evaluate(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with LocalTemporaryDirectory("minimal_baseline") as temp_dir:
             temp_root = Path(temp_dir)
             result = train_and_evaluate_minimal_baseline(
                 seed_dir=temp_root / "missing_seed_dir",
