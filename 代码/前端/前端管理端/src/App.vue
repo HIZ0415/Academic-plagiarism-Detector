@@ -14,56 +14,41 @@
       <v-divider></v-divider>
 
       <v-list density="compact" nav class="admin-nav-list">
-        <v-list-subheader class="text-caption font-weight-bold text-medium-emphasis">工作台</v-list-subheader>
         <v-list-item
           prepend-icon="mdi-view-dashboard-outline"
           title="工作台"
-          subtitle="总览、快捷入口与数据看板"
-          lines="two"
           value="home"
           @click="goToHome"
         />
 
-        <v-list-subheader v-if="isLoggedIn" class="text-caption font-weight-bold text-medium-emphasis">检测与资源</v-list-subheader>
         <v-list-item
           v-if="isLoggedIn"
           prepend-icon="mdi-clipboard-text-outline"
           title="检测与资源"
-          subtitle="任务监控与资源文件（页内可切换）"
-          lines="two"
           value="tasks"
           @click="goToTasks"
         />
 
-        <v-list-subheader v-if="isLoggedIn" class="text-caption font-weight-bold text-medium-emphasis">用户与组织</v-list-subheader>
         <v-list-item
           v-if="isLoggedIn"
           prepend-icon="mdi-account-group-outline"
           title="用户与组织"
-          subtitle="账号与平台或本组织档案（标签切换）"
-          lines="two"
           value="members"
           @click="goToMembers"
         />
 
-        <v-list-subheader v-if="isLoggedIn && userStore.admin_type === 'organization_admin'" class="text-caption font-weight-bold text-medium-emphasis">协作审核</v-list-subheader>
         <v-list-item
           v-if="isLoggedIn && userStore.admin_type === 'organization_admin'"
           prepend-icon="mdi-gavel"
           title="人工审核申请"
-          subtitle="审批用户端申请，通过后进入专家池"
-          lines="two"
           value="reviewRequests"
           @click="goToReviews"
         />
 
-        <v-list-subheader v-if="isLoggedIn" class="text-caption font-weight-bold text-medium-emphasis">审计</v-list-subheader>
         <v-list-item
           v-if="isLoggedIn"
           prepend-icon="mdi-clipboard-text-clock"
           title="操作与审计日志"
-          subtitle="关键操作留痕、检索与导出"
-          lines="two"
           value="logs"
           @click="goToLogs"
         />
@@ -76,11 +61,8 @@
 
     <v-app-bar class="app-bar">
       <v-app-bar-nav-icon @click="drawer = !drawer" v-if="!isMobile"></v-app-bar-nav-icon>
-      <v-toolbar-title class="d-flex flex-column align-start justify-center py-1" style="max-width: min(100%, 520px)">
-        <span class="text-h6 font-weight-bold text-truncate w-100">学术内容诚信 · 管理后台</span>
-        <span class="text-caption text-medium-emphasis font-weight-regular d-none d-md-block text-wrap">
-          工作台 · 检测与资源 · 用户与组织 · 协作审核 · 审计
-        </span>
+      <v-toolbar-title class="d-flex align-center py-1 text-h6 font-weight-bold text-truncate" style="max-width: min(100%, 520px)">
+        学术内容诚信 · 管理后台
       </v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn :icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'" @click="toggleTheme"></v-btn>
@@ -128,7 +110,6 @@
             v-if="isLoggedIn"
             prepend-icon="mdi-folder-cog-outline"
             title="资源与文件"
-            subtitle="与检测任务同模块"
             @click="navigate('/files')"
           />
           <v-list-item
@@ -420,9 +401,4 @@ onMounted(async () => {
   background-color: rgb(var(--v-theme-surface));
 }
 
-.admin-nav-list :deep(.v-list-item-subtitle) {
-  white-space: normal;
-  line-height: 1.35;
-  opacity: 0.85;
-}
 </style>

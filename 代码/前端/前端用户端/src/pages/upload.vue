@@ -159,6 +159,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import paperApi from '@/api/paper'
 import { submitReviewDetection } from '@/api/reviewDetection'
+import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 
 type DetectMode = 'fast' | 'accurate'
 type ResourceType = 'image' | 'paper' | 'review' | 'unknown'
@@ -190,7 +191,7 @@ type LocalTaskRecord = {
   batch_session_id?: string
 }
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
+const USE_MOCK = mockAigcFeaturesEnabled()
 const route = useRoute()
 const router = useRouter()
 const snackbar = useSnackbarStore()

@@ -235,11 +235,12 @@ import { useRouter, useRoute } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import publisher from '@/api/publisher'
 import { getManualReviewApplicationByDetectionTask } from '@/api/manualReviewWorkflow'
+import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 
 const router = useRouter()
 const route = useRoute()
 const snackbar = useSnackbarStore()
-const useMockAigc = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
+const useMockAigc = mockAigcFeaturesEnabled()
 
 // 分页相关
 const pageSize = ref(10)

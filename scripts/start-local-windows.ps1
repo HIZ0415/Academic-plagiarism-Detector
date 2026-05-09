@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$BindHost = '127.0.0.1',
     [int]$UserPort = 3000,
@@ -16,7 +16,8 @@ param(
     [string]$ReviewerUser = 'reviewer_test',
     [string]$ReviewerEmail = 'reviewer_test@example.com',
     [string]$ReviewerPassword = 'Reviewer123!',
-    [switch]$ForceDependencyRefresh
+    [switch]$ForceDependencyRefresh,
+    [switch]$FullFrontendMock
 )
 
 Set-StrictMode -Version Latest
@@ -1080,6 +1081,11 @@ if ($env:Path -notlike "*$nodeBinDir*") {
 
 Ensure-LocalSettings -LocalSettingsPath $LocalSettingsPath -BindHost $BindHost -AiPort $AiPort
 Ensure-FrontendEnvFiles -UserEnvPath $UserEnvPath -AdminEnvPath $AdminEnvPath -BindHost $BindHost -BackendPort $BackendPort
+if ($FullFrontendMock) {
+    Write-Step 'User frontend: enabling VITE_USE_FULL_FRONTEND_MOCK'
+    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_USE_FULL_FRONTEND_MOCK' -Value 'true'
+    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_API_URL' -Value ''
+}
 Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName 'user' -FrontendDir $UserFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
 Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName 'admin' -FrontendDir $AdminFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
 Ensure-AiModelArtifact -AiArtifactPath $AiArtifactPath -BackendPython $BackendPython -AiDir $AiDir
@@ -1117,7 +1123,7 @@ $state = @($aiProcess, $backendProcess, $userProcess, $adminProcess)
 $state | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding UTF8
 
 Write-Host ''
-Write-Host 'Local validation environment is ready:' -ForegroundColor Green
+Write-Host "Local validation environment is ready:" -ForegroundColor Green
 Write-Host "  User frontend:  http://$BindHost`:$UserPort"
 Write-Host "  Admin frontend: http://$BindHost`:$AdminPort"
 Write-Host "  Django:         http://$BindHost`:$BackendPort/admin/"
@@ -1129,3 +1135,7 @@ Write-Host "Publisher:      $PublisherEmail / $PublisherPassword"
 Write-Host "Reviewer:       $ReviewerEmail / $ReviewerPassword"
 Write-Host "Logs:           $LogsDir"
 Write-Host "Stop with:      .\scripts\stop-local-windows.ps1"
+if ($FullFrontendMock) {
+    Write-Host ''
+    Write-Host "User client is in full frontend mock mode. Login without Django. Notifications use HTTP polling." -ForegroundColor Yellow
+}

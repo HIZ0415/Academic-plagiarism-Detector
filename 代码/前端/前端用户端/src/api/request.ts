@@ -1,5 +1,6 @@
 //引入axios
 import axios from 'axios'
+import { fullFrontendMockEnabled, MOCK_FULL_SESSION_KEY } from '@/utils/mockMode'
 
 /** 未配置或无效时使用相对路径 `/api`，走 Vite 代理到本机 Django */
 function getApiOrigin(): string {
@@ -61,6 +62,15 @@ instance.interceptors.response.use(
 
     if (!cfg || status !== 401 || isNoAuthHeaderPath(path) || cfg._retry) {
       return Promise.reject(error)
+    }
+
+    // 全栈 Mock 会话不使用远端刷新令牌，避免误清登录态
+    try {
+      if (fullFrontendMockEnabled() && localStorage.getItem(MOCK_FULL_SESSION_KEY) === '1') {
+        return Promise.reject(error)
+      }
+    } catch {
+      /* ignore */
     }
 
     return refreshToken()

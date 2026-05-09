@@ -46,7 +46,10 @@ interface Store {
 const STORAGE_KEY = 'apd_manual_review_workflow_v1'
 
 export function workflowMockEnabled(): boolean {
-  return import.meta.env.VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW === 'true'
+  return (
+    import.meta.env.VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW === 'true' ||
+    import.meta.env.VITE_USE_FULL_FRONTEND_MOCK === 'true'
+  )
 }
 
 function load(): Store {

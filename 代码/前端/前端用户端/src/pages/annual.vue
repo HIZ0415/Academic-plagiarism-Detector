@@ -20,7 +20,7 @@
     </v-alert>
 
     <v-alert v-if="useWorkflowMock" type="warning" variant="tonal" density="compact" class="mb-4 text-body-2">
-      已开启 <strong>VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW</strong>：全流程数据在用户端浏览器本地；管理端 dev（通常 :3001）与用户端（通常 :3000）origin 不同则<strong>无法共享</strong> Mock 数据——无后端时请展开下方「模拟管理端审批」，或使用真实后端联调。
+      已开启 <strong>VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW</strong> 或 <strong>VITE_USE_FULL_FRONTEND_MOCK</strong>：人工审核全流程数据在用户端浏览器本地；管理端 dev（通常 :3001）与用户端（通常 :3000）origin 不同则<strong>无法共享</strong> Mock 数据——无后端时请展开下方「模拟管理端审批」，或使用真实后端联调。
     </v-alert>
 
     <v-row class="mb-4">

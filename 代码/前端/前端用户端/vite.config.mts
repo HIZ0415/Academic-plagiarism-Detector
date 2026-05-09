@@ -58,6 +58,7 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@workflow-mock': fileURLToPath(new URL('../shared/manualReviewWorkflowMock.ts', import.meta.url)),
+      '@shared': fileURLToPath(new URL('../shared', import.meta.url)),
     },
     extensions: [
       '.js',
@@ -73,10 +74,16 @@ export default defineConfig({
     port: 3000,
     // 开发环境：相对路径 /api/* 转发到本机 Django（urls.py 挂载在 path('api/', ...)）
     // 勿改写路径去掉 /api，否则会变成 /login/ 等与后端不符。
+    // /ws/* 供通知 WebSocket 与 Channels 路由对齐（与 /api 共用同一 Django 端口）
     proxy: {
       '/api': {
         target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000',
         changeOrigin: true,
+      },
+      '/ws': {
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        ws: true,
       },
     },
     hmr: {

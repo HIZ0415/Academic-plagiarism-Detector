@@ -82,6 +82,16 @@
         </div>
 
         <v-alert
+          v-if="fullFrontendMock"
+          type="success"
+          variant="tonal"
+          density="comfortable"
+          class="mb-6 text-body-2"
+        >
+          已启用 <strong>VITE_USE_FULL_FRONTEND_MOCK</strong>：可直接<strong>登录</strong>（邮箱格式正确、密码不少于 6 位即可），无需 Django；检测与人工审核接口走前端桩，角色以上方「编辑 / 专家」为准。
+        </v-alert>
+
+        <v-alert
           v-if="loginType === 'register'"
           type="info"
           variant="tonal"
@@ -342,8 +352,10 @@ import ForgotPassword from '@/components/ForgotPassword.vue'
 import { useSnackbarStore } from '@/stores/snackbar';
 const snackbar = useSnackbarStore();
 import user from '@/api/user'
+import { fullFrontendMockEnabled } from '@/utils/mockMode'
 import { useUserStore } from '@/stores/user';
 const userStore = useUserStore();
+const fullFrontendMock = fullFrontendMockEnabled()
 import { useUiPreviewStore } from '@/stores/uiPreview'
 const uiPreview = useUiPreviewStore()
 import VerificationCodeInput from '@/components/VerificationCodeInput.vue'

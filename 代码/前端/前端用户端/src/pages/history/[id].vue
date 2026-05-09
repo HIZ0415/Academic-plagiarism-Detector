@@ -67,6 +67,7 @@ import { useRoute, useRouter } from 'vue-router'
 import publisher from '@/api/publisher'
 import { useSnackbarStore } from '@/stores/snackbar'
 import type { TaskStatus } from '@/types/core'
+import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 
 type UnifiedTaskType = 'paper_aigc' | 'resource_check' | 'image_detection' | 'review_detection' | 'unknown'
 
@@ -96,7 +97,7 @@ const task = ref<TaskDetail>({
   error_message: '',
 })
 
-const useMockAigc = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
+const useMockAigc = mockAigcFeaturesEnabled()
 
 function typeLabel(t: UnifiedTaskType) {
   if (t === 'paper_aigc') return '论文 AIGC'
