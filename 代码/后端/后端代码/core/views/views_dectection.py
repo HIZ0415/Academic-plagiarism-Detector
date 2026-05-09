@@ -744,6 +744,11 @@ def get_task_detail_unified(request, task_id):
             ],
         }
     elif payload["task_type"] in ("paper_aigc", "resource_check", "review_detection"):
+        detail_map = {
+            "paper_aigc": "paper/aigc/{taskId}/result",
+            "resource_check": "paper/resource-check/{taskId}/result",
+            "review_detection": "review/{taskId}/result",
+        }
         payload["result"] = {
             "paper_file_id": task.paper_file_id,
             "detail_endpoint": "paper/aigc/{taskId}/result" if payload["task_type"] == "paper_aigc"

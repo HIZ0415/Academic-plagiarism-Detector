@@ -1,6 +1,16 @@
-import hashlib
+"""论文 / Review 检测视图
+============================
+
+任务 015 – 论文检测链路 (paper_aigc + resource_check)
+任务 017 – Review 检测链路 (review_detection)
+
+改动要点（相对原版）：
+  * submit 接口改为派发 Celery 异步任务（tasks_paper.py）
+  * status 接口直接读取 DB 状态，去掉基于时间的模拟
+  * result 接口读取 Celery 写入的 JSON 文件
+  * 新增 get_review_detection_result 接口
+"""
 import json
-import re
 import uuid
 from pathlib import Path
 
@@ -20,6 +30,12 @@ from ..utils.review_preprocessing import preprocess_review_bytes, preprocess_rev
 ALPHA_ALLOWED_PAPER_EXT = {".pdf"}
 ALPHA_ALLOWED_REVIEW_FILE_EXT = {".txt"}
 
+MEDIA = Path(settings.MEDIA_ROOT)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  通用辅助
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _now_str(dt):
     if not dt:
@@ -27,8 +43,10 @@ def _now_str(dt):
     return timezone.localtime(dt).strftime("%Y-%m-%d %H:%M:%S")
 
 
+# ---- Paper meta ----
+
 def _paper_meta_path(file_id):
-    return Path(settings.MEDIA_ROOT) / "paper_uploads" / f"{file_id}_meta.json"
+    return MEDIA / "paper_uploads" / f"{file_id}_meta.json"
 
 
 def _load_paper_meta(file_id):
@@ -42,7 +60,7 @@ def _load_paper_meta(file_id):
 
 
 def _save_paper_meta(file_id, payload):
-    folder = Path(settings.MEDIA_ROOT) / "paper_uploads"
+    folder = MEDIA / "paper_uploads"
     folder.mkdir(parents=True, exist_ok=True)
     _paper_meta_path(file_id).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -356,7 +374,7 @@ def _get_paper_text(file_id):
 
 
 def _review_meta_path(file_id):
-    return Path(settings.MEDIA_ROOT) / "review_uploads" / f"{file_id}_meta.json"
+    return MEDIA / "review_uploads" / f"{file_id}_meta.json"
 
 
 def _load_review_meta(file_id):
@@ -370,7 +388,7 @@ def _load_review_meta(file_id):
 
 
 def _save_review_meta(file_id, payload):
-    folder = Path(settings.MEDIA_ROOT) / "review_uploads"
+    folder = MEDIA / "review_uploads"
     folder.mkdir(parents=True, exist_ok=True)
     _review_meta_path(file_id).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -401,6 +419,9 @@ def _sync_review_task_status(task, meta_exists):
         return "in_progress", 80, ""
     return "pending", 30, task.error_message or ""
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  论文上传（保持原逻辑不变）
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -440,7 +461,6 @@ def upload_paper(request):
         f"paper_uploads/{file_management.id}_{unique_part}_{file_name}",
         ContentFile(raw_bytes),
     )
-
     raw_text_rel_path = fs.save(
         f"paper_uploads/{file_management.id}_raw_text.txt",
         ContentFile(preprocessed.raw_text.encode("utf-8")),
@@ -484,17 +504,20 @@ def upload_paper(request):
         related_id=file_management.id,
     )
 
-    return Response(
-        {
-            "paper_file_id": file_management.id,
-            "file_name": file_management.file_name,
-            "upload_time": _now_str(file_management.upload_time),
-            "paragraph_count": len(paragraphs),
-        }
-    )
+    return Response({
+        "paper_file_id": file_management.id,
+        "file_name": file_management.file_name,
+        "upload_time": _now_str(file_management.upload_time),
+        "paragraph_count": len(paragraphs),
+    })
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  论文检测提交 — 派发 Celery 异步任务
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _submit_paper_task(request, expected_type):
+    """通用提交逻辑：paper_aigc / resource_check"""
     user = User.objects.get(id=request.user.id)
     if not user.has_permission("submit"):
         return Response({"detail": "该用户没有提交检测权限。"}, status=403)
@@ -503,7 +526,6 @@ def _submit_paper_task(request, expected_type):
     task_name = (request.data.get("task_name") or "paper-task").strip()
     if not paper_file_id:
         return Response({"detail": "paper_file_id 不能为空。"}, status=400)
-
     try:
         paper_file_id = int(paper_file_id)
     except Exception:
@@ -588,6 +610,10 @@ def submit_resource_check_task(request):
     return _submit_paper_task(request, "resource_check")
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  论文检测状态查询 — 直接读 DB，不再时间模拟
+# ═══════════════════════════════════════════════════════════════════════════════
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_paper_task_status(request, task_id):
@@ -598,45 +624,48 @@ def get_paper_task_status(request, task_id):
 
     if task.task_type not in ("paper_aigc", "resource_check"):
         return Response({"detail": "该任务不是论文检测任务。"}, status=400)
-    if not task.paper_file_id:
-        return Response({"detail": "论文任务缺少 paper_file 关联。"}, status=400)
 
-    meta_exists = bool(_load_paper_meta(task.paper_file_id))
-    status_text, progress, error_message = _sync_paper_task_status(task, meta_exists)
+    progress_map = {
+        "pending": 10,
+        "in_progress": 60,
+        "completed": 100,
+        "failed": 100,
+    }
 
-    return Response(
-        {
-            "task_id": task.id,
-            "status": status_text,
-            "progress": progress,
-            "error_message": error_message,
-        }
-    )
+    return Response({
+        "task_id": task.id,
+        "status": task.status,
+        "progress": progress_map.get(task.status, 0),
+        "error_message": task.error_message or "",
+    })
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  论文检测结果 — 从 Celery 落盘的 JSON 读取
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _ready_result_or_error(task, expected_type):
+    """检查任务状态，如果完成则返回 file_id，否则返回错误 Response。"""
     if task.task_type != expected_type:
-        return None, None, Response({"detail": "任务类型不匹配。"}, status=400)
+        return None, Response({"detail": "任务类型不匹配。"}, status=400)
     if not task.paper_file_id:
-        return None, None, Response({"detail": "论文任务缺少 paper_file 关联。"}, status=400)
+        return None, Response({"detail": "论文任务缺少 paper_file 关联。"}, status=400)
 
-    meta = _load_paper_meta(task.paper_file_id)
-    status_text, _, error_message = _sync_paper_task_status(task, bool(meta))
-    if status_text != "completed":
-        return None, None, Response(
-            {
-                "detail": "任务尚未完成。",
-                "status": status_text,
-                "error_message": error_message,
-            },
-            status=202,
-        )
+    if task.status == "failed":
+        return None, Response({
+            "detail": "任务执行失败。",
+            "status": "failed",
+            "error_message": task.error_message or "",
+        }, status=400)
 
-    paper_text, meta = _get_paper_text(task.paper_file_id)
-    if meta is None:
-        return None, None, Response({"detail": "论文文件元数据丢失。"}, status=404)
+    if task.status != "completed":
+        return None, Response({
+            "detail": "任务尚未完成。",
+            "status": task.status,
+            "error_message": task.error_message or "",
+        }, status=202)
 
-    return task.paper_file_id, paper_text, None
+    return task.paper_file_id, None
 
 
 @api_view(["GET"])
@@ -647,7 +676,7 @@ def get_aigc_result(request, task_id):
     except DetectionTask.DoesNotExist:
         return Response({"detail": "任务不存在。"}, status=404)
 
-    paper_file_id, paper_text, error_resp = _ready_result_or_error(task, "paper_aigc")
+    file_id, error_resp = _ready_result_or_error(task, "paper_aigc")
     if error_resp is not None:
         return error_resp
 
@@ -667,12 +696,20 @@ def get_resource_check_result(request, task_id):
     except DetectionTask.DoesNotExist:
         return Response({"detail": "任务不存在。"}, status=404)
 
-    _, paper_text, error_resp = _ready_result_or_error(task, "resource_check")
+    file_id, error_resp = _ready_result_or_error(task, "resource_check")
     if error_resp is not None:
         return error_resp
 
-    return Response(_build_resource_result(task, paper_text))
+    result = _load_json(_paper_result_path(file_id, "resource"))
+    if result is None:
+        return Response({"detail": "检测结果文件尚未生成，请稍后重试。"}, status=202)
 
+    return Response(result)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Review 检测提交 — 派发 Celery 异步任务
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -791,6 +828,10 @@ def submit_review_detection_task(request):
     )
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Review 检测状态 — 直接读 DB
+# ═══════════════════════════════════════════════════════════════════════════════
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_review_task_status(request, task_id):
@@ -799,6 +840,39 @@ def get_review_task_status(request, task_id):
     except DetectionTask.DoesNotExist:
         return Response({"detail": "任务不存在。"}, status=404)
 
+    progress_map = {
+        "pending": 10,
+        "in_progress": 60,
+        "completed": 100,
+        "failed": 100,
+    }
+
+    return Response({
+        "task_id": task.id,
+        "status": task.status,
+        "progress": progress_map.get(task.status, 0),
+        "error_message": task.error_message or "",
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Review 检测结果查询 — 任务 017 新增接口
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_review_detection_result(request, task_id):
+    """
+    GET /api/review/<task_id>/result/
+    返回 Review 检测的 AI 倾向分析结果。
+    """
+    try:
+        task = DetectionTask.objects.get(id=task_id, user=request.user)
+    except DetectionTask.DoesNotExist:
+        return Response({"detail": "任务不存在。"}, status=404)
+
+    if task.task_type != "review_detection":
+        return Response({"detail": "该任务不是 Review 检测任务。"}, status=400)
     if not task.paper_file_id:
         return Response({"detail": "Review 任务缺少文件关联。"}, status=400)
 
