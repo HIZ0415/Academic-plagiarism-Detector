@@ -1,6 +1,16 @@
-import hashlib
+"""论文 / Review 检测视图
+============================
+
+任务 015 – 论文检测链路 (paper_aigc + resource_check)
+任务 017 – Review 检测链路 (review_detection)
+
+改动要点（相对原版）：
+  * submit 接口改为派发 Celery 异步任务（tasks_paper.py）
+  * status 接口直接读取 DB 状态，去掉基于时间的模拟
+  * result 接口读取 Celery 写入的 JSON 文件
+  * 新增 get_review_detection_result 接口
+"""
 import json
-import re
 import uuid
 from pathlib import Path
 
@@ -19,6 +29,12 @@ from ..utils.review_preprocessing import preprocess_review_bytes, preprocess_rev
 ALPHA_ALLOWED_PAPER_EXT = {".pdf"}
 ALPHA_ALLOWED_REVIEW_FILE_EXT = {".txt"}
 
+MEDIA = Path(settings.MEDIA_ROOT)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  通用辅助
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _now_str(dt):
     if not dt:
@@ -26,8 +42,10 @@ def _now_str(dt):
     return timezone.localtime(dt).strftime("%Y-%m-%d %H:%M:%S")
 
 
+# ---- Paper meta ----
+
 def _paper_meta_path(file_id):
-    return Path(settings.MEDIA_ROOT) / "paper_uploads" / f"{file_id}_meta.json"
+    return MEDIA / "paper_uploads" / f"{file_id}_meta.json"
 
 
 def _load_paper_meta(file_id):
@@ -41,7 +59,7 @@ def _load_paper_meta(file_id):
 
 
 def _save_paper_meta(file_id, payload):
-    folder = Path(settings.MEDIA_ROOT) / "paper_uploads"
+    folder = MEDIA / "paper_uploads"
     folder.mkdir(parents=True, exist_ok=True)
     _paper_meta_path(file_id).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -49,199 +67,10 @@ def _save_paper_meta(file_id, payload):
     )
 
 
-def _sync_paper_task_status(task, meta_exists):
-    if task.status == "failed":
-        message = task.error_message or "论文文件元数据缺失或已损坏。"
-        if task.error_message != message:
-            task.error_message = message
-            task.save(update_fields=["error_message"])
-        return "failed", 100, message
-
-    if not meta_exists:
-        task.status = "failed"
-        task.error_message = "论文文件元数据缺失或已损坏。"
-        task.save(update_fields=["status", "error_message"])
-        return "failed", 100, task.error_message
-
-    if task.status == "completed":
-        if task.error_message:
-            task.error_message = ""
-            task.save(update_fields=["error_message"])
-        return "completed", 100, ""
-
-    elapsed = max((timezone.now() - task.upload_time).total_seconds(), 0)
-    if elapsed < 1.2:
-        if task.status != "pending":
-            task.status = "pending"
-            task.error_message = ""
-            task.save(update_fields=["status", "error_message"])
-        return "pending", 20, ""
-
-    if elapsed < 2.8:
-        if task.status != "in_progress":
-            task.status = "in_progress"
-            task.error_message = ""
-            task.save(update_fields=["status", "error_message"])
-        return "in_progress", 70, ""
-
-    if task.status != "completed":
-        task.status = "completed"
-        if not task.completion_time:
-            task.completion_time = timezone.now()
-        task.error_message = ""
-        task.save(update_fields=["status", "completion_time", "error_message"])
-    return "completed", 100, ""
-
-
-def _split_paragraphs(text):
-    chunks = [x.strip() for x in re.split(r"\n{2,}|(?<=[。！？.!?])\s+", text or "") if x.strip()]
-    if not chunks:
-        return ["未提取到有效文本，建议检查文件内容后重试。"]
-    return chunks[:12]
-
-
-def _load_paper_paragraphs(file_id):
-    meta = _load_paper_meta(file_id)
-    if not meta:
-        return []
-
-    paragraphs_rel_path = meta.get("paragraphs_path", "")
-    paragraphs_abs_path = Path(settings.MEDIA_ROOT) / paragraphs_rel_path
-    if not paragraphs_abs_path.exists():
-        return []
-
-    try:
-        payload = json.loads(paragraphs_abs_path.read_text(encoding="utf-8"))
-    except Exception:
-        return []
-
-    if not isinstance(payload, list):
-        return []
-    return [item for item in payload if isinstance(item, dict) and item.get("text")]
-
-
-def _risk_level(score):
-    if score >= 0.7:
-        return "high"
-    if score >= 0.45:
-        return "medium"
-    return "low"
-
-
-def _build_aigc_result(task, paper_text, paragraphs_data=None):
-    base = f"{task.id}|{paper_text[:2000]}"
-    digest = hashlib.sha256(base.encode("utf-8")).hexdigest()
-    ratio = round(0.2 + (int(digest[:8], 16) / 0xFFFFFFFF) * 0.65, 4)
-
-    paragraph_items = paragraphs_data or [
-        {"index": idx, "text": para}
-        for idx, para in enumerate(_split_paragraphs(paper_text), start=1)
-    ]
-    paragraphs = []
-    for idx, item in enumerate(paragraph_items[:12], start=1):
-        para = str(item.get("text", "")).strip()
-        if not para:
-            continue
-        phash = hashlib.md5(f"{task.id}:{idx}:{para[:200]}".encode("utf-8")).hexdigest()
-        score = round(0.2 + (int(phash[:6], 16) / 0xFFFFFF) * 0.75, 3)
-        paragraphs.append(
-            {
-                "index": item.get("index", idx),
-                "risk_score": score,
-                "risk_level": _risk_level(score),
-                "excerpt": para[:180],
-                "char_start": item.get("char_start"),
-                "char_end": item.get("char_end"),
-            }
-        )
-
-    high_count = sum(1 for p in paragraphs if p["risk_level"] == "high")
-    summary = f"检测完成：AI 贡献占比约 {round(ratio * 100, 1)}%，高风险段落 {high_count} 段。"
-
-    return {
-        "task_id": task.id,
-        "overall_risk_level": _risk_level(ratio),
-        "ai_contribution_ratio": ratio,
-        "summary": summary,
-        "paragraphs": paragraphs,
-    }
-
-
-def _build_resource_result(task, paper_text):
-    lines = [x.strip() for x in (paper_text or "").splitlines() if x.strip()]
-    doi_regex = re.compile(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+")
-    ref_lines = [ln for ln in lines if ("[" in ln and "]" in ln) or "doi" in ln.lower() or "参考" in ln]
-    if not ref_lines:
-        ref_lines = lines[:8]
-
-    issues = []
-    doi_found = 0
-    doi_invalid = 0
-    for i, line in enumerate(ref_lines[:20], start=1):
-        doi = doi_regex.search(line)
-        if doi:
-            doi_found += 1
-            if len(doi.group(0)) < 10:
-                doi_invalid += 1
-                issues.append(
-                    {
-                        "reference_index": i,
-                        "issue_type": "doi_invalid",
-                        "detail": f"DOI 可能不完整：{doi.group(0)}",
-                        "severity": "medium",
-                    }
-                )
-        else:
-            issues.append(
-                {
-                    "reference_index": i,
-                    "issue_type": "doi_missing",
-                    "detail": "未识别到 DOI，建议核验该参考条目来源。",
-                    "severity": "low",
-                }
-            )
-        if len(line) < 18:
-            issues.append(
-                {
-                    "reference_index": i,
-                    "issue_type": "citation_incomplete",
-                    "detail": "条目文本较短，可能缺少卷期、页码或作者信息。",
-                    "severity": "medium",
-                }
-            )
-
-    issues = issues[:10]
-    summary = f"检测完成：共识别 {len(ref_lines)} 条候选参考，疑似风险 {len(issues)} 条。"
-
-    return {
-        "task_id": task.id,
-        "total_references": len(ref_lines),
-        "doi_found_count": doi_found,
-        "doi_invalid_count": doi_invalid,
-        "suspected_risk_count": len(issues),
-        "summary": summary,
-        "issues": issues,
-        "issues_json": issues,
-    }
-
-
-def _get_paper_text(file_id):
-    meta = _load_paper_meta(file_id)
-    if not meta:
-        return "", None
-
-    text_rel_path = meta.get("cleaned_text_path") or meta.get("text_path", "")
-    text_abs_path = Path(settings.MEDIA_ROOT) / text_rel_path
-    if text_abs_path.exists():
-        try:
-            return text_abs_path.read_text(encoding="utf-8", errors="ignore"), meta
-        except Exception:
-            pass
-    return "", meta
-
+# ---- Review meta ----
 
 def _review_meta_path(file_id):
-    return Path(settings.MEDIA_ROOT) / "review_uploads" / f"{file_id}_meta.json"
+    return MEDIA / "review_uploads" / f"{file_id}_meta.json"
 
 
 def _load_review_meta(file_id):
@@ -255,7 +84,7 @@ def _load_review_meta(file_id):
 
 
 def _save_review_meta(file_id, payload):
-    folder = Path(settings.MEDIA_ROOT) / "review_uploads"
+    folder = MEDIA / "review_uploads"
     folder.mkdir(parents=True, exist_ok=True)
     _review_meta_path(file_id).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -263,49 +92,28 @@ def _save_review_meta(file_id, payload):
     )
 
 
-def _sync_review_task_status(task, meta_exists):
-    if task.status == "failed":
-        message = task.error_message or "Review 文件元数据缺失或已损坏。"
-        if task.error_message != message:
-            task.error_message = message
-            task.save(update_fields=["error_message"])
-        return "failed", 100, message
+# ---- Result JSON helpers ----
 
-    if not meta_exists:
-        task.status = "failed"
-        task.error_message = "Review 文件元数据缺失或已损坏。"
-        task.save(update_fields=["status", "error_message"])
-        return "failed", 100, task.error_message
+def _paper_result_path(file_id, result_type: str):
+    return MEDIA / "paper_uploads" / f"{file_id}_{result_type}_result.json"
 
-    if task.status == "completed":
-        if task.error_message:
-            task.error_message = ""
-            task.save(update_fields=["error_message"])
-        return "completed", 100, ""
 
-    elapsed = max((timezone.now() - task.upload_time).total_seconds(), 0)
-    if elapsed < 1.0:
-        if task.status != "pending":
-            task.status = "pending"
-            task.error_message = ""
-            task.save(update_fields=["status", "error_message"])
-        return "pending", 30, ""
+def _review_result_path(file_id):
+    return MEDIA / "review_uploads" / f"{file_id}_detection_result.json"
 
-    if elapsed < 2.2:
-        if task.status != "in_progress":
-            task.status = "in_progress"
-            task.error_message = ""
-            task.save(update_fields=["status", "error_message"])
-        return "in_progress", 80, ""
 
-    if task.status != "completed":
-        task.status = "completed"
-        if not task.completion_time:
-            task.completion_time = timezone.now()
-        task.error_message = ""
-        task.save(update_fields=["status", "completion_time", "error_message"])
-    return "completed", 100, ""
+def _load_json(path: Path):
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  论文上传（保持原逻辑不变）
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -345,7 +153,6 @@ def upload_paper(request):
         f"paper_uploads/{file_management.id}_{unique_part}_{file_name}",
         ContentFile(raw_bytes),
     )
-
     raw_text_rel_path = fs.save(
         f"paper_uploads/{file_management.id}_raw_text.txt",
         ContentFile(preprocessed.raw_text.encode("utf-8")),
@@ -389,17 +196,20 @@ def upload_paper(request):
         related_id=file_management.id,
     )
 
-    return Response(
-        {
-            "paper_file_id": file_management.id,
-            "file_name": file_management.file_name,
-            "upload_time": _now_str(file_management.upload_time),
-            "paragraph_count": len(paragraphs),
-        }
-    )
+    return Response({
+        "paper_file_id": file_management.id,
+        "file_name": file_management.file_name,
+        "upload_time": _now_str(file_management.upload_time),
+        "paragraph_count": len(paragraphs),
+    })
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  论文检测提交 — 派发 Celery 异步任务
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _submit_paper_task(request, expected_type):
+    """通用提交逻辑：paper_aigc / resource_check"""
     user = User.objects.get(id=request.user.id)
     if not user.has_permission("submit"):
         return Response({"detail": "该用户没有提交检测权限。"}, status=403)
@@ -408,7 +218,6 @@ def _submit_paper_task(request, expected_type):
     task_name = (request.data.get("task_name") or "paper-task").strip()
     if not paper_file_id:
         return Response({"detail": "paper_file_id 不能为空。"}, status=400)
-
     try:
         paper_file_id = int(paper_file_id)
     except Exception:
@@ -441,14 +250,19 @@ def _submit_paper_task(request, expected_type):
         related_id=task.id,
     )
 
-    return Response(
-        {
-            "task_id": task.id,
-            "status": task.status,
-            "paper_file_id": file_obj.id,
-            "paragraph_count": meta.get("paragraph_count", 0),
-        }
-    )
+    # ★ 派发 Celery 异步任务
+    from ..tasks_paper import run_paper_aigc_detection, run_resource_check_detection
+    if expected_type == "paper_aigc":
+        run_paper_aigc_detection.delay(task.id)
+    else:
+        run_resource_check_detection.delay(task.id)
+
+    return Response({
+        "task_id": task.id,
+        "status": task.status,
+        "paper_file_id": file_obj.id,
+        "paragraph_count": meta.get("paragraph_count", 0),
+    })
 
 
 @api_view(["POST"])
@@ -463,6 +277,10 @@ def submit_resource_check_task(request):
     return _submit_paper_task(request, "resource_check")
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  论文检测状态查询 — 直接读 DB，不再时间模拟
+# ═══════════════════════════════════════════════════════════════════════════════
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_paper_task_status(request, task_id):
@@ -473,45 +291,48 @@ def get_paper_task_status(request, task_id):
 
     if task.task_type not in ("paper_aigc", "resource_check"):
         return Response({"detail": "该任务不是论文检测任务。"}, status=400)
-    if not task.paper_file_id:
-        return Response({"detail": "论文任务缺少 paper_file 关联。"}, status=400)
 
-    meta_exists = bool(_load_paper_meta(task.paper_file_id))
-    status_text, progress, error_message = _sync_paper_task_status(task, meta_exists)
+    progress_map = {
+        "pending": 10,
+        "in_progress": 60,
+        "completed": 100,
+        "failed": 100,
+    }
 
-    return Response(
-        {
-            "task_id": task.id,
-            "status": status_text,
-            "progress": progress,
-            "error_message": error_message,
-        }
-    )
+    return Response({
+        "task_id": task.id,
+        "status": task.status,
+        "progress": progress_map.get(task.status, 0),
+        "error_message": task.error_message or "",
+    })
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  论文检测结果 — 从 Celery 落盘的 JSON 读取
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def _ready_result_or_error(task, expected_type):
+    """检查任务状态，如果完成则返回 file_id，否则返回错误 Response。"""
     if task.task_type != expected_type:
-        return None, None, Response({"detail": "任务类型不匹配。"}, status=400)
+        return None, Response({"detail": "任务类型不匹配。"}, status=400)
     if not task.paper_file_id:
-        return None, None, Response({"detail": "论文任务缺少 paper_file 关联。"}, status=400)
+        return None, Response({"detail": "论文任务缺少 paper_file 关联。"}, status=400)
 
-    meta = _load_paper_meta(task.paper_file_id)
-    status_text, _, error_message = _sync_paper_task_status(task, bool(meta))
-    if status_text != "completed":
-        return None, None, Response(
-            {
-                "detail": "任务尚未完成。",
-                "status": status_text,
-                "error_message": error_message,
-            },
-            status=202,
-        )
+    if task.status == "failed":
+        return None, Response({
+            "detail": "任务执行失败。",
+            "status": "failed",
+            "error_message": task.error_message or "",
+        }, status=400)
 
-    paper_text, meta = _get_paper_text(task.paper_file_id)
-    if meta is None:
-        return None, None, Response({"detail": "论文文件元数据丢失。"}, status=404)
+    if task.status != "completed":
+        return None, Response({
+            "detail": "任务尚未完成。",
+            "status": task.status,
+            "error_message": task.error_message or "",
+        }, status=202)
 
-    return task.paper_file_id, paper_text, None
+    return task.paper_file_id, None
 
 
 @api_view(["GET"])
@@ -522,11 +343,15 @@ def get_aigc_result(request, task_id):
     except DetectionTask.DoesNotExist:
         return Response({"detail": "任务不存在。"}, status=404)
 
-    paper_file_id, paper_text, error_resp = _ready_result_or_error(task, "paper_aigc")
+    file_id, error_resp = _ready_result_or_error(task, "paper_aigc")
     if error_resp is not None:
         return error_resp
 
-    return Response(_build_aigc_result(task, paper_text, _load_paper_paragraphs(paper_file_id)))
+    result = _load_json(_paper_result_path(file_id, "aigc"))
+    if result is None:
+        return Response({"detail": "检测结果文件尚未生成，请稍后重试。"}, status=202)
+
+    return Response(result)
 
 
 @api_view(["GET"])
@@ -537,12 +362,20 @@ def get_resource_check_result(request, task_id):
     except DetectionTask.DoesNotExist:
         return Response({"detail": "任务不存在。"}, status=404)
 
-    _, paper_text, error_resp = _ready_result_or_error(task, "resource_check")
+    file_id, error_resp = _ready_result_or_error(task, "resource_check")
     if error_resp is not None:
         return error_resp
 
-    return Response(_build_resource_result(task, paper_text))
+    result = _load_json(_paper_result_path(file_id, "resource"))
+    if result is None:
+        return Response({"detail": "检测结果文件尚未生成，请稍后重试。"}, status=202)
 
+    return Response(result)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Review 检测提交 — 派发 Celery 异步任务
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -635,14 +468,20 @@ def submit_review_detection_task(request):
         related_id=task.id,
     )
 
-    return Response(
-        {
-            "task_id": task.id,
-            "status": task.status,
-            "cleaned_text_length": len(preprocessed.cleaned_text),
-        }
-    )
+    # ★ 派发 Celery 异步任务
+    from ..tasks_paper import run_review_detection
+    run_review_detection.delay(task.id)
 
+    return Response({
+        "task_id": task.id,
+        "status": task.status,
+        "cleaned_text_length": len(preprocessed.cleaned_text),
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Review 检测状态 — 直接读 DB
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -652,17 +491,58 @@ def get_review_task_status(request, task_id):
     except DetectionTask.DoesNotExist:
         return Response({"detail": "任务不存在。"}, status=404)
 
+    progress_map = {
+        "pending": 10,
+        "in_progress": 60,
+        "completed": 100,
+        "failed": 100,
+    }
+
+    return Response({
+        "task_id": task.id,
+        "status": task.status,
+        "progress": progress_map.get(task.status, 0),
+        "error_message": task.error_message or "",
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Review 检测结果查询 — 任务 017 新增接口
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_review_detection_result(request, task_id):
+    """
+    GET /api/review/<task_id>/result/
+    返回 Review 检测的 AI 倾向分析结果。
+    """
+    try:
+        task = DetectionTask.objects.get(id=task_id, user=request.user)
+    except DetectionTask.DoesNotExist:
+        return Response({"detail": "任务不存在。"}, status=404)
+
+    if task.task_type != "review_detection":
+        return Response({"detail": "该任务不是 Review 检测任务。"}, status=400)
     if not task.paper_file_id:
         return Response({"detail": "Review 任务缺少文件关联。"}, status=400)
 
-    meta = _load_review_meta(task.paper_file_id)
-    meta_exists = bool(meta and meta.get("ai_payload_path") and meta.get("cleaned_text_path"))
-    status_text, progress, error_message = _sync_review_task_status(task, meta_exists)
-    return Response(
-        {
-            "task_id": task.id,
-            "status": status_text,
-            "progress": progress,
-            "error_message": error_message,
-        }
-    )
+    if task.status == "failed":
+        return Response({
+            "detail": "任务执行失败。",
+            "status": "failed",
+            "error_message": task.error_message or "",
+        }, status=400)
+
+    if task.status != "completed":
+        return Response({
+            "detail": "任务尚未完成。",
+            "status": task.status,
+            "error_message": task.error_message or "",
+        }, status=202)
+
+    result = _load_json(_review_result_path(task.paper_file_id))
+    if result is None:
+        return Response({"detail": "检测结果文件尚未生成，请稍后重试。"}, status=202)
+
+    return Response(result)
