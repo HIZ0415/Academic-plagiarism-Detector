@@ -185,11 +185,12 @@ import {
   type ReviewDetectionStatus,
 } from '@/api/reviewDetection'
 import { useSnackbarStore } from '@/stores/snackbar'
+import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 
 const route = useRoute()
 const router = useRouter()
 const snackbar = useSnackbarStore()
-const useMock = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
+const useMock = mockAigcFeaturesEnabled()
 
 const linkedTaskId = computed(() => {
   const q = route.query.task_id

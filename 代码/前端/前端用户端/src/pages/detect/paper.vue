@@ -214,6 +214,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import paperApi from '@/api/paper'
 import type { ResourceIssue, TaskStatus } from '@/types/core'
+import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 
 type ParagraphResult = {
   index: number
@@ -252,7 +253,7 @@ const tasks = ref<BatchTaskRow[]>([])
 const latestResult = ref<LatestResult | null>(null)
 const paragraphRows = ref<ParagraphResult[]>([])
 const resourceIssueRows = ref<ResourceIssue[]>([])
-const useMockAigc = import.meta.env.VITE_USE_MOCK_AIGC === 'true'
+const useMockAigc = mockAigcFeaturesEnabled()
 
 const panelA = computed(() => {
   if (activeTab.value === 'aigc') {

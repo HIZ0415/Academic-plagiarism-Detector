@@ -187,10 +187,12 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { isLoggedIn } from './api/user'
+import websocket from './api/websocket'
+import { fullFrontendMockEnabled } from '@/utils/mockMode'
 import { marked } from 'marked'
 
 
@@ -402,18 +404,41 @@ const markAllAsRead = async () => {
 }
 
 
-onMounted(async () => {
-  // 从本地存储加载主题设置
+watch(
+  isLoggedIn,
+  async (logged) => {
+    if (timer) {
+      window.clearInterval(timer)
+      timer = null
+    }
+    if (logged) {
+      if (!fullFrontendMockEnabled()) {
+        websocket.Init()
+      }
+      await userStore.fetchUserInfo()
+      fetchUnRead()
+      const intervalMs = fullFrontendMockEnabled() ? 45000 : 60000
+      timer = window.setInterval(fetchUnRead, intervalMs)
+    } else if (!fullFrontendMockEnabled()) {
+      void websocket.Close()
+    }
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
   const savedTheme = localStorage.getItem('app_theme')
   if (savedTheme) {
     theme.value = savedTheme
   }
+})
 
-  if (isLoggedIn.value) {
-    await userStore.fetchUserInfo()
-    fetchUnRead()
-    timer = window.setInterval(fetchUnRead, 60000)
+onUnmounted(() => {
+  if (timer) {
+    window.clearInterval(timer)
+    timer = null
   }
+  void websocket.Close()
 })
 </script>
 
