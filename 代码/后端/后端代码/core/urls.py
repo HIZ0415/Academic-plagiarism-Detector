@@ -16,6 +16,7 @@ from .views.views_paper import (
 )
 # 新增: 导入人工审查相关的视图类
 from .views import views_review, views_organization
+from .views.views_manual_review_adapter import create_manual_review_request, get_manual_review_by_detection_task
 from .views import views_admin
 from .views import views_notify
 from django.urls import path
@@ -194,4 +195,8 @@ urlpatterns = [
     # Keep path without a leading slash; Django route strings should be relative.
     path('review-requests/<int:review_request_id>/delete/', views_admin.delete_review_request, name='delete_review_request'),
 
+
+
+    path('manual-review-requests/', create_manual_review_request, name='manual_review_requests_create'),
+    path('manual-review-requests/by-detection-task/', get_manual_review_by_detection_task, name='manual_review_requests_by_task'),
 ]
