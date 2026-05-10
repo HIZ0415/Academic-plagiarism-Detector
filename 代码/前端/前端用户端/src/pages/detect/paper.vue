@@ -3,7 +3,7 @@
     <v-card-item>
       <v-card-title class="text-h5 font-weight-bold">论文与学术资源检测工作台</v-card-title>
       <v-card-subtitle class="text-body-2 text-wrap mt-1">
-        需求 <strong>FR-LWJC-0001</strong> 与接口约定：论文检测<strong>仅支持上传 PDF</strong>（后端 PyMuPDF 提取文本）。同一工作台另含「学术资源规范性」检测，与 AIGC 目标不同，共用 PDF 上传入口；结果分别走
+        需求与接口约定：论文检测<strong>仅支持上传 PDF</strong>（后端 PyMuPDF 提取文本）。同一工作台另含「学术资源规范性」检测，与 AIGC 目标不同，共用 PDF 上传入口；结果分别走
         <code>/paper/aigc/</code> 与 <code>/paper/resource-check/</code>。概要设计线框中曾写 DOCX/TXT，以<strong>需求与 API 文档为准</strong>。
       </v-card-subtitle>
       <div class="d-flex flex-wrap align-center ga-2 mt-3">
@@ -202,7 +202,7 @@
         density="compact"
         class="mt-5 text-body-2"
       >
-        <strong>整体界面逻辑：</strong>新检测请从<strong>统一入口</strong><router-link to="/upload" class="text-primary"><code>/upload</code></router-link>提交（图像 / 论文 PDF / Review 同批）；本页为<strong>论文 PDF 专项结果工作台</strong>（需带 <code>task_id</code> 深链）。Review 文本检测亦在 <code>/upload</code>（FR-PLJC）。历史中的
+        <strong>整体界面逻辑：</strong>新检测请从<strong>统一入口</strong><router-link to="/upload" class="text-primary"><code>/upload</code></router-link>提交（图像 / 论文 PDF / Review 同批）；本页为<strong>论文 PDF 专项结果工作台</strong>（需带 <code>task_id</code> 深链）。Review 文本检测亦在 <code>/upload</code>。历史中的
         <code>paper_aigc</code> / <code>resource_check</code> 会跳回本页对应标签。
       </v-alert>
     </v-card-text>
@@ -259,7 +259,7 @@ const panelA = computed(() => {
   if (activeTab.value === 'aigc') {
     return {
       title: 'A. 全篇 AIGC 检测提交',
-      hint: '仅 PDF。系统将做格式校验、PDF 文本提取、段落切分后提交 AIGC 检测（FR-LWJC-0001 主流程）。',
+      hint: '仅 PDF。系统将做格式校验、PDF 文本提取、段落切分后提交 AIGC 检测（主流程）。',
       accept: '.pdf,application/pdf',
       fileLabel: '论文 PDF 文件（仅 .pdf）',
       prefixPlaceholder: '例如 aigc-weekly-01',
@@ -354,7 +354,7 @@ const submitBatchTasks = async () => {
 
   const nonPdf = selectedFiles.value.filter((f) => !f.name.toLowerCase().endsWith('.pdf'))
   if (nonPdf.length) {
-    error.value = '仅支持 PDF 上传（需求 FR-LWJC-0001 / 接口 POST /paper/upload/ 约定）。请移除非 PDF 文件后重试。'
+    error.value = '仅支持 PDF 上传（需求与接口 POST /paper/upload/ 约定）。请移除非 PDF 文件后重试。'
     return
   }
 

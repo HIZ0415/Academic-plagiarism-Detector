@@ -1,7 +1,7 @@
 <template>
   <div class="task-detail task-detail-page pa-4 pb-12">
     <v-alert v-if="isPreviewMode" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      <strong>界面预览：</strong>下方可切换<strong>学术图像 / 论文全文 / Review</strong>三类工作台（与需求 FR-YHSH-0001 审核类型及 FR-YHSH-0002/0005/0006 一致）。表单可填，提交不会调用后端。
+      <strong>界面预览：</strong>下方可切换<strong>学术图像 / 论文全文 / Review</strong>三类工作台。表单可填，提交不会调用后端。
       <div class="d-flex flex-wrap align-center ga-2 mt-3">
         <span class="text-caption text-medium-emphasis">预览任务类型：</span>
         <v-btn-toggle
@@ -26,7 +26,7 @@
       density="compact"
       class="mb-4 text-body-2"
     >
-      本条为 <strong>{{ taskKindTitle }}</strong> 人工审核（FR-YHSH-{{ isReviewTaskKind ? '0006' : '0005' }}）。材料单元来自接口 <code>segments</code> / <code>text_units</code>；若为空则使用占位片段直至后端下发结构化正文。
+      本条为 <strong>{{ taskKindTitle }}</strong> 人工审核。材料单元来自接口 <code>segments</code> / <code>text_units</code>；若为空则使用占位片段直至后端下发结构化正文。
     </v-alert>
     <!-- 返回按钮 -->
     <div class="d-flex align-center mb-4 flex-wrap ga-2">
@@ -53,7 +53,7 @@
         </v-expansion-panel-title>
         <v-expansion-panel-text class="text-body-2">
           申请时间 {{ reviewRequestMeta.request_time }}。
-          <span v-if="manualReviewStatus !== 'completed'" class="text-medium-emphasis d-block mt-2">鉴定口径见右侧「评分维度」说明；评论点赞与举报（FR-YHSH-0003 / 0004）待接口接入。</span>
+          <span v-if="manualReviewStatus !== 'completed'" class="text-medium-emphasis d-block mt-2">鉴定口径见右侧「评分维度」说明；评论点赞与举报待接口接入。</span>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>
@@ -203,7 +203,7 @@
               </div>
 
               <div class="fake-judge-section mt-4 pt-4">
-                <div class="text-subtitle-1 mb-4">造假判定（对应 FR-YHSH-0002）</div>
+                <div class="text-subtitle-1 mb-4">造假判定</div>
                 <div class="d-flex justify-space-between">
                   <v-btn :color="imageJudgements[currentImageIndex] === true ? 'error' : 'grey-lighten-1'"
                     variant="tonal" class="flex-grow-1 mr-2" @click="handleJudgement(true)">
@@ -225,7 +225,7 @@
         <div class="content-container textual-workspace d-flex" style="gap: 12px;">
           <div class="text-unit-sidebar rounded-lg elevation-1 pa-3">
             <div class="text-subtitle-1 font-weight-bold mb-2">{{ materialSidebarTitle }}</div>
-            <p class="text-caption text-medium-emphasis mb-3">按单元审读；与需求 FR-YHSH-0002 鉴定结论及 FR-YHSH-{{ isReviewTaskKind ? '0006' : '0005' }} 分项参考一致。</p>
+            <p class="text-caption text-medium-emphasis mb-3">按单元审读；与鉴定结论及分项参考一致。</p>
             <div class="text-unit-list">
               <v-list density="compact" nav>
                 <v-list-item
@@ -268,7 +268,7 @@
             </div>
 
             <div v-if="currentTextualDimensions.length" class="mb-4">
-              <div class="text-subtitle-2 mb-2">鉴定结论（FR-YHSH-0002）</div>
+              <div class="text-subtitle-2 mb-2">鉴定结论</div>
               <v-radio-group
                 :model-value="textUnitVerdicts[currentTextUnitIndex] ?? null"
                 hide-details
@@ -283,7 +283,7 @@
             </div>
 
             <div v-if="isPaperTaskKind && currentTextualDimensions.length" class="mb-4">
-              <div class="text-subtitle-2 mb-2">与系统倾向关系（FR-YHSH-0005）</div>
+              <div class="text-subtitle-2 mb-2">与系统倾向关系</div>
               <v-select
                 :model-value="textUnitPaperStances[currentTextUnitIndex] ?? null"
                 :items="paperStanceItems"
@@ -370,7 +370,7 @@
             <v-list-item title="检测时间" :subtitle="aiDetectionSummary.detection_time || '—'" />
           </v-list>
           <p class="text-caption text-medium-emphasis mt-2">
-            完整报告可由发布者在检测任务结果中查看；此处仅摘要供人工审核参考（FR-YHSH-0002）。
+            完整报告可由发布者在检测任务结果中查看；此处仅摘要供人工审核参考。
           </p>
         </v-card-text>
         <v-card-text v-else>暂无 AI 摘要数据</v-card-text>
@@ -508,21 +508,21 @@ const materialSidebarTitle = computed(() => {
 const appraisalGuidanceText = computed(() => {
   const k = normTaskKind(reviewTaskKind.value)
   if (k.startsWith('paper')) {
-    return '鉴定结论（FR-YHSH-0002 · 论文）：请结合 AI 对全文/段落的异常提示，在「引用风险、生成痕迹、逻辑矛盾」等维度给出评分与理由；细分字段与后端论文检测报告 schema 对齐后固化。'
+    return '鉴定结论（论文）：请结合 AI 对全文/段落的异常提示，在「引用风险、生成痕迹、逻辑矛盾」等维度给出评分与理由；细分字段与后端论文检测报告 schema 对齐后固化。'
   }
   if (k.startsWith('review')) {
-    return '鉴定结论（FR-YHSH-0002 · Review）：请结合 AI 对评审文本的异常提示，在「立场偏颇、抄袭拼接、不当引用」等维度给出结论与理由；字段与 Review 检测 schema 对齐后固化。'
+    return '鉴定结论（Review）：请结合 AI 对评审文本的异常提示，在「立场偏颇、抄袭拼接、不当引用」等维度给出结论与理由；字段与 Review 检测 schema 对齐后固化。'
   }
-  return '鉴定结论（FR-YHSH-0002 · 图像）：每张图请选择「造假图片 / 真实图片」对应需求中的「确认造假或疑似倾向 / 未发现异常」表述；细分维度评分与理由用于支撑您的结论。'
+  return '鉴定结论（图像）：每张图请选择「造假图片 / 真实图片」对应需求中的「确认造假或疑似倾向 / 未发现异常」表述；细分维度评分与理由用于支撑您的结论。'
 })
 
 const dimensionHintText = computed(() => {
   const k = normTaskKind(reviewTaskKind.value)
   if (k.startsWith('paper')) {
-    return '论文人工审核（FR-YHSH-0005）：结合原文片段与下列分项 1–5 分及文字理由；段落高亮与事实性子结论以后端下发为准。'
+    return '论文人工审核：结合原文片段与下列分项 1–5 分及文字理由；段落高亮与事实性子结论以后端下发为准。'
   }
   if (k.startsWith('review')) {
-    return 'Review 人工审核（FR-YHSH-0006）：结合评审文本与 AI 参考信息填写分项评分与理由；可疑片段引用见补充说明。'
+    return 'Review 人工审核：结合评审文本与 AI 参考信息填写分项评分与理由；可疑片段引用见补充说明。'
   }
   return '请根据图片特征，对每个造假方式进行可能性评估，分值越大表示相应维度造假可能性越大，必要时可使用绘制标注功能标记具体位置。'
 })
@@ -729,7 +729,7 @@ function loadPaperPreviewMock() {
       id: 3,
       label: '讨论与结论',
       content:
-        '【示例讨论】局限性包括样本来源单一与人工标注成本。未来工作将扩展至多模态与跨语言场景。审核人请结合 FR-YHSH-0005 选择「同意系统倾向 / 存在重大异议」并填写分项理由。',
+        '【示例讨论】局限性包括样本来源单一与人工标注成本。未来工作将扩展至多模态与跨语言场景。审核人请选择「同意系统倾向 / 存在重大异议」并填写分项理由。',
       aiNote: 'AI：逻辑链基本自洽',
     },
   ]
@@ -778,7 +778,7 @@ function loadReviewPreviewMock() {
       id: 2,
       label: '评审意见 · 具体意见',
       content:
-        '【示例意见】建议补充与 SOTA 的对比实验，并说明数据伦理合规性。若存在利益冲突声明缺失，请在本单元结论中选择「确认造假 / 疑似造假」等并说明理由（FR-YHSH-0002 / 0006）。',
+        '【示例意见】建议补充与 SOTA 的对比实验，并说明数据伦理合规性。若存在利益冲突声明缺失，请在本单元结论中选择「确认造假 / 疑似造假」等并说明理由。',
       aiNote: 'AI：未见明显抄袭拼接',
     },
   ]
@@ -1170,13 +1170,13 @@ function checkTextualAnswerCompletion() {
     if (textUnitVerdicts.value[i] == null) {
       return {
         complete: false,
-        message: `材料单元 ${i + 1} 尚未选择鉴定结论（FR-YHSH-0002：确认造假 / 疑似造假 / 未发现异常）`,
+        message: `材料单元 ${i + 1} 尚未选择鉴定结论（确认造假 / 疑似造假 / 未发现异常）`,
       }
     }
     if (isPaperTaskKind.value && !textUnitPaperStances.value[i]) {
       return {
         complete: false,
-        message: `材料单元 ${i + 1} 尚未选择结论类型（FR-YHSH-0005：同意系统倾向 / 存在重大异议）`,
+        message: `材料单元 ${i + 1} 尚未选择结论类型（同意系统倾向 / 存在重大异议）`,
       }
     }
     const dims = dimensionsPerTextUnit.value[i]
@@ -1762,4 +1762,3 @@ watch(() => currentDrawingDimension.value, (newVal, oldVal) => {
   border-radius: 4px;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
-</style>
