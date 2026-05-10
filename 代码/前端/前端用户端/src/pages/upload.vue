@@ -1,10 +1,10 @@
 <template>
-  <div class="upload-page">
-    <v-row class="mb-6" align="center">
+  <v-container class="py-4">
+    <v-row class="mb-2" align="center">
       <v-col cols="12" md="8">
         <div class="text-h4 font-weight-bold mb-1">统一学术检测</div>
         <div class="text-body-2 text-medium-emphasis">
-          本页为<strong>唯一检测提交入口</strong>：同一批次可同时提交<strong>图像</strong>、<strong>论文 PDF</strong>（FR-LWJC）、<strong>Review</strong>（在线文本或 .txt，FR-PLJC）及 ZIP/RAR 等；各子任务并行执行，共享<strong>批次 ID</strong>，便于在历史中筛选与后续人工审核关联。检测模式仅<strong>快速</strong>与<strong>精准</strong>（FR-YHZS-0007）。
+          本页为<strong>唯一检测提交入口</strong>：同一批次可同时提交<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及 ZIP/RAR 等；各子任务并行执行，共享<strong>批次 ID</strong>，便于在历史中筛选与后续人工审核关联。检测模式仅<strong>快速</strong>与<strong>精准</strong>。
         </div>
       </v-col>
       <v-col cols="12" md="4" class="d-flex justify-end">
@@ -155,7 +155,7 @@
         </v-data-table>
       </v-card-text>
     </v-card>
-  </div>
+  </v-container>
 </template>
 
 <script setup lang="ts">
@@ -392,7 +392,7 @@ async function backendRun(row: QueueRow) {
 
   if (row.type === 'paper') {
     if (!row.file.name.toLowerCase().endsWith('.pdf')) {
-      row.error = '论文检测仅支持 PDF（FR-LWJC）。'
+      row.error = '论文检测仅支持 PDF。'
       throw new Error(row.error)
     }
     const taskName = `${row.batchSessionId.slice(0, 24)}-${mode.value}-${row.name}`

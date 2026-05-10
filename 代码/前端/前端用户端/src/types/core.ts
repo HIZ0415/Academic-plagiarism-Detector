@@ -4,7 +4,7 @@ export interface UserProfile {
   id: number
   username: string
   role: 'publisher' | 'reviewer' | 'admin' | string
-  organization_id?: number | null
+  organization_id?: number | null 
   avatar?: string
 }
 
@@ -19,7 +19,7 @@ export interface AcademicResourceFile {
 export interface DetectionTask {
   task_id: number | string
   task_name: string
-  task_type: 'paper_aigc' | 'resource_check' | 'image_detection' | string
+  task_type: 'paper_aigc' | 'resource_check' | 'image_detection' | 'review_detection' | string
   status: TaskStatus
   upload_time?: string
   completion_time?: string | null
@@ -81,3 +81,33 @@ export interface ActivityLogItem {
   created_at: string
   operator_id?: number
 }
+
+
+export interface ImageDetectionResult {
+  task_id: number | string
+  total_images: number
+  normal_count: number
+  suspicious_count: number
+  details: Array<{
+    image_url: string
+    status: 'normal' | 'suspicious'
+    confidence: number // 置信度 0-1
+    analysis?: string // 可选的分析描述
+  }>
+}
+
+
+export interface ReviewDetectionResult {
+  task_id: number | string
+  template_risk: 'low' | 'medium' | 'high'
+  anomaly_segments: number
+  suggestion: string
+  analysis: string // 详细分析文本
+}
+
+
+export type TaskResult = 
+  | PaperAigcResult 
+  | ResourceCheckResult 
+  | ImageDetectionResult 
+  | ReviewDetectionResult

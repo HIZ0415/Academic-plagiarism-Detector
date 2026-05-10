@@ -3,7 +3,7 @@
     <v-card-item>
       <v-card-title class="text-h5 font-weight-bold">同行评审 Review 检测</v-card-title>
       <v-card-subtitle class="text-body-2 text-wrap mt-1">
-        需求 <strong>FR-PLJC-0001</strong>：对同行评审（Review）文本做自动化检测；输入为<strong>在线文本</strong>或<strong>TXT 文件</strong>，需求写明「本阶段不新增 Review PDF、DOCX 等格式」。接口
+        需求：对同行评审（Review）文本做自动化检测；输入为<strong>在线文本</strong>或<strong>TXT 文件</strong>，需求写明「本阶段不新增 Review PDF、DOCX 等格式」。接口
         <code>POST /api/review/submit/</code>（字段 <code>text</code> 或 <code>file</code>）与《current-project-api》§16.2 一致。
       </v-card-subtitle>
       <div class="d-flex flex-wrap align-center ga-2 mt-3">
