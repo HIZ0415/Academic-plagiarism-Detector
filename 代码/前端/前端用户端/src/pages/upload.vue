@@ -136,6 +136,11 @@
             </v-chip>
           </template>
 
+          <template #item.errorHint="{ item }">
+            <span v-if="item.error" class="text-caption text-error">{{ item.error }}</span>
+            <span v-else class="text-caption text-medium-emphasis">—</span>
+          </template>
+
           <template #item.actions="{ item }">
             <v-btn
               v-if="item.taskId && item.type !== 'image'"
@@ -213,8 +218,29 @@ const headers = [
   { title: '类型', key: 'type', align: 'center' as const, width: 120 },
   { title: '进度', key: 'progress', align: 'center' as const, width: 220 },
   { title: '状态', key: 'status', align: 'center' as const, width: 140 },
+  { title: '失败原因', key: 'errorHint', align: 'start' as const, minWidth: 200 },
   { title: '操作', key: 'actions', align: 'center' as const, sortable: false, width: 100 },
 ] as const
+
+/** 从 axios / 后端响应取出可读说明，便于编辑模式下自助排查 */
+function axiosDetail(err: unknown): string {
+  const ax = err as {
+    response?: { data?: Record<string, unknown>; status?: number }
+    message?: string
+  }
+  const d = ax.response?.data
+  if (d && typeof d === 'object') {
+    const detail = d.detail
+    const message = d.message
+    if (typeof detail === 'string') return detail
+    if (Array.isArray(detail) && typeof detail[0] === 'string') return detail[0]
+    if (typeof message === 'string') return message
+  }
+  if (ax.response?.status === 403) {
+    return '无权限（403）：发布者需归属组织且具备上传/提交权限；若 Django 里用户无 organization，也会 403。'
+  }
+  return typeof ax.message === 'string' ? ax.message : '请求失败，请打开 F12 → Network 查看接口返回'
+}
 
 const rows = ref<QueueRow[]>([])
 
@@ -371,7 +397,14 @@ async function backendRun(row: QueueRow) {
     }
     const taskName = `${row.batchSessionId.slice(0, 24)}-${mode.value}-${row.name}`
     const submitRes = await paperApi.uploadAndSubmitAigcTask(row.file, taskName)
-    row.taskId = String(submitRes.data.task_id)
+    const payload = submitRes.data as { task_id?: string | number; status?: string; error_message?: string }
+    row.taskId = String(payload.task_id ?? '')
+    if (payload.status === 'failed') {
+      row.error =
+        payload.error_message ||
+        '论文 AIGC 检测失败（常见：本机 AI 服务未启动、Django 未配置 AI_SERVICE_URL，或 PDF 预处理异常）'
+      throw new Error(row.error)
+    }
     row.progress = 100
     row.status = 'completed'
     return
@@ -455,8 +488,11 @@ async function start() {
       } else {
         await backendRun(row)
       }
-    } catch {
+    } catch (e: unknown) {
       row.status = row.status === 'completed' ? 'completed' : 'failed'
+      if (!row.error) {
+        row.error = axiosDetail(e)
+      }
     }
   }
 
@@ -464,7 +500,9 @@ async function start() {
 
   const okCount = rows.value.filter((r) => r.status === 'completed').length
   const failCount = rows.value.length - okCount
-  snackbar.showMessage(`本批检测结束：成功 ${okCount}，失败 ${failCount}`, failCount ? 'warning' : 'success')
+  const firstFail = rows.value.find((r) => r.status === 'failed' && r.error)
+  const hint = firstFail?.error ? `（首条：${firstFail.error.slice(0, 100)}${firstFail.error.length > 100 ? '…' : ''}）` : ''
+  snackbar.showMessage(`本批检测结束：成功 ${okCount}，失败 ${failCount} ${hint}`, failCount ? 'warning' : 'success')
   saveLocalTasks(rows.value)
 }
 

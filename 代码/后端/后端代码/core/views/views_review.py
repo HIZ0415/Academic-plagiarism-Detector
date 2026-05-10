@@ -542,8 +542,15 @@ def get_publisher_review_tasks(request):
         'detection_result__detection_task').prefetch_related('reviewers', 'manual_reviews')
     review_requests = review_requests.order_by('-request_time')
 
-    if status_filter:
-        review_requests = review_requests.filter(status1=status_filter)
+    # 与用户端 annual.vue 一致：pending=待管理端；in_progress=已通过且专家未完成；completed=专家侧已全部完成
+    if status_filter == 'pending':
+        review_requests = review_requests.filter(status2='pending')
+    elif status_filter == 'in_progress':
+        review_requests = review_requests.filter(status2='accepted').exclude(status1='completed')
+    elif status_filter == 'completed':
+        review_requests = review_requests.filter(status2='accepted', status1='completed')
+    elif status_filter == 'failed':
+        review_requests = review_requests.filter(status2='refused')
     if start_time:
         review_requests = review_requests.filter(request_time__gte=start_time)
     if end_time:
@@ -563,19 +570,25 @@ def get_publisher_review_tasks(request):
         completed_reviews_count = review_request.manual_reviews.filter(status='completed').count()
         progress = f"{completed_reviews_count}/{reviewers_count}"
 
-        # 计算状态逻辑：根据 status2 决定显示哪个状态
-        if review_request.status2 == 'accepted':
-            display_status = review_request.status1  # 使用 status1
+        if review_request.status2 == 'refused':
+            ui_status = 'failed'
+        elif review_request.status2 == 'pending':
+            ui_status = 'pending'
+        elif review_request.status1 == 'completed':
+            ui_status = 'completed'
         else:
-            display_status = review_request.status2  # 使用 status2
+            ui_status = 'in_progress'
 
+        dt = getattr(review_request.detection_result, 'detection_task', None)
         tasks.append({
             'review_request_id': review_request.id,
             'request_time': review_request.request_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'status': display_status,  # 动态选择状态
+            'status': ui_status,
             'status1': review_request.status1,
             'status2': review_request.status2,
-            'progress': progress
+            'progress': progress,
+            'detection_task_id': str(dt.id) if dt else '',
+            'task_type': dt.task_type if dt else '',
         })
 
     return Response({

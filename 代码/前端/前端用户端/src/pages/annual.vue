@@ -422,6 +422,7 @@ const statusOptions = [
   { title: '审核中', value: 'pending' },
   { title: '已下发', value: 'in_progress' },
   { title: '已完成', value: 'completed' },
+  { title: '已拒绝', value: 'failed' },
 ]
 
 const timeRangeOptions = [
@@ -440,6 +441,8 @@ const getStatusColor = (status: string) => {
       return 'info'
     case 'completed':
       return 'success'
+    case 'failed':
+      return 'error'
     default:
       return 'grey'
   }
@@ -453,6 +456,8 @@ const getStatusName = (status: string) => {
       return '已下发'
     case 'completed':
       return '已完成'
+    case 'failed':
+      return '已拒绝'
     default:
       return status
   }
