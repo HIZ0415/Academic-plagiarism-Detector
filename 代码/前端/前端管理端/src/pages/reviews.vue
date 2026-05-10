@@ -214,6 +214,9 @@
 
               <div class="d-flex flex-column gap-2">
                 <div class="text-subtitle-1 font-weight-bold">审核人列表</div>
+                <div v-if="!reviewDetails.persons?.length" class="text-caption text-medium-emphasis">
+                  申请提交时若组织内尚无审稿人，此处可能为空。<strong>点「通过」</strong>时会自动绑定当时本组织内的全部专家（审稿人）账号；若通过时仍无人，请先在组织中添加审稿人后再审批。
+                </div>
                 <div class="d-flex flex-wrap gap-4">
                   <div v-for="person in reviewDetails.persons" :key="person.id" class="d-flex align-center">
                     <v-avatar size="32" class="mr-2">
@@ -412,9 +415,13 @@ async function approveRequest() {
     showRejectDialog.value = false
     rejectReason.value = ''
     fetchRequests(currentPage.value, pageSize.value)
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('处理审核请求失败:', error)
-    snackbar.showMessage('处理审核请求失败', 'error')
+    const msg =
+      error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined
+    snackbar.showMessage(msg || '处理审核请求失败', 'error')
   }
 }
 
@@ -434,9 +441,13 @@ async function confirmReject() {
     showRejectDialog.value = false
     rejectReason.value = ''
     fetchRequests(currentPage.value, pageSize.value)
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('处理审核请求失败:', error)
-    snackbar.showMessage('处理审核请求失败', 'error')
+    const msg =
+      error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined
+    snackbar.showMessage(msg || '处理审核请求失败', 'error')
   }
 }
 

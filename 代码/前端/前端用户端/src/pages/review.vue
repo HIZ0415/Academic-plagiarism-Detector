@@ -4,7 +4,7 @@
       <v-col cols="12" md="8">
         <h1 class="text-h4 font-weight-bold mb-2">人工审核任务池</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          路由 <code>/review</code>：<strong>审稿人人工复核</strong>（FR-YHSH-0001 任务池、FR-YHSH-0002 鉴定）。任务材料可含图像 / 论文 / Review 等，以 <code>task_kind</code> 区分；与发布者侧 Review 文本<strong>自动检测</strong>（统一入口 <code>/upload</code>，FR-PLJC）不是同一功能。
+          本页供<strong>专家（审稿人）</strong>使用：在管理端通过申请后，在此查看并处理人工复核任务。材料类型（图像 / 论文 / Review 等）由后端 <code>task_kind</code> 区分。与发布者在 <code>/upload</code> 发起的 Review 文本<strong>自动检测</strong>不是同一入口。
         </p>
       </v-col>
     </v-row>
