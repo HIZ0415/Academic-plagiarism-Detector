@@ -4,7 +4,7 @@
       <v-col cols="12" md="8">
         <div class="text-h4 font-weight-bold mb-1">统一学术检测</div>
         <div class="text-body-2 text-medium-emphasis">
-          本页为<strong>唯一检测提交入口</strong>：同一批次可同时提交<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及 ZIP/RAR 等；各子任务并行执行，共享<strong>批次 ID</strong>，便于在历史中筛选与后续人工审核关联。检测模式仅<strong>快速</strong>与<strong>精准</strong>。
+          本页为<strong>唯一检测提交入口</strong>：同一批次可同时提交<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及 ZIP/RAR 等；各子任务并行执行，共享<strong>批次 ID</strong>，便于在历史中筛选与后续人工审核关联。
         </div>
       </v-col>
       <v-col cols="12" md="4" class="d-flex justify-end">
@@ -24,7 +24,7 @@
 
     <v-card class="pa-4" variant="outlined">
       <v-row>
-        <v-col cols="12" md="8">
+        <v-col cols="12">
           <v-file-input
             v-model="files"
             multiple
@@ -33,15 +33,6 @@
             prepend-icon="mdi-paperclip"
             label="选择文件（图像、PDF 论文、TXT Review、ZIP/RAR 等，可与下方 Review 文本同批）"
             accept="image/*,.pdf,.txt,.zip,.rar"
-            :disabled="running"
-          />
-        </v-col>
-        <v-col cols="12" md="4">
-          <v-select
-            v-model="mode"
-            :items="modeItems"
-            label="检测模式"
-            prepend-icon="mdi-tune"
             :disabled="running"
           />
         </v-col>
@@ -163,10 +154,11 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import paperApi from '@/api/paper'
+import publisherApi from '@/api/publisher'
+import uploadApi from '@/api/upload'
 import { submitReviewDetection } from '@/api/reviewDetection'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 
-type DetectMode = 'fast' | 'accurate'
 type ResourceType = 'image' | 'paper' | 'review' | 'unknown'
 type RowStatus = 'pending' | 'running' | 'completed' | 'failed'
 
@@ -203,14 +195,8 @@ const snackbar = useSnackbarStore()
 
 const files = ref<File[]>([])
 const reviewPasteText = ref('')
-const mode = ref<DetectMode>('fast')
 const running = ref(false)
 const batchSessionId = ref('')
-
-const modeItems = computed(() => ([
-  { title: '快速', value: 'fast' as const },
-  { title: '精准', value: 'accurate' as const },
-]))
 
 const headers = [
   { title: '批次', key: 'batchSessionId', align: 'center' as const, width: 120 },
@@ -218,7 +204,7 @@ const headers = [
   { title: '类型', key: 'type', align: 'center' as const, width: 120 },
   { title: '进度', key: 'progress', align: 'center' as const, width: 220 },
   { title: '状态', key: 'status', align: 'center' as const, width: 140 },
-  { title: '失败原因', key: 'errorHint', align: 'start' as const, minWidth: 200 },
+  { title: '失败原因', key: 'errorHint', align: 'start' as const, minWidth: '200px' },
   { title: '操作', key: 'actions', align: 'center' as const, sortable: false, width: 100 },
 ] as const
 
@@ -377,7 +363,7 @@ async function mockRun(row: QueueRow) {
   row.progress = 0
 
   const steps = [15, 35, 60, 85, 100]
-  const stepMs = mode.value === 'fast' ? 250 : 450
+  const stepMs = 300
   for (const p of steps) {
     await new Promise((r) => setTimeout(r, stepMs))
     row.progress = p
@@ -390,12 +376,55 @@ async function backendRun(row: QueueRow) {
   row.status = 'running'
   row.progress = 10
 
+  if (row.type === 'image') {
+    if (!row.file.type.startsWith('image/')) {
+      row.error = '图像检测仅支持图片文件。'
+      throw new Error(row.error)
+    }
+
+    const formData = new FormData()
+    formData.append('file', row.file)
+    const uploadRes = await uploadApi.uploadFile(formData)
+    row.progress = 45
+
+    const fileId = (uploadRes.data as { file_id?: string | number; id?: string | number }).file_id
+      ?? (uploadRes.data as { id?: string | number }).id
+    if (!fileId) {
+      row.error = '图片上传成功，但后端未返回 file_id。'
+      throw new Error(row.error)
+    }
+
+    const imagesRes = await uploadApi.getExtractedImages({
+      file_id: fileId,
+      page_number: 1,
+      page_size: 100,
+    })
+    const images = ((imagesRes.data as { images?: Array<{ image_id?: string | number }> }).images || [])
+      .map((item) => item.image_id)
+      .filter((id): id is string | number => id !== undefined && id !== null)
+    if (!images.length) {
+      row.error = '图片已上传，但后端未生成可检测的 image_id。'
+      throw new Error(row.error)
+    }
+
+    row.progress = 70
+    const taskName = `${row.batchSessionId.slice(0, 24)}-${row.name}`
+    const submitRes = await publisherApi.submitDetection({
+      image_ids: images,
+      task_name: taskName,
+    })
+    row.taskId = String((submitRes.data as { task_id?: string | number }).task_id ?? '')
+    row.progress = 100
+    row.status = 'completed'
+    return
+  }
+
   if (row.type === 'paper') {
     if (!row.file.name.toLowerCase().endsWith('.pdf')) {
       row.error = '论文检测仅支持 PDF。'
       throw new Error(row.error)
     }
-    const taskName = `${row.batchSessionId.slice(0, 24)}-${mode.value}-${row.name}`
+    const taskName = `${row.batchSessionId.slice(0, 24)}-${row.name}`
     const submitRes = await paperApi.uploadAndSubmitAigcTask(row.file, taskName)
     const payload = submitRes.data as { task_id?: string | number; status?: string; error_message?: string }
     row.taskId = String(payload.task_id ?? '')
@@ -412,7 +441,7 @@ async function backendRun(row: QueueRow) {
 
   if (row.type === 'review') {
     const baseName = row.name.replace(/\.[^.]+$/, '') || 'review'
-    const taskName = `${row.batchSessionId.slice(0, 24)}-${mode.value}-${baseName}`
+    const taskName = `${row.batchSessionId.slice(0, 24)}-${baseName}`
     if (row.pastedReviewText != null && row.pastedReviewText.length > 0) {
       const submitRes = await submitReviewDetection({
         task_name: taskName,

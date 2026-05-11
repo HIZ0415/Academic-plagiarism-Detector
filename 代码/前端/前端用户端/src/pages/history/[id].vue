@@ -3,7 +3,7 @@
     <v-card-title class="d-flex align-center">
       <div>
         <div class="text-h5 font-weight-bold">检测记录详情</div>
-        <div class="text-body-2 text-medium-emphasis">统一任务详情页（任务 ID：{{ taskId }})</div>
+        <div class="text-body-2 text-medium-emphasis">统一任务详情页（任务编号：{{ formatTaskId(taskId) }})</div>
       </div>
       <v-spacer />
       <v-chip :color="statusColor(task.status)" variant="tonal">{{ statusLabel(task.status) }}</v-chip>
@@ -47,7 +47,7 @@
             <div class="text-subtitle-1 font-weight-bold mb-3">C. 操作</div>
             <div class="d-flex flex-column ga-3">
               <v-btn color="primary" variant="elevated" @click="goSpecialDetail" :disabled="task.status !== 'completed'">
-                进入专项详情
+                查看专项结果
               </v-btn>
               <v-btn color="primary" variant="outlined" @click="goHistory">返回检测历史</v-btn>
               <v-btn color="error" variant="text" @click="deleteTask" :disabled="task.status !== 'completed'">
@@ -85,7 +85,10 @@ const route = useRoute()
 const router = useRouter()
 const snackbar = useSnackbarStore()
 
-const taskId = computed(() => String(route.params.id || ''))
+const taskId = computed(() => {
+  const id = (route.params as Record<string, string | string[] | undefined>).id
+  return Array.isArray(id) ? String(id[0] || '') : String(id || '')
+})
 
 const task = ref<TaskDetail>({
   task_id: taskId.value,
@@ -98,6 +101,19 @@ const task = ref<TaskDetail>({
 })
 
 const useMockAigc = mockAigcFeaturesEnabled()
+
+function formatTaskId(id?: string | number) {
+  const raw = String(id ?? '').trim()
+  if (!raw) return 'DT-000000'
+  const digits = raw.replace(/\D/g, '')
+  if (digits) return `DT-${digits.slice(-6).padStart(6, '0')}`
+
+  let hash = 0
+  for (const ch of raw) {
+    hash = (hash * 31 + ch.charCodeAt(0)) % 1000000
+  }
+  return `DT-${String(hash).padStart(6, '0')}`
+}
 
 function typeLabel(t: UnifiedTaskType) {
   if (t === 'paper_aigc') return '论文 AIGC'

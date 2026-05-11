@@ -4,7 +4,7 @@
       <v-card-title class="d-flex align-center pa-0">
         <div>
           <div class="text-h5 font-weight-bold">检测记录详情</div>
-          <div class="text-body-2 text-medium-emphasis">任务 ID：{{ detailTask.task_id }}</div>
+          <div class="text-body-2 text-medium-emphasis">任务编号：{{ formatTaskId(detailTask.task_id) }}</div>
         </div>
         <v-spacer></v-spacer>
         <v-chip :color="getStatusColor(detailTask.status)" size="small">{{ getStatus(detailTask.status) }}</v-chip>
@@ -94,7 +94,7 @@
                   人工审核申请
                 </v-btn>
                 <v-btn color="primary" variant="tonal" class="text-none" :disabled="detailTask.status !== 'completed'" @click="goSpecialDetail(detailTask)">
-                  进入专项详情
+                  查看专项结果
                 </v-btn>
                 <v-btn
                   variant="outlined"
@@ -125,7 +125,9 @@
         <v-icon class="mr-2">mdi-filter</v-icon>
         筛选
       </v-btn>
-      <!-- <v-btn variant="outlined">新建</v-btn> -->
+      <v-btn color="primary" prepend-icon="mdi-upload" @click="goUpload">
+        统一检测
+      </v-btn>
     </v-card-title>
 
     <v-alert v-if="batchSessionFilter" type="info" variant="tonal" density="compact" class="mt-3 mb-2">
@@ -167,7 +169,7 @@
         class="elevation-1" :show-select="showSelection" item-value="id" hide-default-footer>
         <!-- 任务状态列自定义 -->
         <template v-slot:item.task_id="{ item }">
-          <span>{{ item.task_id }}</span>
+          <span :title="`原始 ID：${item.task_id}`">{{ formatTaskId(item.task_id) }}</span>
         </template>
 
         <template v-slot:item.upload_time="{ item }">
@@ -191,7 +193,7 @@
           <div class="d-flex justify-center gap-2">
             <v-btn size="small" color="primary" variant="text" @click="handleNext(item)"
               :disabled="!canEnterDetail(item)">
-              下一步
+              更多操作
             </v-btn>
             <v-btn size="small" color="error" variant="text" @click="handleDelete(item)"
               :disabled="item.status !== 'completed'">
@@ -251,7 +253,7 @@ const loading = ref(false)
 
 // 表格列定义
 const headers = [
-  { title: '任务ID', key: 'task_id', align: 'center' as const, width: '120px' },
+  { title: '任务编号', key: 'task_id', align: 'center' as const, width: '130px' },
   { title: '批次', key: 'batch_session_id', align: 'center' as const, width: '130px' },
   { title: '上传时间', key: 'upload_time', align: 'center' as const, width: '180px' },
   { title: '完成时间', key: 'completion_time', align: 'center' as const, width: '180px' },
@@ -503,6 +505,19 @@ function shortBatchId(id?: string) {
   return id.length > 18 ? `${id.slice(0, 10)}…${id.slice(-6)}` : id
 }
 
+function formatTaskId(id?: string | number) {
+  const raw = String(id ?? '').trim()
+  if (!raw) return 'DT-000000'
+  const digits = raw.replace(/\D/g, '')
+  if (digits) return `DT-${digits.slice(-6).padStart(6, '0')}`
+
+  let hash = 0
+  for (const ch of raw) {
+    hash = (hash * 31 + ch.charCodeAt(0)) % 1000000
+  }
+  return `DT-${String(hash).padStart(6, '0')}`
+}
+
 function clearBatchFilter() {
   const q = { ...route.query } as Record<string, string | string[] | undefined>
   delete q.batch_session_id
@@ -620,6 +635,10 @@ const getTaskTypeLabel = (taskType?: string) => {
 
 const backToList = () => {
   router.push('/history')
+}
+
+const goUpload = () => {
+  router.push('/upload')
 }
 
 const goSpecialDetail = (task: Task) => {

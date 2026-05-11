@@ -84,7 +84,11 @@ router.beforeEach(
     return
   }
 
-  // 检测提交统一入口为 /upload；专项页仅保留带 task_id 的结果深链（历史「进入专项详情」）
+  // 检测提交统一入口为 /upload；专项页仅保留带 task_id 的结果深链（历史「查看专项结果」）
+  if (allowUnauth && to.path === '/detect/image') {
+    next({ path: '/upload', replace: true })
+    return
+  }
   if (allowUnauth && (to.path === '/detect/paper' || to.path === '/detect/review') && !String(to.query.task_id || '').trim()) {
     next({ path: '/upload', replace: true })
     return
