@@ -850,6 +850,15 @@ function Ensure-LocalDemoAccounts {
     }
     $bootstrap = @"
 import json
+import os
+import sys
+
+sys.path.insert(0, os.getcwd())
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'fake_image_detector.local_settings')
+
+import django
+django.setup()
+
 from django.contrib.auth import get_user_model
 from core.models import Organization, PublisherReviewerRelationship
 
@@ -911,7 +920,15 @@ PublisherReviewerRelationship.objects.update_or_create(
 
 print('ready')
 "@
-    Invoke-CommandChecked -Executable $BackendPython -Arguments @('manage.py', 'shell', '-c', $bootstrap) -WorkingDirectory $BackendDir
+    $bootstrapPath = Join-Path ([System.IO.Path]::GetTempPath()) 'academic_plagiarism_detector_demo_accounts.py'
+
+    try {
+        Set-Content -LiteralPath $bootstrapPath -Value $bootstrap -Encoding UTF8
+        Invoke-CommandChecked -Executable $BackendPython -Arguments @($bootstrapPath) -WorkingDirectory $BackendDir
+    }
+    finally {
+        Remove-Item -LiteralPath $bootstrapPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Wait-HttpReady {
