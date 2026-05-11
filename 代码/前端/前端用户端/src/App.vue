@@ -273,7 +273,7 @@ const getCategoryLabel = (category: string) => {
     case 'GLOBAL': return '管理员'
     case 'SYSTEM': return 'AI检测'
     case 'P2R': return '出版社'
-    case 'R2P': return '审稿人'
+    case 'R2P': return '专家'
     default: return '未知'
   }
 }

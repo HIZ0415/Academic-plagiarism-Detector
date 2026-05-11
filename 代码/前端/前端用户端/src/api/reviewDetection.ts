@@ -61,7 +61,7 @@ export interface ReviewDetectionResult {
   basic_explanation?: string[]
 }
 
-/** 需求 FR-PLJC-0001 / API 文档 §16.2：在线文本或 .txt 文件，二者择一提交 */
+/** API 文档 §16.2：在线文本或 .txt 文件，二者择一提交 */
 export function submitReviewDetection(params: {
   task_name: string
   text?: string

@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$BindHost = '127.0.0.1',
     [int]$UserPort = 3000,
@@ -1157,6 +1157,11 @@ if ($FullFrontendMock) {
     Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_USE_FULL_FRONTEND_MOCK' -Value 'true'
     Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_API_URL' -Value ''
 }
+else {
+    Write-Step 'User frontend: real backend mode (disabling full-stack / workflow mock flags)'
+    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_USE_FULL_FRONTEND_MOCK' -Value 'false'
+    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW' -Value 'false'
+}
 Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName 'user' -FrontendDir $UserFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
 Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName 'admin' -FrontendDir $AdminFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
 Ensure-AiModelArtifact -AiArtifactPath $AiArtifactPath -BackendPython $BackendPython -AiDir $AiDir
@@ -1180,33 +1185,40 @@ Write-Step 'Starting local services'
 $env:PYTHONIOENCODING = 'utf-8'
 $env:PYTHONUTF8 = '1'
 $env:AI_SERVICE_TIMEOUT_SECONDS = '120'
-$aiProcess = Start-ManagedProcess -Name 'ai-service' -Executable $BackendPython -Arguments @('ai_http_service.py', '--host', $BindHost, '--port', "$AiPort") -WorkingDirectory $AiDir -HealthUrl "http://$BindHost`:$AiPort/health" -LogsDir $LogsDir -Port $AiPort -TimeoutSeconds 120
+# URL 一律用 ASCII 拼接，兼容 Windows PowerShell 5.1 与各类文件编码
+$aiHealthUrl = 'http://' + $BindHost + ':' + $AiPort + '/health'
+$aiProcess = Start-ManagedProcess -Name 'ai-service' -Executable $BackendPython -Arguments @('ai_http_service.py', '--host', $BindHost, '--port', "$AiPort") -WorkingDirectory $AiDir -HealthUrl $aiHealthUrl -LogsDir $LogsDir -Port $AiPort -TimeoutSeconds 120
 
 $env:DJANGO_SETTINGS_MODULE = 'fake_image_detector.local_settings'
-$env:AI_SERVICE_URL = "http://$BindHost`:$AiPort"
+$env:AI_SERVICE_URL = 'http://' + $BindHost + ':' + $AiPort
 $env:AI_SERVICE_TIMEOUT = '1200'
-$backendProcess = Start-ManagedProcess -Name 'django' -Executable $BackendPython -Arguments @('manage.py', 'runserver', "$BindHost`:$BackendPort") -WorkingDirectory $BackendDir -HealthUrl "http://$BindHost`:$BackendPort/admin/" -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
+$djangoHealthUrl = 'http://' + $BindHost + ':' + $BackendPort + '/admin/'
+$djangoListen = $BindHost + ':' + $BackendPort
+$backendProcess = Start-ManagedProcess -Name 'django' -Executable $BackendPython -Arguments @('manage.py', 'runserver', $djangoListen) -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
 
-$userProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $UserFrontendDir -Name 'frontend-user' -BindHost $BindHost -Port $UserPort -LogsDir $LogsDir -HealthUrl "http://$BindHost`:$UserPort/"
-$adminProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $AdminFrontendDir -Name 'frontend-admin' -BindHost $BindHost -Port $AdminPort -LogsDir $LogsDir -HealthUrl "http://$BindHost`:$AdminPort/"
+$userHealthUrl = 'http://' + $BindHost + ':' + $UserPort + '/'
+$adminHealthUrl = 'http://' + $BindHost + ':' + $AdminPort + '/'
+$userProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $UserFrontendDir -Name 'frontend-user' -BindHost $BindHost -Port $UserPort -LogsDir $LogsDir -HealthUrl $userHealthUrl
+$adminProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $AdminFrontendDir -Name 'frontend-admin' -BindHost $BindHost -Port $AdminPort -LogsDir $LogsDir -HealthUrl $adminHealthUrl
 
 $state = @($aiProcess, $backendProcess, $userProcess, $adminProcess)
 $state | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding UTF8
 
 Write-Host ''
-Write-Host "Local validation environment is ready:" -ForegroundColor Green
-Write-Host "  User frontend:  http://$BindHost`:$UserPort"
-Write-Host "  Admin frontend: http://$BindHost`:$AdminPort"
-Write-Host "  Django:         http://$BindHost`:$BackendPort/admin/"
-Write-Host "  AI service:     http://$BindHost`:$AiPort/health"
+Write-Host 'Local validation environment is ready:' -ForegroundColor Green
+# 仅用 ASCII 拼接，避免 PS 5.1 对 -f / 花括号与「智能引号」文件的解析问题
+Write-Host ('  User frontend:  http://' + $BindHost + ':' + $UserPort)
+Write-Host ('  Admin frontend: http://' + $BindHost + ':' + $AdminPort)
+Write-Host ('  Django:         http://' + $BindHost + ':' + $BackendPort + '/admin/')
+Write-Host ('  AI service:     http://' + $BindHost + ':' + $AiPort + '/health')
 Write-Host ''
-Write-Host "Node toolchain: $($NodeToolchain.Source) $($NodeToolchain.Version)"
-Write-Host "Admin login:    $AdminEmail / $AdminPassword"
-Write-Host "Publisher:      $PublisherEmail / $PublisherPassword"
-Write-Host "Reviewer:       $ReviewerEmail / $ReviewerPassword"
-Write-Host "Logs:           $LogsDir"
-Write-Host "Stop with:      .\scripts\stop-local-windows.ps1"
+Write-Host ('Node toolchain: ' + $NodeToolchain.Source + ' ' + $NodeToolchain.Version)
+Write-Host ('Admin login:    ' + $AdminEmail + ' / ' + $AdminPassword)
+Write-Host ('Publisher:      ' + $PublisherEmail + ' / ' + $PublisherPassword)
+Write-Host ('Reviewer:       ' + $ReviewerEmail + ' / ' + $ReviewerPassword)
+Write-Host ('Logs:           ' + $LogsDir)
+Write-Host 'Stop with:      .\scripts\stop-local-windows.ps1'
 if ($FullFrontendMock) {
     Write-Host ''
-    Write-Host "User client is in full frontend mock mode. Login without Django. Notifications use HTTP polling." -ForegroundColor Yellow
+    Write-Host 'User client is in full frontend mock mode. Login without Django. Notifications use HTTP polling.' -ForegroundColor Yellow
 }

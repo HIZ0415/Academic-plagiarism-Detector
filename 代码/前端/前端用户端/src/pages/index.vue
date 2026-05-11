@@ -5,7 +5,7 @@
         <v-card variant="tonal">
           <v-card-title class="text-h5">欢迎使用学术内容诚信检测平台</v-card-title>
           <v-card-text>
-            平台支持图像、论文 PDF（全篇 AIGC 与参考文献规范等）、Review 文本（在线或 TXT）及人工审核协作；论文与 Review 的<strong>允许输入格式</strong>以需求 FR-LWJC / FR-PLJC 及接口约定为准（论文仅 PDF，Review 非 PDF/DOCX 本阶段）。
+            平台支持图像、论文 PDF（全篇 AIGC 与参考文献规范等）、Review 文本（在线或 TXT）及人工审核协作。
           </v-card-text>
         </v-card>
       </v-col>
@@ -17,7 +17,7 @@
           <v-card class="h-100">
             <v-card-title class="text-h6">专家 · 人工审核任务池</v-card-title>
             <v-card-text class="text-body-2">
-              本卡片进入的是<strong>人工审核</strong>任务池（路由 <code>/review</code>，FR-YHSH-0001 / 0002），与发布者侧的<strong>Review 文本自动检测</strong>（统一入口 <code>/upload</code>，FR-PLJC）不是同一功能。任务类型可含图像、论文、Review 等材料单元；论文自动检测输入为 PDF，Review 自动检测为文本或 TXT。
+              本卡片进入的是<strong>人工审核</strong>任务池（路由 <code>/review</code>），与发布者侧的<strong>Review 文本自动检测</strong>（统一入口 <code>/upload</code>）不是同一功能。任务类型可含图像、论文、Review 等材料单元。
             </v-card-text>
             <v-card-actions>
               <v-btn color="primary" to="/review" prepend-icon="mdi-clipboard-check-multiple">进入人工审核</v-btn>
@@ -43,7 +43,7 @@
         <v-card class="h-100">
           <v-card-title class="text-h6">统一学术检测（唯一入口）</v-card-title>
           <v-card-text class="text-body-2">
-            <code>/upload</code>：同一批次可同时送检<strong>图像</strong>、<strong>论文 PDF</strong>（FR-LWJC）、<strong>Review</strong>（在线文本或 .txt，FR-PLJC）及压缩包等；系统为每批生成 <strong>batch_session_id</strong>，各子任务结果在检测历史中可筛选对照。检测模式仅<strong>快速 / 精准</strong>（FR-YHZS-0007）。论文与 Review 不再设独立提交页；带任务 ID 的历史深链仍可打开专项结果视图。
+            <code>/upload</code>：同一批次可同时送检<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及压缩包等；系统为每批生成 <strong>batch_session_id</strong>，各子任务结果在检测历史中可筛选对照。检测模式仅<strong>快速 / 精准</strong>。论文与 Review 不再设独立提交页；带任务 ID 的历史深链仍可打开专项结果视图。
           </v-card-text>
           <v-card-actions>
             <v-btn color="primary" to="/upload" prepend-icon="mdi-upload">进入统一检测</v-btn>

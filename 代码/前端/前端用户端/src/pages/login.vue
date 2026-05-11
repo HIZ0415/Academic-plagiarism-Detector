@@ -11,7 +11,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">精准检测模式</div>
-              <div class="text-body-2 text-grey">学术检测策略之一（需求 FR-YHZS-0007：仅<strong>快速</strong>与<strong>精准</strong>两档，与登录角色「编辑/专家」无关）。面向图像、论文 PDF、Review 文本等多类对象，由对应适配链路执行模型分析。</div>
+              <div class="text-body-2 text-grey">学术检测策略之一：仅<strong>快速</strong>与<strong>精准</strong>两档，与登录角色「编辑/专家」无关。面向图像、论文 PDF、Review 文本等多类对象，由对应适配链路执行模型分析。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -20,7 +20,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">快速检测模式</div>
-              <div class="text-body-2 text-grey">学术检测另一策略（FR-YHZS-0007），用于更快得到初筛结论；论文输入须为 PDF（FR-LWJC），Review 须为在线文本或 TXT（FR-PLJC）。</div>
+              <div class="text-body-2 text-grey">学术检测另一策略，用于更快得到初筛结论；论文输入须为 PDF，Review 须为在线文本或 TXT。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -29,7 +29,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">双重验证机制</div>
-              <div class="text-body-2 text-grey">AI初检+人工复核双保险，确保结果客观可信，降低误判风险。</div>
+              <div class="text-body-2 text-grey">AI 初检与人工复核结合，结论更稳妥。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -38,7 +38,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">多角色协同平台</div>
-              <div class="text-body-2 text-grey">支持出版社、审稿人多端登录，任务进度实时追踪，反馈结果集中归档。</div>
+              <div class="text-body-2 text-grey">编辑与专家（审稿人）分角色使用；专家即人工复核执行账号，任务进度可查。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -47,7 +47,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">可追溯审计</div>
-              <div class="text-body-2 text-grey">所有操作留痕，满足出版机构对流程透明性与合规性的严格要求</div>
+              <div class="text-body-2 text-grey">关键操作留痕，便于追溯与合规核对。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -56,7 +56,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">多维统计分析</div>
-              <div class="text-body-2 text-grey">自动生成结构化检测报告，附带篡改区域标记与证据链，助力学术争议裁定。</div>
+              <div class="text-body-2 text-grey">结构化报告与证据展示，便于复核与研判。</div>
             </div>
           </div>
         </div>
@@ -79,6 +79,9 @@
               class="role-btn">编辑</v-btn>
             <v-btn value="reviewer" :class="{ 'active-role': selectedRole === 'reviewer' }" class="role-btn">专家</v-btn>
           </v-btn-toggle>
+          <div class="text-caption text-medium-emphasis mt-2">
+            「专家」与文档中的「审稿人」为同一类账号（系统内角色 reviewer），负责管理端通过后的<strong>人工复核</strong>；与期刊「审稿」业务流程不是同一概念。
+          </div>
         </div>
 
         <v-alert
@@ -99,8 +102,8 @@
           class="mb-6 text-body-2"
         >
           <strong>注册说明：</strong>账号角色由<strong>邀请码</strong>决定，必须与上方选择的身份一致。
-          「专家」需使用组织下发的 <strong>审稿人（reviewer）邀请码</strong>；仅用「编辑」邀请码无法注册为专家。
-          邀请码可向组织管理员索取，或在组织审批通过后随邮件/管理流程分配（见概要设计：邀请码与角色绑定）。
+          「专家」即审稿人账号，需使用组织下发的 <strong>审稿人邀请码</strong>（注册后角色为 reviewer）；仅用「编辑」邀请码无法注册为专家。
+          邀请码可向组织管理员索取，或在审批通过后由邮件、管理流程发放。
         </v-alert>
 
         <v-form ref="form" @submit.prevent="handleSubmit">
@@ -544,6 +547,11 @@ const handleSubmit = async () => {
                 : typeof d?.detail === 'string'
                   ? d.detail
                   : '账号或密码错误'
+            // 后端 401 = EmailBackend 未匹配到用户或密码错误（与界面「编辑/专家」开关无直接关系）
+            if (selectedRole.value === 'reviewer') {
+              errorMessage +=
+                ' 专家登录须使用后台中「邮箱」与输入完全一致、且已正确设置密码的审稿人账号；若在 Django Admin 手建用户，请填写 email 并用「修改密码」保存。'
+            }
             break
           }
           case 400: {
