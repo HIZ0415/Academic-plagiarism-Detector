@@ -121,7 +121,7 @@ import time
 def submit_detection2(request):
     submit_time = time.time()
     user_id = request.user.id
-    mode = int(request.data['mode'])
+    mode = int(request.data.get('mode') or 1)
     user = User.objects.get(id=user_id)
     organization = user.organization  # 获取用户所属组织
     organization.reset_usage()  # 重置组织内所有用户的共享次数

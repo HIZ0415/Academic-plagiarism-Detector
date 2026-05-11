@@ -10,8 +10,8 @@
               <v-icon size="32" color="primary">mdi-magnify</v-icon>
             </div>
             <div class="feature-text">
-              <div class="text-subtitle-1 font-weight-medium">精准检测模式</div>
-              <div class="text-body-2 text-grey">学术检测策略之一：仅<strong>快速</strong>与<strong>精准</strong>两档，与登录角色「编辑/专家」无关。面向图像、论文 PDF、Review 文本等多类对象，由对应适配链路执行模型分析。</div>
+              <div class="text-subtitle-1 font-weight-medium">统一检测入口</div>
+              <div class="text-body-2 text-grey">面向图像、论文 PDF、Review 文本等多类对象，由对应适配链路执行模型分析。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -19,8 +19,8 @@
               <v-icon size="32" color="primary">mdi-compare</v-icon>
             </div>
             <div class="feature-text">
-              <div class="text-subtitle-1 font-weight-medium">快速检测模式</div>
-              <div class="text-body-2 text-grey">学术检测另一策略，用于更快得到初筛结论；论文输入须为 PDF，Review 须为在线文本或 TXT。</div>
+              <div class="text-subtitle-1 font-weight-medium">多类型材料检测</div>
+              <div class="text-body-2 text-grey">论文输入须为 PDF，Review 须为在线文本或 TXT，图像材料可直接上传进入检测队列。</div>
             </div>
           </div>
           <div class="feature-item">

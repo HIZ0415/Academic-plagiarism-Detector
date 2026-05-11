@@ -1,39 +1,39 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
-    [string]$BindHost = '127.0.0.1',
+    [string]$BindHost = "127.0.0.1",
     [int]$UserPort = 3000,
     [int]$AdminPort = 3001,
     [int]$BackendPort = 8000,
     [int]$AiPort = 8010,
-    [string]$LocalOrganizationName = 'Local Demo Organization',
-    [string]$LocalOrganizationEmail = 'local-org@example.com',
-    [string]$AdminUser = 'admin',
-    [string]$AdminEmail = 'admin@mail.com',
-    [string]$AdminPassword = 'Admin123!',
-    [string]$PublisherUser = 'publisher_test',
-    [string]$PublisherEmail = 'publisher_test@example.com',
-    [string]$PublisherPassword = 'Publisher123!',
-    [string]$ReviewerUser = 'reviewer_test',
-    [string]$ReviewerEmail = 'reviewer_test@example.com',
-    [string]$ReviewerPassword = 'Reviewer123!',
+    [string]$LocalOrganizationName = "Local Demo Organization",
+    [string]$LocalOrganizationEmail = "local-org@example.com",
+    [string]$AdminUser = "admin",
+    [string]$AdminEmail = "admin@mail.com",
+    [string]$AdminPassword = "Admin123!",
+    [string]$PublisherUser = "publisher_test",
+    [string]$PublisherEmail = "publisher_test@example.com",
+    [string]$PublisherPassword = "Publisher123!",
+    [string]$ReviewerUser = "reviewer_test",
+    [string]$ReviewerEmail = "reviewer_test@example.com",
+    [string]$ReviewerPassword = "Reviewer123!",
     [switch]$ForceDependencyRefresh,
     [switch]$FullFrontendMock
 )
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Write-Step {
     param([string]$Message)
-    Write-Host ''
+    Write-Host ""
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
 function Assert-WindowsPlatform {
     if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
-        throw 'This script is Windows-only. Use the Windows startup script on a Windows machine.'
+        throw "This script is Windows-only. Use the Windows startup script on a Windows machine."
     }
 }
 
@@ -42,8 +42,8 @@ function Resolve-RepositoryRoot {
 
     $current = Resolve-Path -LiteralPath $StartDir
     while ($null -ne $current) {
-        $hasGitIgnore = Test-Path -LiteralPath (Join-Path $current.Path '.gitignore')
-        $hasReadme = Test-Path -LiteralPath (Join-Path $current.Path 'README.md')
+        $hasGitIgnore = Test-Path -LiteralPath (Join-Path $current.Path ".gitignore")
+        $hasReadme = Test-Path -LiteralPath (Join-Path $current.Path "README.md")
         if ($hasGitIgnore -and $hasReadme) {
             return $current.Path
         }
@@ -56,7 +56,7 @@ function Resolve-RepositoryRoot {
         $current = Resolve-Path -LiteralPath $parent
     }
 
-    throw 'Unable to locate the repository root from the current script directory.'
+    throw "Unable to locate the repository root from the current script directory."
 }
 
 function Ensure-Directory {
@@ -87,7 +87,7 @@ function Find-FrontendDirectory {
         [string]$PackageName
     )
 
-    $packageFiles = @(Get-ChildItem -LiteralPath $RootDir -Recurse -File -Filter 'package.json')
+    $packageFiles = @(Get-ChildItem -LiteralPath $RootDir -Recurse -File -Filter "package.json")
     foreach ($packageFile in $packageFiles) {
         try {
             $package = Get-Content -LiteralPath $packageFile.FullName -Raw | ConvertFrom-Json
@@ -124,7 +124,7 @@ function Get-PortProcessIds {
         $matches = netstat -ano -p tcp | Select-String "[:\.]$Port\s"
         foreach ($match in $matches) {
             $text = $match.ToString()
-            if ($text -match '\s+(\d+)\s*$') {
+            if ($text -match "\s+(\d+)\s*$") {
                 $processId = [int]$Matches[1]
                 if ($processId -gt 0 -and -not $ids.Contains($processId)) {
                     $ids.Add($processId)
@@ -205,7 +205,7 @@ function Test-CommandAvailable {
 function ConvertTo-VersionObject {
     param([string]$VersionText)
 
-    $normalized = $VersionText.Trim().TrimStart('v')
+    $normalized = $VersionText.Trim().TrimStart("v")
     try {
         return [version]$normalized
     }
@@ -220,8 +220,8 @@ function Resolve-PythonFromKnownLocations {
         "$env:LocalAppData\Programs\Python\Python311\python.exe",
         "$env:ProgramFiles\Python312\python.exe",
         "$env:ProgramFiles\Python311\python.exe",
-        'C:\Python312\python.exe',
-        'C:\Python311\python.exe'
+        "C:\Python312\python.exe",
+        "C:\Python311\python.exe"
     )
 
     foreach ($candidate in $candidates) {
@@ -236,9 +236,9 @@ function Resolve-PythonFromKnownLocations {
 function Resolve-SystemPython {
     $pythonSnippet = 'import json, sys; print(json.dumps({"executable": sys.executable, "version": list(sys.version_info[:3])}))'
     $candidates = @(
-        @{ command = 'py'; arguments = @('-3.12', '-c', $pythonSnippet) },
-        @{ command = 'py'; arguments = @('-3.11', '-c', $pythonSnippet) },
-        @{ command = 'python'; arguments = @('-c', $pythonSnippet) }
+        @{ command = "py"; arguments = @("-3.12", "-c", $pythonSnippet) },
+        @{ command = "py"; arguments = @("-3.11", "-c", $pythonSnippet) },
+        @{ command = "python"; arguments = @("-c", $pythonSnippet) }
     )
 
     foreach ($candidate in $candidates) {
@@ -254,7 +254,7 @@ function Resolve-SystemPython {
 
             $result = $raw | ConvertFrom-Json
             $version = [version]::new([int]$result.version[0], [int]$result.version[1], [int]$result.version[2])
-            if ($version -ge [version]'3.11.0' -and (Test-Path -LiteralPath $result.executable)) {
+            if ($version -ge [version]"3.11.0" -and (Test-Path -LiteralPath $result.executable)) {
                 return @{
                     PythonPath = (Resolve-Path -LiteralPath $result.executable).Path
                     Version    = $version
@@ -271,7 +271,7 @@ function Resolve-SystemPython {
             $raw = & $knownPython -c $pythonSnippet 2>$null | Select-Object -First 1
             $result = $raw | ConvertFrom-Json
             $version = [version]::new([int]$result.version[0], [int]$result.version[1], [int]$result.version[2])
-            if ($version -ge [version]'3.11.0') {
+            if ($version -ge [version]"3.11.0") {
                 return @{
                     PythonPath = (Resolve-Path -LiteralPath $result.executable).Path
                     Version    = $version
@@ -286,23 +286,23 @@ function Resolve-SystemPython {
 }
 
 function Install-PythonOnWindows {
-    if (Test-CommandAvailable -CommandName 'winget') {
-        Write-Step 'Python not found. Installing Python 3.12 with winget.'
+    if (Test-CommandAvailable -CommandName "winget") {
+        Write-Step "Python not found. Installing Python 3.12 with winget."
         & winget install --id Python.Python.3.12 -e --accept-package-agreements --accept-source-agreements
         if ($LASTEXITCODE -eq 0) {
             return
         }
     }
 
-    if (Test-CommandAvailable -CommandName 'choco') {
-        Write-Step 'Python not found. Installing Python 3.12 with Chocolatey.'
+    if (Test-CommandAvailable -CommandName "choco") {
+        Write-Step "Python not found. Installing Python 3.12 with Chocolatey."
         & choco install python312 -y
         if ($LASTEXITCODE -eq 0) {
             return
         }
     }
 
-    throw 'Python 3.11+ is missing and automatic installation failed. Install Python manually, then rerun the script.'
+    throw "Python 3.11+ is missing and automatic installation failed. Install Python manually, then rerun the script."
 }
 
 function Ensure-BootstrapPython {
@@ -315,7 +315,7 @@ function Ensure-BootstrapPython {
 
     $python = Resolve-SystemPython
     if (-not $python) {
-        throw 'Python installation completed, but python.exe is still unavailable in this shell. Reopen PowerShell and rerun the script.'
+        throw "Python installation completed, but python.exe is still unavailable in this shell. Reopen PowerShell and rerun the script."
     }
 
     return $python
@@ -331,12 +331,12 @@ function Resolve-SystemNodeToolchain {
     try {
         $versionText = (& $nodeCommand.Source -p "process.versions.node" 2>$null | Select-Object -First 1).Trim()
         $version = ConvertTo-VersionObject -VersionText $versionText
-        if ($null -eq $version -or $version -lt [version]'20.0.0') {
+        if ($null -eq $version -or $version -lt [version]"20.0.0") {
             return $null
         }
 
         return @{
-            Source        = 'system'
+            Source        = "system"
             NodePath      = $nodeCommand.Source
             NpmCommand    = $npmCommand.Source
             NpmCliPath    = $null
@@ -351,8 +351,8 @@ function Resolve-SystemNodeToolchain {
 function Resolve-PortableNodeToolchain {
     param([string]$NodeDir)
 
-    $nodePath = Join-Path $NodeDir 'node.exe'
-    $npmCliPath = Join-Path $NodeDir 'node_modules\npm\bin\npm-cli.js'
+    $nodePath = Join-Path $NodeDir "node.exe"
+    $npmCliPath = Join-Path $NodeDir "node_modules\npm\bin\npm-cli.js"
     if (-not (Test-Path -LiteralPath $nodePath) -or -not (Test-Path -LiteralPath $npmCliPath)) {
         return $null
     }
@@ -360,12 +360,12 @@ function Resolve-PortableNodeToolchain {
     try {
         $versionText = (& $nodePath -p "process.versions.node" 2>$null | Select-Object -First 1).Trim()
         $version = ConvertTo-VersionObject -VersionText $versionText
-        if ($null -eq $version -or $version -lt [version]'20.0.0') {
+        if ($null -eq $version -or $version -lt [version]"20.0.0") {
             return $null
         }
 
         return @{
-            Source        = 'portable'
+            Source        = "portable"
             NodePath      = $nodePath
             NpmCommand    = $null
             NpmCliPath    = $npmCliPath
@@ -378,15 +378,15 @@ function Resolve-PortableNodeToolchain {
 }
 
 function Resolve-NodeFromKnownLocations {
-    $nodePath = Join-Path $env:ProgramFiles 'nodejs\node.exe'
-    $npmPath = Join-Path $env:ProgramFiles 'nodejs\npm.cmd'
+    $nodePath = Join-Path $env:ProgramFiles "nodejs\node.exe"
+    $npmPath = Join-Path $env:ProgramFiles "nodejs\npm.cmd"
     if ((Test-Path -LiteralPath $nodePath) -and (Test-Path -LiteralPath $npmPath)) {
         try {
             $versionText = (& $nodePath -p "process.versions.node" 2>$null | Select-Object -First 1).Trim()
             $version = ConvertTo-VersionObject -VersionText $versionText
-            if ($null -ne $version -and $version -ge [version]'20.0.0') {
+            if ($null -ne $version -and $version -ge [version]"20.0.0") {
                 return @{
-                    Source     = 'system'
+                    Source     = "system"
                     NodePath   = $nodePath
                     NpmCommand = $npmPath
                     NpmCliPath = $null
@@ -408,8 +408,8 @@ function Install-PortableNodeRuntime {
         [string]$Version
     )
 
-    $nodeDir = Join-Path $RootDir '.tools\node'
-    $downloadDir = Join-Path $LocalDevDir 'downloads'
+    $nodeDir = Join-Path $RootDir ".tools\node"
+    $downloadDir = Join-Path $LocalDevDir "downloads"
     $zipPath = Join-Path $downloadDir "node-v$Version-win-x64.zip"
     $extractRoot = Join-Path $downloadDir "node-v$Version-win-x64"
     $downloadUrl = "https://nodejs.org/dist/v$Version/node-v$Version-win-x64.zip"
@@ -443,23 +443,23 @@ function Install-PortableNodeRuntime {
 }
 
 function Install-SystemNodeRuntime {
-    if (Test-CommandAvailable -CommandName 'winget') {
-        Write-Step 'Node.js not found. Installing Node.js LTS with winget.'
+    if (Test-CommandAvailable -CommandName "winget") {
+        Write-Step "Node.js not found. Installing Node.js LTS with winget."
         & winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
         if ($LASTEXITCODE -eq 0) {
             return
         }
     }
 
-    if (Test-CommandAvailable -CommandName 'choco') {
-        Write-Step 'Node.js not found. Installing Node.js LTS with Chocolatey.'
+    if (Test-CommandAvailable -CommandName "choco") {
+        Write-Step "Node.js not found. Installing Node.js LTS with Chocolatey."
         & choco install nodejs-lts -y
         if ($LASTEXITCODE -eq 0) {
             return
         }
     }
 
-    throw 'Node.js 20+ is missing and automatic installation failed. Install Node.js manually, then rerun the script.'
+    throw "Node.js 20+ is missing and automatic installation failed. Install Node.js manually, then rerun the script."
 }
 
 function Ensure-NodeToolchain {
@@ -474,7 +474,7 @@ function Ensure-NodeToolchain {
         return $systemToolchain
     }
 
-    $portableToolchain = Resolve-PortableNodeToolchain -NodeDir (Join-Path $RootDir '.tools\node')
+    $portableToolchain = Resolve-PortableNodeToolchain -NodeDir (Join-Path $RootDir ".tools\node")
     if ($portableToolchain) {
         return $portableToolchain
     }
@@ -502,7 +502,7 @@ function Ensure-NodeToolchain {
         return $systemToolchain
     }
 
-    throw 'Node.js installation completed, but node.exe/npm.cmd are still unavailable in this shell.'
+    throw "Node.js installation completed, but node.exe/npm.cmd are still unavailable in this shell."
 }
 
 function Invoke-CommandChecked {
@@ -516,7 +516,8 @@ function Invoke-CommandChecked {
     try {
         & $Executable @Arguments
         if ($LASTEXITCODE -ne 0) {
-            throw "Command failed: $Executable $($Arguments -join ' ')"
+            $argumentText = [string]::Join(" ", $Arguments)
+            throw "Command failed: $Executable $argumentText"
         }
     }
     finally {
@@ -546,11 +547,11 @@ function Invoke-NpmInstallWithRetry {
         [string]$WorkingDirectory
     )
 
-    $installArgs = @('install', '--no-fund', '--no-audit')
+    $installArgs = @("install", "--no-fund", "--no-audit")
     if (-not [string]::IsNullOrWhiteSpace($env:LOCAL_NPM_REGISTRY)) {
         $installArgs += @(
             "--registry=$env:LOCAL_NPM_REGISTRY",
-            '--replace-registry-host=always'
+            "--replace-registry-host=always"
         )
     }
     $originalRegistry = $env:npm_config_registry
@@ -562,16 +563,16 @@ function Invoke-NpmInstallWithRetry {
         Write-Warning "npm install failed: $($_.Exception.Message)"
     }
 
-    $retryRegistry = if ([string]::IsNullOrWhiteSpace($env:LOCAL_NPM_REGISTRY)) { 'https://registry.npmjs.org/' } else { $env:LOCAL_NPM_REGISTRY }
+    $retryRegistry = if ([string]::IsNullOrWhiteSpace($env:LOCAL_NPM_REGISTRY)) { "https://registry.npmjs.org/" } else { $env:LOCAL_NPM_REGISTRY }
     Write-Warning "Retrying npm install with cache preference disabled and registry $retryRegistry."
     try {
         $env:npm_config_registry = $retryRegistry
         Invoke-NpmCommandChecked -NodeToolchain $NodeToolchain -Arguments @(
-            'install',
-            '--no-fund',
-            '--no-audit',
-            '--prefer-online',
-            '--replace-registry-host=always',
+            "install",
+            "--no-fund",
+            "--no-audit",
+            "--prefer-online",
+            "--replace-registry-host=always",
             "--registry=$retryRegistry"
         ) -WorkingDirectory $WorkingDirectory
     }
@@ -592,13 +593,13 @@ function Ensure-BackendVenv {
         [string]$BackendDir
     )
 
-    $venvPython = Join-Path $VenvDir 'Scripts\python.exe'
+    $venvPython = Join-Path $VenvDir "Scripts\python.exe"
     if (Test-Path -LiteralPath $venvPython) {
         return $venvPython
     }
 
-    Write-Step 'Creating backend virtual environment'
-    Invoke-CommandChecked -Executable $BootstrapPythonPath -Arguments @('-m', 'venv', $VenvDir) -WorkingDirectory $BackendDir
+    Write-Step "Creating backend virtual environment"
+    Invoke-CommandChecked -Executable $BootstrapPythonPath -Arguments @("-m", "venv", $VenvDir) -WorkingDirectory $BackendDir
     return $venvPython
 }
 
@@ -612,14 +613,14 @@ function Ensure-BackendDependencies {
     )
 
     Ensure-Directory -Path $LocalDevDir
-    $stampPath = Join-Path $LocalDevDir 'backend-requirements.sha256'
+    $stampPath = Join-Path $LocalDevDir "backend-requirements.sha256"
     $requirementsHash = (Get-FileHash -LiteralPath $BackendRequirements -Algorithm SHA256).Hash
-    $recordedHash = if (Test-Path -LiteralPath $stampPath) { (Get-Content -LiteralPath $stampPath -Raw).Trim() } else { '' }
-    $importProbe = 'import django, rest_framework, corsheaders, channels, celery, pymysql, paramiko, scp, numpy, PIL, fitz, reportlab, cv2, sklearn'
+    $recordedHash = if (Test-Path -LiteralPath $stampPath) { (Get-Content -LiteralPath $stampPath -Raw).Trim() } else { "" }
+    $importProbe = "import django, rest_framework, corsheaders, channels, celery, pymysql, paramiko, scp, numpy, PIL, fitz, reportlab, cv2, sklearn"
     $importsHealthy = $false
 
     try {
-        Invoke-CommandChecked -Executable $BackendPython -Arguments @('-c', $importProbe) -WorkingDirectory $BackendDir
+        Invoke-CommandChecked -Executable $BackendPython -Arguments @("-c", $importProbe) -WorkingDirectory $BackendDir
         $importsHealthy = $true
     }
     catch {
@@ -634,9 +635,9 @@ function Ensure-BackendDependencies {
         return
     }
 
-    Write-Step 'Installing or updating backend dependencies'
-    Invoke-CommandChecked -Executable $BackendPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip', 'setuptools', 'wheel') -WorkingDirectory $BackendDir
-    Invoke-CommandChecked -Executable $BackendPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '-r', $BackendRequirements) -WorkingDirectory $BackendDir
+    Write-Step "Installing or updating backend dependencies"
+    Invoke-CommandChecked -Executable $BackendPython -Arguments @("-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "pip", "setuptools", "wheel") -WorkingDirectory $BackendDir
+    Invoke-CommandChecked -Executable $BackendPython -Arguments @("-m", "pip", "install", "--disable-pip-version-check", "-r", $BackendRequirements) -WorkingDirectory $BackendDir
     Set-Content -LiteralPath $stampPath -Value $requirementsHash -Encoding UTF8
 }
 
@@ -651,7 +652,7 @@ function Ensure-LocalSettings {
         return
     }
 
-    Write-Step 'Creating local Django settings'
+    Write-Step "Creating local Django settings"
     $aiServiceUrl = "http://$BindHost`:$AiPort"
     $content = @"
 import os
@@ -725,10 +726,10 @@ function Ensure-FrontendEnvFiles {
         [int]$BackendPort
     )
 
-    Write-Step 'Syncing frontend local environment files'
+    Write-Step "Syncing frontend local environment files"
     $apiUrl = "http://$BindHost`:$BackendPort"
-    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_API_URL' -Value $apiUrl
-    Set-DotEnvValue -Path $AdminEnvPath -Key 'VITE_API_URL' -Value $apiUrl
+    Set-DotEnvValue -Path $UserEnvPath -Key "VITE_API_URL" -Value $apiUrl
+    Set-DotEnvValue -Path $AdminEnvPath -Key "VITE_API_URL" -Value $apiUrl
 }
 
 function Ensure-FrontendDependencies {
@@ -740,13 +741,13 @@ function Ensure-FrontendDependencies {
         [switch]$ForceRefresh
     )
 
-    $lockPath = Join-Path $FrontendDir 'package-lock.json'
-    $nodeModulesPath = Join-Path $FrontendDir 'node_modules'
+    $lockPath = Join-Path $FrontendDir "package-lock.json"
+    $nodeModulesPath = Join-Path $FrontendDir "node_modules"
     $stampPath = Join-Path $LocalDevDir "$FrontendName-package-lock.sha256"
     $lockHash = (Get-FileHash -LiteralPath $lockPath -Algorithm SHA256).Hash
-    $recordedHash = if (Test-Path -LiteralPath $stampPath) { (Get-Content -LiteralPath $stampPath -Raw).Trim() } else { '' }
-    $viteBinary = Join-Path $FrontendDir 'node_modules\.bin\vite.cmd'
-    $viteCliPath = Join-Path $FrontendDir 'node_modules\vite\bin\vite.js'
+    $recordedHash = if (Test-Path -LiteralPath $stampPath) { (Get-Content -LiteralPath $stampPath -Raw).Trim() } else { "" }
+    $viteBinary = Join-Path $FrontendDir "node_modules\.bin\vite.cmd"
+    $viteCliPath = Join-Path $FrontendDir "node_modules\vite\bin\vite.js"
 
     if (-not $ForceRefresh -and (Test-Path -LiteralPath $nodeModulesPath) -and (Test-Path -LiteralPath $viteBinary) -and (Test-Path -LiteralPath $viteCliPath)) {
         if ($lockHash -ne $recordedHash) {
@@ -768,7 +769,7 @@ function Ensure-FrontendDependencies {
         }
         catch {
             Write-Warning "Unable to remove existing node_modules for ${FrontendName}: $($_.Exception.Message)"
-            Write-Warning 'Continuing with npm install; npm will repair or replace packages where possible.'
+            Write-Warning "Continuing with npm install; npm will repair or replace packages where possible."
         }
     }
     Invoke-NpmInstallWithRetry -NodeToolchain $NodeToolchain -WorkingDirectory $FrontendDir
@@ -789,8 +790,76 @@ function Ensure-AiModelArtifact {
         return
     }
 
-    Write-Step 'Minimal AI model artifact is missing. Training local baseline model.'
-    Invoke-CommandChecked -Executable $BackendPython -Arguments @('train_minimal_baseline.py') -WorkingDirectory $AiDir
+    Write-Step "Minimal AI model artifact is missing. Training local baseline model."
+    Invoke-CommandChecked -Executable $BackendPython -Arguments @("train_minimal_baseline.py") -WorkingDirectory $AiDir
+}
+
+function Repair-LocalSqliteMigrationHistory {
+    param(
+        [string]$BackendPython,
+        [string]$BackendDir
+    )
+
+    $repairScript = @"
+import os
+import sqlite3
+from pathlib import Path
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fake_image_detector.local_settings")
+
+from django.conf import settings
+
+database = settings.DATABASES.get("default", {})
+if database.get("ENGINE") != "django.db.backends.sqlite3":
+    raise SystemExit(0)
+
+db_path = Path(database.get("NAME", ""))
+if not db_path.exists():
+    raise SystemExit(0)
+
+con = sqlite3.connect(db_path)
+try:
+    tables = {
+        row[0]
+        for row in con.execute(
+            "select name from sqlite_master where type='table'"
+        )
+    }
+    if "django_migrations" not in tables:
+        raise SystemExit(0)
+
+    applied = {
+        tuple(row)
+        for row in con.execute(
+            "select app, name from django_migrations"
+        )
+    }
+    has_core_tables = "core_user" in tables or "core_detectiontask" in tables
+    needs_core_fake = (
+        ("admin", "0001_initial") in applied
+        and ("core", "0001_initial") not in applied
+        and has_core_tables
+    )
+
+    if needs_core_fake:
+        con.execute(
+            "insert into django_migrations(app, name, applied) values (?, ?, CURRENT_TIMESTAMP)",
+            ("core", "0001_initial"),
+        )
+        con.commit()
+        print("[local sqlite repair] faked missing core.0001_initial migration record")
+finally:
+    con.close()
+"@
+    $repairPath = Join-Path ([System.IO.Path]::GetTempPath()) "academic_plagiarism_detector_repair_migrations.py"
+
+    try {
+        Set-Content -LiteralPath $repairPath -Value $repairScript -Encoding UTF8
+        Invoke-CommandChecked -Executable $BackendPython -Arguments @($repairPath) -WorkingDirectory $BackendDir
+    }
+    finally {
+        Remove-Item -LiteralPath $repairPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Ensure-BackendDatabase {
@@ -801,14 +870,15 @@ function Ensure-BackendDatabase {
         [int]$AiPort
     )
 
-    Write-Step 'Running Django database initialization'
-    $env:DJANGO_SETTINGS_MODULE = 'fake_image_detector.local_settings'
+    Write-Step "Running Django database initialization"
+    $env:DJANGO_SETTINGS_MODULE = "fake_image_detector.local_settings"
     $env:AI_SERVICE_URL = "http://$BindHost`:$AiPort"
-    $env:AI_SERVICE_TIMEOUT = '1200'
-    $env:AI_SERVICE_TIMEOUT_SECONDS = '120'
-    Invoke-CommandChecked -Executable $BackendPython -Arguments @('manage.py', 'migrate', '--run-syncdb', '--noinput') -WorkingDirectory $BackendDir
-    Invoke-CommandChecked -Executable $BackendPython -Arguments @('manage.py', 'migrate_detection_task_v2') -WorkingDirectory $BackendDir
-    Invoke-CommandChecked -Executable $BackendPython -Arguments @('manage.py', 'backfill_detection_task_v2') -WorkingDirectory $BackendDir
+    $env:AI_SERVICE_TIMEOUT = "1200"
+    $env:AI_SERVICE_TIMEOUT_SECONDS = "120"
+    Repair-LocalSqliteMigrationHistory -BackendPython $BackendPython -BackendDir $BackendDir
+    Invoke-CommandChecked -Executable $BackendPython -Arguments @("manage.py", "migrate", "--run-syncdb", "--noinput") -WorkingDirectory $BackendDir
+    Invoke-CommandChecked -Executable $BackendPython -Arguments @("manage.py", "migrate_detection_task_v2") -WorkingDirectory $BackendDir
+    Invoke-CommandChecked -Executable $BackendPython -Arguments @("manage.py", "backfill_detection_task_v2") -WorkingDirectory $BackendDir
 }
 
 function ConvertTo-PythonJsonLiteral {
@@ -834,7 +904,7 @@ function Ensure-LocalDemoAccounts {
         [string]$ReviewerPassword
     )
 
-    Write-Step 'Ensuring local demo accounts'
+    Write-Step "Ensuring local demo accounts"
     $payload = ConvertTo-PythonJsonLiteral -Value @{
         organization_name  = $OrganizationName
         organization_email = $OrganizationEmail
@@ -920,7 +990,7 @@ PublisherReviewerRelationship.objects.update_or_create(
 
 print('ready')
 "@
-    $bootstrapPath = Join-Path ([System.IO.Path]::GetTempPath()) 'academic_plagiarism_detector_demo_accounts.py'
+    $bootstrapPath = Join-Path ([System.IO.Path]::GetTempPath()) "academic_plagiarism_detector_demo_accounts.py"
 
     try {
         Set-Content -LiteralPath $bootstrapPath -Value $bootstrap -Encoding UTF8
@@ -963,7 +1033,7 @@ function Get-LogTail {
     param([string]$Path)
 
     if (-not (Test-Path -LiteralPath $Path)) {
-        return ''
+        return ""
     }
 
     return (Get-Content -LiteralPath $Path -Tail 40 | Out-String).Trim()
@@ -1049,43 +1119,43 @@ function Start-FrontendDevServer {
         [string]$HealthUrl
     )
 
-    $viteCliPath = Join-Path $FrontendDir 'node_modules\vite\bin\vite.js'
+    $viteCliPath = Join-Path $FrontendDir "node_modules\vite\bin\vite.js"
     if (-not (Test-Path -LiteralPath $viteCliPath)) {
         throw "Vite CLI was not found for $Name at $viteCliPath"
     }
 
-    return Start-ManagedProcess -Name $Name -Executable $NodeToolchain.NodePath -Arguments @($viteCliPath, '--host', $BindHost, '--port', "$Port", '--strictPort') -WorkingDirectory $FrontendDir -HealthUrl $HealthUrl -LogsDir $LogsDir -Port $Port -TimeoutSeconds 120
+    return Start-ManagedProcess -Name $Name -Executable $NodeToolchain.NodePath -Arguments @($viteCliPath, "--host", $BindHost, "--port", "$Port", "--strictPort") -WorkingDirectory $FrontendDir -HealthUrl $HealthUrl -LogsDir $LogsDir -Port $Port -TimeoutSeconds 120
 }
 
 Assert-WindowsPlatform
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Resolve-RepositoryRoot -StartDir $ScriptDir
-$LocalDevDir = Join-Path $RootDir '.local-dev'
-$LogsDir = Join-Path $LocalDevDir 'logs'
-$StatePath = Join-Path $LocalDevDir 'processes.json'
-$PortableNodeVersion = if ($env:LOCAL_NODE_VERSION) { $env:LOCAL_NODE_VERSION } else { '22.15.0' }
+$LocalDevDir = Join-Path $RootDir ".local-dev"
+$LogsDir = Join-Path $LocalDevDir "logs"
+$StatePath = Join-Path $LocalDevDir "processes.json"
+$PortableNodeVersion = if ($env:LOCAL_NODE_VERSION) { $env:LOCAL_NODE_VERSION } else { "22.15.0" }
 $Ports = @($UserPort, $AdminPort, $BackendPort, $AiPort)
 
-Write-Step 'Resolving project directories'
+Write-Step "Resolving project directories"
 # 优先使用本仓库约定路径，避免对整个目录树递归（会扫过 node_modules，极慢或看似卡死）
-$BackendDirGuess = Join-Path $RootDir '代码\后端\后端代码'
-$AiDirGuess = Join-Path $RootDir '代码\AI服务\AI服务器代码'
-$UserFrontendDirGuess = Join-Path $RootDir '代码\前端\前端用户端'
-$AdminFrontendDirGuess = Join-Path $RootDir '代码\前端\前端管理端'
+$BackendDirGuess = Join-Path $RootDir "代码\后端\后端代码"
+$AiDirGuess = Join-Path $RootDir "代码\AI服务\AI服务器代码"
+$UserFrontendDirGuess = Join-Path $RootDir "代码\前端\前端用户端"
+$AdminFrontendDirGuess = Join-Path $RootDir "代码\前端\前端管理端"
 
-if (Test-Path -LiteralPath (Join-Path $BackendDirGuess 'manage.py')) {
+if (Test-Path -LiteralPath (Join-Path $BackendDirGuess "manage.py")) {
     $BackendDir = $BackendDirGuess
 }
 else {
-    $BackendDir = Find-SingleFileParent -RootDir $RootDir -Filter 'manage.py' -Description 'backend'
+    $BackendDir = Find-SingleFileParent -RootDir $RootDir -Filter "manage.py" -Description "backend"
 }
 
-if (Test-Path -LiteralPath (Join-Path $AiDirGuess 'ai_http_service.py')) {
+if (Test-Path -LiteralPath (Join-Path $AiDirGuess "ai_http_service.py")) {
     $AiDir = $AiDirGuess
 }
 else {
-    $AiDir = Find-SingleFileParent -RootDir $RootDir -Filter 'ai_http_service.py' -Description 'AI service'
+    $AiDir = Find-SingleFileParent -RootDir $RootDir -Filter "ai_http_service.py" -Description "AI service"
 }
 
 function Resolve-FrontendDirByPackageName {
@@ -1095,7 +1165,7 @@ function Resolve-FrontendDirByPackageName {
         [string]$PackageName
     )
 
-    $pkgPath = Join-Path $GuessDir 'package.json'
+    $pkgPath = Join-Path $GuessDir "package.json"
     if (Test-Path -LiteralPath $pkgPath) {
         try {
             $pkg = Get-Content -LiteralPath $pkgPath -Raw | ConvertFrom-Json
@@ -1110,30 +1180,32 @@ function Resolve-FrontendDirByPackageName {
     return (Find-FrontendDirectory -RootDir $RootDir -PackageName $PackageName)
 }
 
-$UserFrontendDir = Resolve-FrontendDirByPackageName -RootDir $RootDir -GuessDir $UserFrontendDirGuess -PackageName 'buaa_se'
-$AdminFrontendDir = Resolve-FrontendDirByPackageName -RootDir $RootDir -GuessDir $AdminFrontendDirGuess -PackageName 'BUAA_SE_manage'
-$VenvDir = Join-Path $BackendDir '.venv'
-$BackendRequirements = Join-Path $BackendDir 'requirements.local.txt'
-$LocalSettingsPath = Join-Path $BackendDir 'fake_image_detector\local_settings.py'
-$UserEnvPath = Join-Path $UserFrontendDir '.env'
-$AdminEnvPath = Join-Path $AdminFrontendDir '.env'
-$AiArtifactPath = Join-Path $AiDir 'detection_service\artifacts\minimal_baseline.pkl'
+$UserFrontendDir = Resolve-FrontendDirByPackageName -RootDir $RootDir -GuessDir $UserFrontendDirGuess -PackageName "buaa_se"
+$AdminFrontendDir = Resolve-FrontendDirByPackageName -RootDir $RootDir -GuessDir $AdminFrontendDirGuess -PackageName "BUAA_SE_manage"
+$VenvDir = Join-Path $BackendDir ".venv"
+$BackendRequirements = Join-Path $BackendDir "requirements.local.txt"
+$LocalSettingsPath = Join-Path $BackendDir "fake_image_detector\local_settings.py"
+$UserEnvPath = Join-Path $UserFrontendDir ".env"
+$AdminEnvPath = Join-Path $AdminFrontendDir ".env"
+$AiArtifactPath = Join-Path $AiDir "detection_service\artifacts\minimal_baseline.pkl"
 
-Write-Step 'Preparing local working directories'
+Write-Step "Preparing local working directories"
 Ensure-Directory -Path $LocalDevDir
 Ensure-Directory -Path $LogsDir
-Ensure-Directory -Path (Join-Path $LocalDevDir 'npm-cache')
-Ensure-Directory -Path (Join-Path $LocalDevDir 'tmp')
-$env:npm_config_cache = Join-Path $LocalDevDir 'npm-cache'
-$env:npm_config_update_notifier = 'false'
-$env:TEMP = Join-Path $LocalDevDir 'tmp'
-$env:TMP = Join-Path $LocalDevDir 'tmp'
+Ensure-Directory -Path (Join-Path $LocalDevDir "npm-cache")
+Ensure-Directory -Path (Join-Path $LocalDevDir "tmp")
+$env:npm_config_cache = Join-Path $LocalDevDir "npm-cache"
+$env:npm_config_update_notifier = "false"
+$env:TEMP = Join-Path $LocalDevDir "tmp"
+$env:TMP = Join-Path $LocalDevDir "tmp"
+Ensure-Directory -Path (Join-Path $BackendDir ".local-dev")
+$env:SQLITE_NAME = Join-Path (Join-Path $BackendDir ".local-dev") "db.sqlite3"
 
-Write-Step 'Stopping existing local service processes'
+Write-Step "Stopping existing local service processes"
 Stop-ManagedProcesses -StatePath $StatePath -Ports $Ports -Quiet
 
-Write-Step 'Checking Python environment'
-$ExistingVenvPython = Join-Path $VenvDir 'Scripts\python.exe'
+Write-Step "Checking Python environment"
+$ExistingVenvPython = Join-Path $VenvDir "Scripts\python.exe"
 if (Test-Path -LiteralPath $ExistingVenvPython) {
     $BackendPython = $ExistingVenvPython
 }
@@ -1143,7 +1215,7 @@ else {
 }
 Ensure-BackendDependencies -BackendPython $BackendPython -BackendDir $BackendDir -BackendRequirements $BackendRequirements -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
 
-Write-Step 'Checking Node.js environment'
+Write-Step "Checking Node.js environment"
 $NodeToolchain = Ensure-NodeToolchain -RootDir $RootDir -LocalDevDir $LocalDevDir -Version $PortableNodeVersion
 $nodeBinDir = Split-Path -Parent $NodeToolchain.NodePath
 if ($env:Path -notlike "*$nodeBinDir*") {
@@ -1153,17 +1225,17 @@ if ($env:Path -notlike "*$nodeBinDir*") {
 Ensure-LocalSettings -LocalSettingsPath $LocalSettingsPath -BindHost $BindHost -AiPort $AiPort
 Ensure-FrontendEnvFiles -UserEnvPath $UserEnvPath -AdminEnvPath $AdminEnvPath -BindHost $BindHost -BackendPort $BackendPort
 if ($FullFrontendMock) {
-    Write-Step 'User frontend: enabling VITE_USE_FULL_FRONTEND_MOCK'
-    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_USE_FULL_FRONTEND_MOCK' -Value 'true'
-    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_API_URL' -Value ''
+    Write-Step "User frontend: enabling VITE_USE_FULL_FRONTEND_MOCK"
+    Set-DotEnvValue -Path $UserEnvPath -Key "VITE_USE_FULL_FRONTEND_MOCK" -Value "true"
+    Set-DotEnvValue -Path $UserEnvPath -Key "VITE_API_URL" -Value ""
 }
 else {
-    Write-Step 'User frontend: real backend mode (disabling full-stack / workflow mock flags)'
-    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_USE_FULL_FRONTEND_MOCK' -Value 'false'
-    Set-DotEnvValue -Path $UserEnvPath -Key 'VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW' -Value 'false'
+    Write-Step "User frontend: real backend mode (disabling full-stack / workflow mock flags)"
+    Set-DotEnvValue -Path $UserEnvPath -Key "VITE_USE_FULL_FRONTEND_MOCK" -Value "false"
+    Set-DotEnvValue -Path $UserEnvPath -Key "VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW" -Value "false"
 }
-Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName 'user' -FrontendDir $UserFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
-Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName 'admin' -FrontendDir $AdminFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
+Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName "user" -FrontendDir $UserFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
+Ensure-FrontendDependencies -NodeToolchain $NodeToolchain -FrontendName "admin" -FrontendDir $AdminFrontendDir -LocalDevDir $LocalDevDir -ForceRefresh:$ForceDependencyRefresh
 Ensure-AiModelArtifact -AiArtifactPath $AiArtifactPath -BackendPython $BackendPython -AiDir $AiDir
 Ensure-BackendDatabase -BackendPython $BackendPython -BackendDir $BackendDir -BindHost $BindHost -AiPort $AiPort
 Ensure-LocalDemoAccounts `
@@ -1181,44 +1253,44 @@ Ensure-LocalDemoAccounts `
     -ReviewerEmail $ReviewerEmail `
     -ReviewerPassword $ReviewerPassword
 
-Write-Step 'Starting local services'
-$env:PYTHONIOENCODING = 'utf-8'
-$env:PYTHONUTF8 = '1'
-$env:AI_SERVICE_TIMEOUT_SECONDS = '120'
+Write-Step "Starting local services"
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
+$env:AI_SERVICE_TIMEOUT_SECONDS = "120"
 # URL 一律用 ASCII 拼接，兼容 Windows PowerShell 5.1 与各类文件编码
-$aiHealthUrl = 'http://' + $BindHost + ':' + $AiPort + '/health'
-$aiProcess = Start-ManagedProcess -Name 'ai-service' -Executable $BackendPython -Arguments @('ai_http_service.py', '--host', $BindHost, '--port', "$AiPort") -WorkingDirectory $AiDir -HealthUrl $aiHealthUrl -LogsDir $LogsDir -Port $AiPort -TimeoutSeconds 120
+$aiHealthUrl = "http://" + $BindHost + ":" + $AiPort + "/health"
+$aiProcess = Start-ManagedProcess -Name "ai-service" -Executable $BackendPython -Arguments @("ai_http_service.py", "--host", $BindHost, "--port", "$AiPort") -WorkingDirectory $AiDir -HealthUrl $aiHealthUrl -LogsDir $LogsDir -Port $AiPort -TimeoutSeconds 120
 
-$env:DJANGO_SETTINGS_MODULE = 'fake_image_detector.local_settings'
-$env:AI_SERVICE_URL = 'http://' + $BindHost + ':' + $AiPort
-$env:AI_SERVICE_TIMEOUT = '1200'
-$djangoHealthUrl = 'http://' + $BindHost + ':' + $BackendPort + '/admin/'
-$djangoListen = $BindHost + ':' + $BackendPort
-$backendProcess = Start-ManagedProcess -Name 'django' -Executable $BackendPython -Arguments @('manage.py', 'runserver', $djangoListen) -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
+$env:DJANGO_SETTINGS_MODULE = "fake_image_detector.local_settings"
+$env:AI_SERVICE_URL = "http://" + $BindHost + ":" + $AiPort
+$env:AI_SERVICE_TIMEOUT = "1200"
+$djangoHealthUrl = "http://" + $BindHost + ":" + $BackendPort + "/admin/"
+$djangoListen = $BindHost + ":" + $BackendPort
+$backendProcess = Start-ManagedProcess -Name "django" -Executable $BackendPython -Arguments @("manage.py", "runserver", $djangoListen) -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
 
-$userHealthUrl = 'http://' + $BindHost + ':' + $UserPort + '/'
-$adminHealthUrl = 'http://' + $BindHost + ':' + $AdminPort + '/'
-$userProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $UserFrontendDir -Name 'frontend-user' -BindHost $BindHost -Port $UserPort -LogsDir $LogsDir -HealthUrl $userHealthUrl
-$adminProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $AdminFrontendDir -Name 'frontend-admin' -BindHost $BindHost -Port $AdminPort -LogsDir $LogsDir -HealthUrl $adminHealthUrl
+$userHealthUrl = "http://" + $BindHost + ":" + $UserPort + "/"
+$adminHealthUrl = "http://" + $BindHost + ":" + $AdminPort + "/"
+$userProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $UserFrontendDir -Name "frontend-user" -BindHost $BindHost -Port $UserPort -LogsDir $LogsDir -HealthUrl $userHealthUrl
+$adminProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $AdminFrontendDir -Name "frontend-admin" -BindHost $BindHost -Port $AdminPort -LogsDir $LogsDir -HealthUrl $adminHealthUrl
 
 $state = @($aiProcess, $backendProcess, $userProcess, $adminProcess)
 $state | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding UTF8
 
-Write-Host ''
-Write-Host 'Local validation environment is ready:' -ForegroundColor Green
+Write-Host ""
+Write-Host "Local validation environment is ready:" -ForegroundColor Green
 # 仅用 ASCII 拼接，避免 PS 5.1 对 -f / 花括号与「智能引号」文件的解析问题
-Write-Host ('  User frontend:  http://' + $BindHost + ':' + $UserPort)
-Write-Host ('  Admin frontend: http://' + $BindHost + ':' + $AdminPort)
-Write-Host ('  Django:         http://' + $BindHost + ':' + $BackendPort + '/admin/')
-Write-Host ('  AI service:     http://' + $BindHost + ':' + $AiPort + '/health')
-Write-Host ''
-Write-Host ('Node toolchain: ' + $NodeToolchain.Source + ' ' + $NodeToolchain.Version)
-Write-Host ('Admin login:    ' + $AdminEmail + ' / ' + $AdminPassword)
-Write-Host ('Publisher:      ' + $PublisherEmail + ' / ' + $PublisherPassword)
-Write-Host ('Reviewer:       ' + $ReviewerEmail + ' / ' + $ReviewerPassword)
-Write-Host ('Logs:           ' + $LogsDir)
-Write-Host 'Stop with:      .\scripts\stop-local-windows.ps1'
+Write-Host ("  User frontend:  http://" + $BindHost + ":" + $UserPort)
+Write-Host ("  Admin frontend: http://" + $BindHost + ":" + $AdminPort)
+Write-Host ("  Django:         http://" + $BindHost + ":" + $BackendPort + "/admin/")
+Write-Host ("  AI service:     http://" + $BindHost + ":" + $AiPort + "/health")
+Write-Host ""
+Write-Host ("Node toolchain: " + $NodeToolchain.Source + " " + $NodeToolchain.Version)
+Write-Host ("Admin login:    " + $AdminEmail + " / " + $AdminPassword)
+Write-Host ("Publisher:      " + $PublisherEmail + " / " + $PublisherPassword)
+Write-Host ("Reviewer:       " + $ReviewerEmail + " / " + $ReviewerPassword)
+Write-Host ("Logs:           " + $LogsDir)
+Write-Host "Stop with:      .\scripts\stop-local-windows.ps1"
 if ($FullFrontendMock) {
-    Write-Host ''
-    Write-Host 'User client is in full frontend mock mode. Login without Django. Notifications use HTTP polling.' -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "User client is in full frontend mock mode. Login without Django. Notifications use HTTP polling." -ForegroundColor Yellow
 }

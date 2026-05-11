@@ -43,7 +43,7 @@
         <v-card class="h-100">
           <v-card-title class="text-h6">统一学术检测（唯一入口）</v-card-title>
           <v-card-text class="text-body-2">
-            <code>/upload</code>：同一批次可同时送检<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及压缩包等；系统为每批生成 <strong>batch_session_id</strong>，各子任务结果在检测历史中可筛选对照。检测模式仅<strong>快速 / 精准</strong>。论文与 Review 不再设独立提交页；带任务 ID 的历史深链仍可打开专项结果视图。
+            <code>/upload</code>：同一批次可同时送检<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及压缩包等；系统为每批生成 <strong>batch_session_id</strong>，各子任务结果在检测历史中可筛选对照。论文与 Review 不再设独立提交页；带任务 ID 的历史深链仍可打开专项结果视图。
           </v-card-text>
           <v-card-actions>
             <v-btn color="primary" to="/upload" prepend-icon="mdi-upload">进入统一检测</v-btn>
