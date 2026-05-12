@@ -3,7 +3,10 @@
     <!-- 标题 -->
     <v-row class="mb-6">
       <v-col>
-        <h1 class="text-h4 font-weight-bold">人工审核审批</h1>
+        <h1 class="text-h4 font-weight-bold">人工审核申请审批</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
+          处理发布者在用户端提交的<strong>人工复核申请</strong>；通过后任务进入审稿人任务池。本页仅<strong>组织管理员</strong>使用（与软件管理员的跨组织职责区分）。
+        </p>
       </v-col>
     </v-row>
 
@@ -211,6 +214,9 @@
 
               <div class="d-flex flex-column gap-2">
                 <div class="text-subtitle-1 font-weight-bold">审核人列表</div>
+                <div v-if="!reviewDetails.persons?.length" class="text-caption text-medium-emphasis">
+                  申请提交时若组织内尚无审稿人，此处可能为空。<strong>点「通过」</strong>时会自动绑定当时本组织内的全部专家（审稿人）账号；若通过时仍无人，请先在组织中添加审稿人后再审批。
+                </div>
                 <div class="d-flex flex-wrap gap-4">
                   <div v-for="person in reviewDetails.persons" :key="person.id" class="d-flex align-center">
                     <v-avatar size="32" class="mr-2">
@@ -219,6 +225,11 @@
                     <span>{{ person.username }}</span>
                   </div>
                 </div>
+              </div>
+
+              <div v-if="reviewDetails.detection_task_id" class="d-flex flex-column gap-2">
+                <div class="text-subtitle-1 font-weight-bold">关联检测任务</div>
+                <div class="text-body-2"><code>{{ reviewDetails.detection_task_id }}</code>（{{ reviewDetails.task_type || reviewDetails.file_type || '—' }}）</div>
               </div>
 
               <div v-if="reviewDetails.reason" class="d-flex flex-column gap-2">
@@ -230,8 +241,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="error" variant="text" :disabled="!selectedRequest || selectedRequest.state !== 'pending'" @click="handleReviewRequest(0)">拒绝</v-btn>
-          <v-btn color="success" :disabled="!selectedRequest || selectedRequest.state !== 'pending'" @click="handleReviewRequest(1)">通过</v-btn>
+          <v-btn color="error" variant="text" :disabled="!selectedRequest || selectedRequest.state !== 'pending'" @click="startReject">拒绝</v-btn>
+          <v-btn color="success" :disabled="!selectedRequest || selectedRequest.state !== 'pending'" @click="approveRequest">通过</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -252,7 +263,7 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="grey" variant="text" @click="showRejectDialog = false">取消</v-btn>
-          <v-btn color="error" @click="handleReviewRequest(0)">确认拒绝</v-btn>
+          <v-btn color="error" @click="confirmReject">确认拒绝</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -273,11 +284,17 @@ interface ReviewRequest {
   state: string
   file_type: string
   time: string
+  detection_task_id?: string
+  task_type?: string
+  reason?: string
 }
 
 const headers = [
   { title: '头像', key: 'avatar', align: 'center', sortable: false },
   { title: '编辑', key: 'username', align: 'start' },
+  { title: '检测任务ID', key: 'detection_task_id', align: 'center', minWidth: 120 },
+  { title: '类型', key: 'task_type', align: 'center', minWidth: 100 },
+  { title: '申请理由', key: 'reason', align: 'start', minWidth: 160 },
   { title: '审核状态', key: 'state', align: 'center' },
   { title: '提交时间', key: 'time', align: 'center' },
   { title: '操作', key: 'actions', align: 'center', sortable: false },
@@ -334,6 +351,10 @@ const reviewDetails = ref<{
   imgs: Array<{ id: number, url: string }>
   persons: Array<{ id: number, username: string, avatar: string }>
   reason: string
+  detection_task_id?: string
+  task_type?: string
+  file_type?: string
+  priority?: string
 } | null>(null)
 const rejectReason = ref('')
 const showRejectDialog = ref(false)
@@ -380,25 +401,53 @@ const openReviewDialog = async (request: ReviewRequest) => {
   }
 }
 
-const handleReviewRequest = async (choice: number) => {
-  if (choice === 0 && !rejectReason.value) {
-    showRejectDialog.value = true
-    return
-  }
+function startReject() {
+  rejectReason.value = ''
+  showRejectDialog.value = true
+}
 
+async function approveRequest() {
+  if (!selectedRequest.value) return
   try {
-    await reviewApi.handleReviewRequest(selectedRequest.value!.id, {
-      choice,
-      reason: rejectReason.value
-    })
-    snackbar.showMessage(choice === 1 ? '已通过审核' : '已拒绝审核', 'success')
+    await reviewApi.handleReviewRequest(selectedRequest.value.id, { choice: 1, reason: '' })
+    snackbar.showMessage('已通过审核，已进入专家分配队列', 'success')
     showReviewDialog.value = false
     showRejectDialog.value = false
     rejectReason.value = ''
     fetchRequests(currentPage.value, pageSize.value)
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('处理审核请求失败:', error)
-    snackbar.showMessage('处理审核请求失败', 'error')
+    const msg =
+      error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined
+    snackbar.showMessage(msg || '处理审核请求失败', 'error')
+  }
+}
+
+async function confirmReject() {
+  if (!rejectReason.value.trim()) {
+    snackbar.showMessage('请填写拒绝理由', 'warning')
+    return
+  }
+  if (!selectedRequest.value) return
+  try {
+    await reviewApi.handleReviewRequest(selectedRequest.value.id, {
+      choice: 0,
+      reason: rejectReason.value.trim(),
+    })
+    snackbar.showMessage('已拒绝申请', 'success')
+    showReviewDialog.value = false
+    showRejectDialog.value = false
+    rejectReason.value = ''
+    fetchRequests(currentPage.value, pageSize.value)
+  } catch (error: unknown) {
+    console.error('处理审核请求失败:', error)
+    const msg =
+      error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+        : undefined
+    snackbar.showMessage(msg || '处理审核请求失败', 'error')
   }
 }
 
@@ -505,10 +554,13 @@ const fetchRequests = async (page: number, pageSize: number) => {
     requests.value = requestList.map((request: any) => ({
       id: request.id,
       username: request.username,
-      avatar: import.meta.env.VITE_API_URL + request.avatar || '',
+      avatar: request.avatar ? import.meta.env.VITE_API_URL + request.avatar : '',
       state: request.state,
       file_type: request.file_type,
-      time: request.time
+      time: request.time,
+      detection_task_id: request.detection_task_id ?? request.detection_task ?? '—',
+      task_type: request.task_type ?? request.file_type ?? '—',
+      reason: request.reason ? (String(request.reason).length > 48 ? `${String(request.reason).slice(0, 48)}…` : String(request.reason)) : '—',
     }))
     
     currentPage.value = current_page

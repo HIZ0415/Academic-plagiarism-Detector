@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { buildNotificationsWebSocketUrl } from '@shared/notificationsWsUrl'
 
 /**
  * 连接 /ws/notifications/，在收到推送时触发回调（用于任务列表等与通知相关的刷新）。
@@ -8,13 +9,6 @@ export function useAdminNotifySocket(onEvent: () => void) {
   const connected = ref(false)
   let ws: WebSocket | null = null
   let debounceTimer: number | null = null
-
-  function buildWsUrl(): string | null {
-    const base = import.meta.env.VITE_API_URL
-    if (!base) return null
-    const wsBase = base.replace(/^http/, 'ws').replace(/\/$/, '')
-    return `${wsBase}/ws/notifications/`
-  }
 
   function scheduleCb() {
     if (debounceTimer) clearTimeout(debounceTimer)
@@ -26,13 +20,14 @@ export function useAdminNotifySocket(onEvent: () => void) {
 
   function connect() {
     const token = localStorage.getItem('1-token')
-    const url = buildWsUrl()
-    if (!url || !token) return
+    if (!token) return
+
+    const url = buildNotificationsWebSocketUrl(token)
 
     disconnect()
 
     try {
-      ws = new WebSocket(`${url}?token=${encodeURIComponent(token)}`)
+      ws = new WebSocket(url)
       ws.onopen = () => {
         connected.value = true
       }

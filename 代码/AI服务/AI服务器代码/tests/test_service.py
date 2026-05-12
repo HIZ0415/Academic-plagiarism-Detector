@@ -5,7 +5,6 @@ import io
 import json
 import os
 import sys
-import tempfile
 import time
 import zipfile
 from pathlib import Path
@@ -19,6 +18,10 @@ if str(ROOT) not in sys.path:
 
 from detection_service import DetectionModelRegistry, DetectionService, ValidationError
 from detection_service.contracts import DetectionResponse, StandardImageResult
+from tests.temp_utils import LocalTemporaryDirectory, TEST_TEMP_ROOT
+
+
+os.environ.setdefault("AI_SERVICE_TEMP_ROOT", str(TEST_TEMP_ROOT / "image_batches"))
 
 
 class DetectionServiceTest(unittest.TestCase):
@@ -26,23 +29,83 @@ class DetectionServiceTest(unittest.TestCase):
         service = DetectionService()
         payload = service.health_payload()
         self.assertIn("image", payload["supported_tasks"])
-        self.assertIn("paper", payload["reserved_tasks"])
+        self.assertIn("paper", payload["supported_tasks"])
+        self.assertIn("review", payload["supported_tasks"])
+        self.assertEqual(payload["reserved_tasks"], [])
         self.assertEqual(payload["default_image_profile"], "default")
         self.assertIn("fast", payload["available_image_profiles"])
         self.assertIn("splicing", payload["image_methods"])
 
-    def test_paper_task_route_is_reserved(self):
+    def test_paper_task_accepts_backend_preprocessed_payload(self):
         service = DetectionService()
-        with self.assertRaises(NotImplementedError):
-            service.handle_request(
-                {
-                    "schema_version": "backend-ai-request-v1",
-                    "task_type": "paper",
-                    "batch_id": "paper_fixture",
-                    "parameters": {"model_version": "paper-fixture-2026-04"},
-                    "payload_base64": base64.b64encode(b"paper content").decode("ascii"),
-                }
-            )
+        response = service.handle_request(
+            {
+                "schema_version": "backend-ai-request-v1",
+                "task_type": "paper",
+                "batch_id": "paper_fixture",
+                "parameters": {"model_version": "paper-fixture-2026-04", "threshold": 0.5},
+                "payload_base64": self._build_payload_base64(
+                    {
+                        "schema_version": "paper-preprocess-v1",
+                        "source_name": "paper.pdf",
+                        "text": "This is a normalized paper paragraph for AI detection.",
+                        "paragraphs": [
+                            {
+                                "index": 1,
+                                "text": "This is a normalized paper paragraph for AI detection.",
+                                "char_start": 0,
+                                "char_end": 54,
+                                "word_count": 9,
+                            }
+                        ],
+                    }
+                ),
+            }
+        )
+
+        self.assertEqual(response["schema_version"], "text-detection-v1")
+        self.assertEqual(response["task_type"], "paper")
+        self.assertEqual(response["results"][0]["source_name"], "paper.pdf")
+        self.assertEqual(response["results"][0]["details"]["paragraph_count"], 1)
+        self.assertIn("paper_summary", response["results"][0]["details"])
+        self.assertIn("paragraph_risks", response["results"][0]["details"])
+        self.assertIn("basic_explanation", response["results"][0]["details"])
+        self.assertEqual(response["results"][0]["details"]["paper_summary"]["analyzed_paragraph_count"], 1)
+        self.assertEqual(response["results"][0]["details"]["paragraph_risks"][0]["index"], 1)
+        self.assertIn("risk_score", response["results"][0]["details"]["paragraph_risks"][0])
+        self.assertIn("basic_explanation", response["results"][0]["details"]["paragraph_risks"][0])
+
+    def test_review_task_accepts_backend_preprocessed_payload(self):
+        service = DetectionService()
+        response = service.handle_request(
+            {
+                "schema_version": "backend-ai-request-v1",
+                "task_type": "review",
+                "batch_id": "review_fixture",
+                "parameters": {"model_version": "review-fixture-2026-04"},
+                "payload_base64": self._build_payload_base64(
+                    {
+                        "schema_version": "review-preprocess-v1",
+                        "source_name": "review.txt",
+                        "text": "This review has already been cleaned by the backend.",
+                        "text_length": 52,
+                        "line_count": 1,
+                    }
+                ),
+            }
+        )
+
+        self.assertEqual(response["schema_version"], "text-detection-v1")
+        self.assertEqual(response["task_type"], "review")
+        self.assertEqual(response["results"][0]["source_name"], "review.txt")
+        self.assertEqual(response["results"][0]["details"]["line_count"], 1)
+        self.assertIn("review_summary", response["results"][0]["details"])
+        self.assertIn("ai_tendency", response["results"][0]["details"])
+        self.assertIn("template_tendency", response["results"][0]["details"])
+        self.assertIn("suspicious_segments", response["results"][0]["details"])
+        self.assertIn("basic_explanation", response["results"][0]["details"])
+        self.assertIn("score", response["results"][0]["details"]["ai_tendency"])
+        self.assertIn("score", response["results"][0]["details"]["template_tendency"])
 
     def test_image_request_is_forwarded_to_task_handler(self):
         service = DetectionService()
@@ -138,7 +201,7 @@ class DetectionServiceTest(unittest.TestCase):
         )
 
     def test_registry_is_hot_reloaded_when_config_changes(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with LocalTemporaryDirectory("registry_reload") as temp_dir:
             config_path = Path(temp_dir) / "model_registry.json"
             self._write_registry_config(
                 config_path,
@@ -190,7 +253,7 @@ class DetectionServiceTest(unittest.TestCase):
             self.assertIsNone(reloaded["registry_reload"]["last_reload_error"])
 
     def test_invalid_hot_reload_keeps_previous_registry(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with LocalTemporaryDirectory("registry_invalid") as temp_dir:
             config_path = Path(temp_dir) / "model_registry.json"
             self._write_registry_config(
                 config_path,
@@ -226,6 +289,10 @@ class DetectionServiceTest(unittest.TestCase):
             for name, content in entries.items():
                 zip_file.writestr(name, content)
         return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+    @staticmethod
+    def _build_payload_base64(payload: dict) -> str:
+        return base64.b64encode(json.dumps(payload, ensure_ascii=False).encode("utf-8")).decode("ascii")
 
     @staticmethod
     def _write_registry_config(path: Path, payload: dict, *, ensure_newer: bool = False) -> None:

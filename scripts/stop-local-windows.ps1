@@ -1,11 +1,16 @@
 [CmdletBinding()]
 param(
-    [int[]]$Ports = @(3000, 3001, 8000, 8010),
+    [int]$UserPort = 3000,
+    [int]$AdminPort = 3001,
+    [int]$BackendPort = 8000,
+    [int]$AiPort = 8010,
+    [int[]]$Ports = @(),
     [switch]$CleanTemp
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Write-Step {
@@ -143,6 +148,9 @@ $RootDir = Resolve-RepositoryRoot -StartDir $ScriptDir
 $LocalDevDir = Join-Path $RootDir '.local-dev'
 $StatePath = Join-Path $LocalDevDir 'processes.json'
 $TmpDir = Join-Path $LocalDevDir 'tmp'
+if ($Ports.Count -eq 0) {
+    $Ports = @($UserPort, $AdminPort, $BackendPort, $AiPort)
+}
 
 Write-Step 'Stopping processes recorded by the local state file'
 if (Test-Path -LiteralPath $StatePath) {

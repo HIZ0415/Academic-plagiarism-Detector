@@ -1,9 +1,17 @@
 <template>
-  <v-container fluid class="organization-profile-page">
+  <component
+    :is="embed ? 'div' : 'v-container'"
+    class="organization-profile-page"
+    :class="{ 'w-100': embed }"
+    v-bind="embed ? {} : { fluid: true }"
+  >
     <!-- 页面标题 -->
-    <v-row class="mb-6">
+    <v-row v-if="!embed" class="mb-6">
       <v-col>
-        <h1 class="text-h4 font-weight-bold">组织信息</h1>
+        <h1 class="text-h4 font-weight-bold">本组织信息</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
+          维护当前登录管理员所属组织的对外展示信息、Logo 与联系方式；与「平台组织管理」区分，仅<strong>组织管理员</strong>使用。
+        </p>
       </v-col>
     </v-row>
 
@@ -142,7 +150,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </v-container>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -151,6 +159,8 @@ import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
 import organization from '@/api/organization'
 import userApi from '@/api/user'
+
+withDefaults(defineProps<{ embed?: boolean }>(), { embed: false })
 
 const snackbar = useSnackbarStore()
 const userStore = useUserStore()

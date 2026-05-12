@@ -1,9 +1,17 @@
 <template>
-  <v-container fluid class="organizations-page">
+  <component
+    :is="embed ? 'div' : 'v-container'"
+    class="organizations-page"
+    :class="{ 'w-100': embed }"
+    v-bind="embed ? {} : { fluid: true }"
+  >
     <!-- 标题和操作按钮 -->
-    <v-row class="mb-6">
+    <v-row v-if="!embed" class="mb-6">
       <v-col>
-        <h1 class="text-h4 font-weight-bold">组织管理</h1>
+        <h1 class="text-h4 font-weight-bold">组织管理（平台）</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
+          平台级多组织入驻、审批、邀请码与组织档案；仅<strong>软件管理员</strong>可访问。
+        </p>
       </v-col>
     </v-row>
 
@@ -350,7 +358,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </v-container>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -359,6 +367,8 @@ import { useSnackbarStore } from '@/stores/snackbar'
 import organization from '@/api/organization'
 import type { DataTableHeader } from 'vuetify'
 import { useUserStore } from '@/stores/user'
+
+withDefaults(defineProps<{ embed?: boolean }>(), { embed: false })
 
 const snackbar = useSnackbarStore()
 

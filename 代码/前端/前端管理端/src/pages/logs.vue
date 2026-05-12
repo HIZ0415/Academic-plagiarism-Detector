@@ -3,7 +3,10 @@
   <!-- 标题 -->
   <v-row class="mb-6">
     <v-col>
-      <h1 class="text-h4 font-weight-bold">日志记录</h1>
+      <h1 class="text-h4 font-weight-bold">操作与审计日志</h1>
+      <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
+        按用户、时间与类型检索关键操作记录，支撑审计与故障排查。
+      </p>
     </v-col>
   </v-row>
 
@@ -208,6 +211,7 @@ import { useSnackbarStore } from '@/stores/snackbar'
 import logApi from '@/api/log'
 import userApi from '@/api/user'
 import axios from 'axios'
+import type { UserListItem } from '@/types/core'
 
 const snackbar = useSnackbarStore()
 
@@ -219,13 +223,6 @@ interface Log {
   related_model: string
   related_id: number
   operation_time: string
-}
-
-interface User {
-  id: number
-  username: string
-  email: string
-  avatar: string
 }
 
 const headers = computed(() => {
@@ -253,9 +250,9 @@ const totalLogs = ref(0)
 const totalPages = ref(1)
 
 // 表格搜索相关
-const searchSelectedUser = ref<User | null>(null)
+const searchSelectedUser = ref<UserListItem | null>(null)
 const searchSelectedOrg = ref<string | null>(null)
-const searchUsersList = ref<User[]>([])
+const searchUsersList = ref<UserListItem[]>([])
 const loadingSearchUsers = ref(false)
 const searchQuery = ref('')
 
@@ -280,8 +277,8 @@ const operationTypeOptions = [
   { title: '提交审核', value: 'manual_review' }
 ]
 
-const getImageUrl =(url:string)=>{
-  return import.meta.env.VITE_API_URL + url
+const getImageUrl = (url?: string) => {
+  return import.meta.env.VITE_API_URL + (url ?? '')
 }
 
 
@@ -579,8 +576,8 @@ const resetDownloadFilters = () => {
 }
 
 // 下载相关
-const downloadSelectedUsers = ref<User[]>([])
-const downloadUsersList = ref<User[]>([])
+const downloadSelectedUsers = ref<UserListItem[]>([])
+const downloadUsersList = ref<UserListItem[]>([])
 const loadingDownloadUsers = ref(false)
 const downloadUserSearch = ref('')
 

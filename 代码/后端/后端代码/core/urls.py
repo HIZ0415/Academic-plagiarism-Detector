@@ -12,9 +12,15 @@ from .views.views_paper import (
     get_resource_check_result,
     submit_review_detection_task,
     get_review_task_status,
+    get_review_detection_result,
 )
 # 新增: 导入人工审查相关的视图类
 from .views import views_review, views_organization
+from .views.views_manual_review_adapter import (
+    create_manual_review_request,
+    get_manual_review_by_detection_task,
+    get_publisher_manual_review_summary,
+)
 from .views import views_admin
 from .views import views_notify
 from django.urls import path
@@ -78,6 +84,7 @@ urlpatterns = [
     path('paper/resource-check/<int:task_id>/result/', get_resource_check_result, name='paper_resource_result'),
     path('review/submit/', submit_review_detection_task, name='review_submit'),
     path('review/tasks/<int:task_id>/status/', get_review_task_status, name='review_task_status'),
+    path('review/tasks/<int:task_id>/result/', get_review_detection_result, name='review_result'),
     # 图片检测相关的URL
     path('detection/<int:image_id>/', get_detection_result, name='image_detection'),
     path('detection/submit/', submit_detection2, name='submit_detection'),
@@ -192,4 +199,13 @@ urlpatterns = [
     # Keep path without a leading slash; Django route strings should be relative.
     path('review-requests/<int:review_request_id>/delete/', views_admin.delete_review_request, name='delete_review_request'),
 
+
+
+    path('manual-review-requests/', create_manual_review_request, name='manual_review_requests_create'),
+    path('manual-review-requests/by-detection-task/', get_manual_review_by_detection_task, name='manual_review_requests_by_task'),
+    path(
+        'manual-review-requests/<int:review_request_id>/publisher-summary/',
+        get_publisher_manual_review_summary,
+        name='manual_review_publisher_summary',
+    ),
 ]

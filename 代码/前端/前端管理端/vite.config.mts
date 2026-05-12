@@ -57,6 +57,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@workflow-mock': fileURLToPath(new URL('../shared/manualReviewWorkflowMock.ts', import.meta.url)),
+      '@shared': fileURLToPath(new URL('../shared', import.meta.url)),
     },
     extensions: [
       '.js',
@@ -72,9 +74,13 @@ export default defineConfig({
     port: 3001,
     proxy: {
       '/api': {
-        target: 'http://122.9.45.122',
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/ws': {
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        ws: true,
       },
     },
     hmr: {

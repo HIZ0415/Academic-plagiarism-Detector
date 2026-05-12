@@ -1,5 +1,8 @@
 <template>
   <v-container>
+    <v-alert v-if="isPreviewMode" type="info" variant="tonal" density="compact" class="mb-4">
+      当前为<strong>界面预览</strong>，未请求用户资料与统计；登录后将显示真实数据。
+    </v-alert>
     <v-row>
       <v-col cols="12" md="4">
         <!-- 个人信息卡片 -->
@@ -193,17 +196,19 @@
 
 <script lang="ts" setup>
 import { reactive, onMounted, ref, computed, onUnmounted } from 'vue'
-import user from '@/api/user'
+import user, { isLoggedIn } from '@/api/user'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
 import { useRoute } from 'vue-router'
 import VerificationCodeInput from '@/components/VerificationCodeInput.vue'
 import publisher from '@/api/publisher'
 import reviewer from '@/api/reviewer'
+import { useEffectiveRole } from '@/composables/useEffectiveRole'
 
 const snackbar = useSnackbarStore()
 const userStore = useUserStore()
 const route = useRoute()
+const { effectiveRole, isPreviewMode } = useEffectiveRole()
 
 // 编辑表单
 const showEditDialog = ref(false)
@@ -344,6 +349,9 @@ const recentActivities = ref<RecentActivity[]>([])
 
 // 获取用户信息
 onMounted(async () => {
+  if (isPreviewMode.value || !isLoggedIn.value) {
+    return
+  }
   try {
     await userStore.fetchUserInfo()
     // 初始化编辑表单
@@ -355,7 +363,7 @@ onMounted(async () => {
     }
     // 初始化密码表单
     passwordForm.value.email = userStore.email
-    if (userStore.role === 'publisher') {
+    if (effectiveRole.value === 'publisher') {
       const response = (await publisher.getTaskSummary()).data
       stats.value.completedTasks = response.completed_task_count
       stats.value.uploadedTasks = response.total_task_count

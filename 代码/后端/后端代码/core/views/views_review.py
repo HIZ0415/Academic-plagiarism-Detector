@@ -542,8 +542,15 @@ def get_publisher_review_tasks(request):
         'detection_result__detection_task').prefetch_related('reviewers', 'manual_reviews')
     review_requests = review_requests.order_by('-request_time')
 
-    if status_filter:
-        review_requests = review_requests.filter(status1=status_filter)
+    # 与用户端 annual.vue 一致：pending=待管理端；in_progress=已通过且专家未完成；completed=专家侧已全部完成
+    if status_filter == 'pending':
+        review_requests = review_requests.filter(status2='pending')
+    elif status_filter == 'in_progress':
+        review_requests = review_requests.filter(status2='accepted').exclude(status1='completed')
+    elif status_filter == 'completed':
+        review_requests = review_requests.filter(status2='accepted', status1='completed')
+    elif status_filter == 'failed':
+        review_requests = review_requests.filter(status2='refused')
     if start_time:
         review_requests = review_requests.filter(request_time__gte=start_time)
     if end_time:
@@ -563,19 +570,25 @@ def get_publisher_review_tasks(request):
         completed_reviews_count = review_request.manual_reviews.filter(status='completed').count()
         progress = f"{completed_reviews_count}/{reviewers_count}"
 
-        # 计算状态逻辑：根据 status2 决定显示哪个状态
-        if review_request.status2 == 'accepted':
-            display_status = review_request.status1  # 使用 status1
+        if review_request.status2 == 'refused':
+            ui_status = 'failed'
+        elif review_request.status2 == 'pending':
+            ui_status = 'pending'
+        elif review_request.status1 == 'completed':
+            ui_status = 'completed'
         else:
-            display_status = review_request.status2  # 使用 status2
+            ui_status = 'in_progress'
 
+        dt = getattr(review_request.detection_result, 'detection_task', None)
         tasks.append({
             'review_request_id': review_request.id,
             'request_time': review_request.request_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'status': display_status,  # 动态选择状态
+            'status': ui_status,
             'status1': review_request.status1,
             'status2': review_request.status2,
-            'progress': progress
+            'progress': progress,
+            'detection_task_id': str(dt.id) if dt else '',
+            'task_type': dt.task_type if dt else '',
         })
 
     return Response({
@@ -646,6 +659,8 @@ def get_reviewer_manual_request(request):
     query = request.query_params.get('query', '')
     start_time = request.query_params.get('start_time', None)
     end_time = request.query_params.get('end_time', None)
+    review_request_status = request.query_params.get('review_request_status', '')
+    admin_gate_status = request.query_params.get('admin_gate_status', '')
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 10))
 
@@ -681,6 +696,10 @@ def get_reviewer_manual_request(request):
         manual_review = review_request.manual_reviews.filter(reviewer=user).first()
 
         if manual_review:
+            if review_request_status and review_request.status1 != review_request_status:
+                continue
+            if admin_gate_status and review_request.status2 != admin_gate_status:
+                continue
             if status:
                 if manual_review.status == status:
                     results.append({
@@ -689,7 +708,11 @@ def get_reviewer_manual_request(request):
                         'publisher_username': publisher.username,
                         'publisher_avatar': publisher.avatar.url if publisher.avatar else None,
                         'image_count': image_count,
-                        'status': manual_review.status
+                        'status': manual_review.status,
+                        'review_request_id': review_request.id,
+                        'review_request_status': review_request.status1,
+                        'admin_gate_status': review_request.status2,
+                        'task_kind': 'image',
                     })
             else:
                 results.append({
@@ -698,7 +721,11 @@ def get_reviewer_manual_request(request):
                     'publisher_username': publisher.username,
                     'publisher_avatar': publisher.avatar.url if publisher.avatar else None,
                     'image_count': image_count,
-                    'status': manual_review.status
+                    'status': manual_review.status,
+                    'review_request_id': review_request.id,
+                    'review_request_status': review_request.status1,
+                    'admin_gate_status': review_request.status2,
+                    'task_kind': 'image',
                 })
 
     return Response({
@@ -734,11 +761,10 @@ def get_review_detail(request, manual_review_id):
     # 获取关联的DetectionTask对象
     detection_task = detection_result.detection_task
 
-    # 获取图片ID列表
-    image_ids = [image_upload.id for image_upload in manual_review.imgs.all()]
-
-    # 获取图片URL列表
-    image_urls = [image_upload.image.url for image_upload in manual_review.imgs.all()]
+    qs_imgs = manual_review.imgs.all()
+    imgs = [{'id': image_upload.id, 'url': image_upload.image.url} for image_upload in qs_imgs]
+    image_ids = [x['id'] for x in imgs]
+    image_urls = [x['url'] for x in imgs]
 
     # 获取AI检测结果
     ai_detection_result = {
@@ -780,10 +806,19 @@ def get_review_detail(request, manual_review_id):
         })
 
     return Response({
+        'imgs': imgs,
         'image_urls': image_urls,
+        'image_ids': image_ids,
         'ai_detection_result': ai_detection_result,
         'count': len(image_ids),
-        'reviewers_results': reviewers_results
+        'reviewers_results': reviewers_results,
+        'review_request': {
+            'id': review_request.id,
+            'status': review_request.status1,
+            'admin_gate_status': review_request.status2,
+            'request_time': review_request.request_time.strftime('%Y-%m-%d %H:%M:%S'),
+        },
+        'manual_review_status': manual_review.status,
     })
 
 

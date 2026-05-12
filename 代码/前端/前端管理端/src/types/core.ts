@@ -9,6 +9,7 @@ export interface AdminUserInfo {
   organization?: number
   organization_name?: string
   avatar?: string
+  profile?: string
 }
 
 export interface UserListItem {

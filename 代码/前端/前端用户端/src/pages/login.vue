@@ -3,15 +3,15 @@
     <!-- 左侧功能介绍区域 -->
     <div class="feature-section">
       <div class="feature-content">
-        <h1 class="text-h4 font-weight-bold mb-12">学术图像造假检测平台</h1>
+        <h1 class="text-h4 font-weight-bold mb-12">学术内容诚信检测平台</h1>
         <div class="feature-grid">
           <div class="feature-item">
             <div class="feature-icon">
               <v-icon size="32" color="primary">mdi-magnify</v-icon>
             </div>
             <div class="feature-text">
-              <div class="text-subtitle-1 font-weight-medium">AI精准检测</div>
-              <div class="text-body-2 text-grey">基于深度学习与图像分析技术，精准识别重复、篡改、拼接等学术图像异常。</div>
+              <div class="text-subtitle-1 font-weight-medium">统一检测入口</div>
+              <div class="text-body-2 text-grey">面向图像、论文 PDF、Review 文本等多类对象，由对应适配链路执行模型分析。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -19,8 +19,8 @@
               <v-icon size="32" color="primary">mdi-compare</v-icon>
             </div>
             <div class="feature-text">
-              <div class="text-subtitle-1 font-weight-medium">秒级快速筛查</div>
-              <div class="text-body-2 text-grey">AI预检测可在数秒内完成初筛，大幅降低人工审核成本，提升出版社工作效率</div>
+              <div class="text-subtitle-1 font-weight-medium">多类型材料检测</div>
+              <div class="text-body-2 text-grey">论文输入须为 PDF，Review 须为在线文本或 TXT，图像材料可直接上传进入检测队列。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -29,7 +29,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">双重验证机制</div>
-              <div class="text-body-2 text-grey">AI初检+人工复核双保险，确保结果客观可信，降低误判风险。</div>
+              <div class="text-body-2 text-grey">AI 初检与人工复核结合，结论更稳妥。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -38,7 +38,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">多角色协同平台</div>
-              <div class="text-body-2 text-grey">支持出版社、审稿人多端登录，任务进度实时追踪，反馈结果集中归档。</div>
+              <div class="text-body-2 text-grey">编辑与专家（审稿人）分角色使用；专家即人工复核执行账号，任务进度可查。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -47,7 +47,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">可追溯审计</div>
-              <div class="text-body-2 text-grey">所有操作留痕，满足出版机构对流程透明性与合规性的严格要求</div>
+              <div class="text-body-2 text-grey">关键操作留痕，便于追溯与合规核对。</div>
             </div>
           </div>
           <div class="feature-item">
@@ -56,7 +56,7 @@
             </div>
             <div class="feature-text">
               <div class="text-subtitle-1 font-weight-medium">多维统计分析</div>
-              <div class="text-body-2 text-grey">自动生成结构化检测报告，附带篡改区域标记与证据链，助力学术争议裁定。</div>
+              <div class="text-body-2 text-grey">结构化报告与证据展示，便于复核与研判。</div>
             </div>
           </div>
         </div>
@@ -79,7 +79,32 @@
               class="role-btn">编辑</v-btn>
             <v-btn value="reviewer" :class="{ 'active-role': selectedRole === 'reviewer' }" class="role-btn">专家</v-btn>
           </v-btn-toggle>
+          <div class="text-caption text-medium-emphasis mt-2">
+            「专家」与文档中的「审稿人」为同一类账号（系统内角色 reviewer），负责管理端通过后的<strong>人工复核</strong>；与期刊「审稿」业务流程不是同一概念。
+          </div>
         </div>
+
+        <v-alert
+          v-if="fullFrontendMock"
+          type="success"
+          variant="tonal"
+          density="comfortable"
+          class="mb-6 text-body-2"
+        >
+          已启用 <strong>VITE_USE_FULL_FRONTEND_MOCK</strong>：可直接<strong>登录</strong>（邮箱格式正确、密码不少于 6 位即可），无需 Django；检测与人工审核接口走前端桩，角色以上方「编辑 / 专家」为准。
+        </v-alert>
+
+        <v-alert
+          v-if="loginType === 'register'"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-6 text-body-2"
+        >
+          <strong>注册说明：</strong>账号角色由<strong>邀请码</strong>决定，必须与上方选择的身份一致。
+          「专家」即审稿人账号，需使用组织下发的 <strong>审稿人邀请码</strong>（注册后角色为 reviewer）；仅用「编辑」邀请码无法注册为专家。
+          邀请码可向组织管理员索取，或在审批通过后由邮件、管理流程发放。
+        </v-alert>
 
         <v-form ref="form" @submit.prevent="handleSubmit">
           <!-- 登录表单 -->
@@ -162,6 +187,15 @@
             </template>
           </div>
         </v-form>
+
+        <v-divider class="my-8" />
+        <div class="text-subtitle-2 font-weight-medium mb-2">本地前端调试（无后端联调）</div>
+        <v-alert type="warning" variant="tonal" density="compact" class="mb-4 text-body-2">
+          使用上方 <strong>编辑 / 专家</strong> 切换后，点击下方可进入对应角色的界面预览（不调用登录接口）。数据与通知需登录后才会真实加载。
+        </v-alert>
+        <v-btn block color="secondary" variant="tonal" prepend-icon="mdi-eye-outline" @click="enterUiPreview">
+          进入界面预览
+        </v-btn>
       </div>
     </div>
 
@@ -321,14 +355,18 @@ import ForgotPassword from '@/components/ForgotPassword.vue'
 import { useSnackbarStore } from '@/stores/snackbar';
 const snackbar = useSnackbarStore();
 import user from '@/api/user'
+import { fullFrontendMockEnabled } from '@/utils/mockMode'
 import { useUserStore } from '@/stores/user';
 const userStore = useUserStore();
+const fullFrontendMock = fullFrontendMockEnabled()
+import { useUiPreviewStore } from '@/stores/uiPreview'
+const uiPreview = useUiPreviewStore()
 import VerificationCodeInput from '@/components/VerificationCodeInput.vue'
 
 const router = useRouter()
 const captchaRef = ref()
 const loginType = ref('login')
-const selectedRole = ref('reviewer')
+const selectedRole = ref<'publisher' | 'reviewer'>('publisher')
 const email = ref('')
 const password = ref('')
 const agreement = ref(false)
@@ -442,6 +480,14 @@ const validateCaptcha = () => {
   return true
 }
 
+const enterUiPreview = () => {
+  const role = selectedRole.value as 'publisher' | 'reviewer'
+  uiPreview.enable(role)
+  const label = role === 'publisher' ? '编辑' : '专家'
+  snackbar.showMessage(`已进入界面预览（${label}）`, 'success')
+  router.push(role === 'publisher' ? '/upload' : '/review')
+}
+
 const isFormValid = computed(() => {
   if (!agreement.value) return false
   if (!captchaInput.value) return false
@@ -451,24 +497,33 @@ const isFormValid = computed(() => {
       /.+@.+\..+/.test(email.value) &&
       password.value.length >= 6
   } else {
-    return registerFormData.value.email &&
-      registerFormData.value.inviteCode &&
-      /.+@.+\..+/.test(registerFormData.value.email) &&
-      registerFormData.value.inviteCode.length >= 6
+    const r = registerFormData.value
+    return !!(
+      r.username &&
+      r.email &&
+      r.password &&
+      r.password.length >= 6 &&
+      r.confirmPassword === r.password &&
+      r.inviteCode &&
+      r.inviteCode.length >= 6 &&
+      /.+@.+\..+/.test(r.email)
+    )
   }
 })
 
 const handleSubmit = async () => {
   if (!validateCaptcha()) {
+    snackbar.showMessage(captchaError.value || '请先完成图形验证码', 'warning')
     return
   }
   // 继续登录/注册流程...
   if (loginType.value === 'login') {
     const response = await user.login({
-      email: email.value,
+      email: email.value.trim().toLowerCase(),
       password: password.value,
       role: selectedRole.value
-    }).then(async res => {
+    }).then(async (res) => {
+      uiPreview.disable()
       localStorage.setItem("2-token", res.data.access)
       localStorage.setItem("2-refresh", res.data.refresh)
       localStorage.setItem("2-isLoggedIn", "true")
@@ -478,18 +533,45 @@ const handleSubmit = async () => {
 
       snackbar.showMessage('登录成功', 'success')
       router.push('/')
-    }).catch(error => {
-      console.log(error)
-      let errorMessage = '网络错误，请稍后重试'
-      if (error.response) {
-        switch (error.response.status) {
-          case 401:
-            errorMessage = '账号/密码错误'
+    }).catch((error: unknown) => {
+      console.error(error)
+      let errorMessage = '无法连接后端'
+      const ax = error as { response?: { status: number; data?: unknown }; code?: string; message?: string }
+      if (ax.response) {
+        switch (ax.response.status) {
+          case 401: {
+            const d = ax.response.data as Record<string, unknown> | undefined
+            errorMessage =
+              typeof d?.message === 'string'
+                ? d.message
+                : typeof d?.detail === 'string'
+                  ? d.detail
+                  : '账号或密码错误'
+            // 后端 401 = EmailBackend 未匹配到用户或密码错误（与界面「编辑/专家」开关无直接关系）
+            if (selectedRole.value === 'reviewer') {
+              errorMessage +=
+                ' 专家登录须使用后台中「邮箱」与输入完全一致、且已正确设置密码的审稿人账号；若在 Django Admin 手建用户，请填写 email 并用「修改密码」保存。'
+            }
             break
-          default://400
-            errorMessage = '请联系管理员'
+          }
+          case 400: {
+            const d = ax.response.data as Record<string, unknown> | undefined
+            const nfe = d?.non_field_errors
+            const msg =
+              d?.message ??
+              d?.detail ??
+              (Array.isArray(nfe) && typeof nfe[0] === 'string' ? nfe[0] : null)
+            errorMessage = typeof msg === 'string' ? msg : '登录请求被拒绝，请检查账号角色是否与账号类型一致'
             break
+          }
+          default:
+            errorMessage = `服务器返回 ${ax.response.status}，请稍后重试`
         }
+      } else if (ax.code === 'ECONNABORTED') {
+        errorMessage = '请求超时，请确认 Django 已启动且地址正确'
+      } else if (ax.code === 'ERR_NETWORK' || ax.message === 'Network Error') {
+        errorMessage =
+          '无法连接后端：请在浏览器打开 http://127.0.0.1:8000/admin/ 若打不开说明 Django 未启动或已崩溃；查看仓库下 `.local-dev/logs/django.stderr.log`。一键脚本启动的用户端请确认 `.env` 里为 `VITE_API_URL=http://127.0.0.1:8000`，网页也请用 http://127.0.0.1:3000 访问'
       }
       snackbar.showMessage(errorMessage, 'error')
     })
@@ -506,17 +588,30 @@ const handleSubmit = async () => {
       loginType.value = 'login'
     } catch (error: any) {
       let errorMessage = '注册失败，请稍后重试'
-      if (error.response) {
-        if (error.response.status === 400) {
-          // 处理字段验证错误
-          const errors = error.response.data
-          const errorMessages = []
-
-          if (errors.email) errorMessages.push(`邮箱已存在`)
-          if (errors.inviteCode) errorMessages.push(`邀请码已存在`)
-
-          errorMessage = errorMessages.length > 0 ? errorMessages.join(';') : '请检查输入信息'
+      if (error.response?.status === 400) {
+        const data = error.response.data
+        const parts: string[] = []
+        const pushArr = (key: string, label: string) => {
+          const v = data[key]
+          if (!v) return
+          const msg = Array.isArray(v) ? v.join(' ') : String(v)
+          parts.push(`${label}: ${msg}`)
         }
+        pushArr('email', '邮箱')
+        pushArr('username', '用户名')
+        pushArr('invitation_code', '邀请码')
+        pushArr('inviteCode', '邀请码')
+        pushArr('role', '角色')
+        pushArr('non_field_errors', '提示')
+        if (typeof data === 'object' && data !== null) {
+          for (const k of Object.keys(data)) {
+            if (['email', 'username', 'invitation_code', 'inviteCode', 'role', 'non_field_errors'].includes(k)) continue
+            const v = data[k]
+            if (Array.isArray(v)) parts.push(`${k}: ${v.join(' ')}`)
+            else if (typeof v === 'string') parts.push(`${k}: ${v}`)
+          }
+        }
+        errorMessage = parts.length ? parts.join('；') : '请检查输入信息或与邀请码是否匹配当前身份'
       }
       snackbar.showMessage(errorMessage, 'error')
     }

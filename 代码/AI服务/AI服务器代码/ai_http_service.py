@@ -14,6 +14,9 @@ from detection_service import DetectionService, ErrorResponse, TaskNotImplemente
 
 
 IMAGE_BATCH_PATH = "/api/v1/image-detection/batches"
+DETECTION_BATCH_PATH = "/api/v1/detection/batches"
+PAPER_BATCH_PATH = "/api/v1/paper-detection/batches"
+REVIEW_BATCH_PATH = "/api/v1/review-detection/batches"
 HEALTH_PATH = "/health"
 ADMIN_REGISTRY_PATH = "/api/v1/admin/model-registry"
 SERVICE = DetectionService()
@@ -146,7 +149,7 @@ class AIHTTPHandler(BaseHTTPRequestHandler):
         )
 
     def do_POST(self) -> None:
-        if self.path != IMAGE_BATCH_PATH:
+        if self.path not in {IMAGE_BATCH_PATH, DETECTION_BATCH_PATH, PAPER_BATCH_PATH, REVIEW_BATCH_PATH}:
             self._send_json(
                 HTTPStatus.NOT_FOUND,
                 build_error_response(

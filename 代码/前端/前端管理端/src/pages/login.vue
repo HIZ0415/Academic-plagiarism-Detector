@@ -3,15 +3,15 @@
       <!-- 左侧功能介绍区域 -->
       <div class="feature-section">
         <div class="feature-content">
-          <h1 class="text-h4 font-weight-bold mb-12">学术图像造假检测平台</h1>
+          <h1 class="text-h4 font-weight-bold mb-12">学术内容诚信 · 管理端</h1>
           <div class="feature-grid">
             <div class="feature-item">
               <div class="feature-icon">
                 <v-icon size="32" color="primary">mdi-magnify</v-icon>
               </div>
               <div class="feature-text">
-                <div class="text-subtitle-1 font-weight-medium">AI精准检测</div>
-                <div class="text-body-2 text-grey">基于深度学习与图像分析技术，精准识别重复、篡改、拼接等学术图像异常。</div>
+                <div class="text-subtitle-1 font-weight-medium">AI 图像检测</div>
+                <div class="text-body-2 text-grey">基于深度学习与图像分析技术，识别重复、篡改、拼接等学术图像异常。</div>
               </div>
             </div>
             <div class="feature-item">
@@ -19,7 +19,7 @@
                 <v-icon size="32" color="primary">mdi-compare</v-icon>
               </div>
               <div class="feature-text">
-                <div class="text-subtitle-1 font-weight-medium">秒级快速筛查</div>
+                <div class="text-subtitle-1 font-weight-medium">自动化筛查</div>
                 <div class="text-body-2 text-grey">AI预检测可在数秒内完成初筛，大幅降低人工审核成本，提升出版社工作效率</div>
               </div>
             </div>

@@ -34,11 +34,11 @@ export const useUserStore = defineStore('user', {
         this.username = response.data.username || '';
         this.email = response.data.email || '';
         this.role = response.data.role || '';
-        this.profile = response.data.profile || '';
+        this.profile = response.data.profile ?? '';
         this.avatar = response.data.avatar ? `${API_BASE_URL}${response.data.avatar}` : './192.png';
-        this.admin_type = response.data.admin_type;
+        this.admin_type = response.data.admin_type ?? '';
         this.isLoaded = true;
-        this.organization = response.data.organization;
+        this.organization = response.data.organization ?? 0;
         return true;
       } catch (error) {
         console.error('获取用户信息失败:', error);

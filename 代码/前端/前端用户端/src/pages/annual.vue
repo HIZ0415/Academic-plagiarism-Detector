@@ -1,25 +1,57 @@
 <template>
   <div class="annual-page">
-    <!-- 标题 -->
-    <v-row class="mb-6">
+    <v-row class="mb-2">
       <v-col>
-        <h1 class="text-h4 font-weight-bold">我的任务</h1>
+        <h1 class="text-h4 font-weight-bold">人工审核申请</h1>
+        <p class="text-body-2 text-medium-emphasis mb-0">发布者侧：查看已提交的审核申请与进度；与检测历史详情中「人工审核申请」入口一致（概要设计用户端 `/annual`）。</p>
       </v-col>
     </v-row>
 
-    <!-- 筛选按钮 -->
+    <v-alert
+      v-if="fromTaskId"
+      type="info"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4 text-body-2"
+      closable
+      @click:close="clearFromTaskHint"
+    >
+      您从检测任务 <code>{{ fromTaskId }}</code> 跳转而来；可直接点击「发起人工审核申请」预填该任务 ID，或在下列列表中跟踪进度。
+    </v-alert>
+
+    <v-alert v-if="useWorkflowMock" type="warning" variant="tonal" density="compact" class="mb-4 text-body-2">
+      已开启 <strong>VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW</strong> 或 <strong>VITE_USE_FULL_FRONTEND_MOCK</strong>：人工审核全流程数据在用户端浏览器本地；管理端 dev（通常 :3001）与用户端（通常 :3000）origin 不同则<strong>无法共享</strong> Mock 数据——无后端时请展开下方「模拟管理端审批」，或使用真实后端联调。
+    </v-alert>
+
     <v-row class="mb-4">
-      <v-col cols="12" class="d-flex justify-end">
-        <v-btn 
-          color="primary" 
-          class="text-none" 
-          prepend-icon="mdi-filter-variant"
-          @click="showFilterDialog = true"
-        >
+      <v-col cols="12" class="d-flex flex-wrap align-center ga-2 justify-space-between">
+        <div class="d-flex flex-wrap ga-2">
+          <v-btn color="primary" class="text-none" prepend-icon="mdi-plus-circle-outline" @click="openCreateDialog">
+            发起人工审核申请
+          </v-btn>
+        </div>
+        <v-btn color="primary" variant="tonal" class="text-none" prepend-icon="mdi-filter-variant" @click="showFilterDialog = true">
           筛选
         </v-btn>
       </v-col>
     </v-row>
+
+    <v-expansion-panels v-if="useWorkflowMock" class="mb-4">
+      <v-expansion-panel>
+        <v-expansion-panel-title class="text-body-2 font-weight-medium">
+          本地联调 · 模拟管理端审批（仅 Mock；通过后专家任务池可出现对应任务）
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <v-data-table :headers="simHeaders" :items="pendingSimulationRows" hide-default-footer density="compact">
+            <template #item.actions="{ item }">
+              <v-btn size="small" color="success" variant="tonal" class="text-none me-2" @click="simulateApprove(item.review_request_id)">通过</v-btn>
+              <v-btn size="small" color="error" variant="tonal" class="text-none" @click="simulateReject(item.review_request_id)">拒绝</v-btn>
+            </template>
+          </v-data-table>
+          <div v-if="!pendingSimulationRows.length" class="text-caption text-medium-emphasis mt-2">暂无待管理审批的申请。</div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
 
     <v-card class="elevation-2">
       <v-data-table
@@ -102,6 +134,61 @@
       </div>
     </v-card>
 
+    <!-- 发起申请 -->
+    <v-dialog v-model="showCreateDialog" max-width="560" persistent>
+      <v-card>
+        <v-card-title class="text-h6 font-weight-bold">发起人工审核申请</v-card-title>
+        <v-card-text>
+          <v-text-field
+            v-model="createForm.detection_task_id"
+            label="关联自动检测任务 ID *"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            class="mb-3"
+          />
+          <v-select
+            v-model="createForm.task_type"
+            :items="taskTypeItems"
+            label="任务类型 *"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            class="mb-3"
+          />
+          <v-textarea
+            v-model="createForm.reason"
+            label="申请理由 *（建议不少于 10 字）"
+            variant="outlined"
+            rows="4"
+            hide-details="auto"
+            class="mb-3"
+          />
+          <v-select
+            v-model="createForm.priority"
+            :items="priorityItems"
+            label="优先级"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            class="mb-3"
+          />
+          <v-text-field
+            v-model="createForm.batch_session_id"
+            label="统一检测批次 ID（可选）"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="createSubmitting" @click="showCreateDialog = false">取消</v-btn>
+          <v-btn color="primary" :loading="createSubmitting" @click="submitCreate">提交申请</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- 筛选对话框 -->
     <v-dialog v-model="showFilterDialog" max-width="500">
       <v-card class="elevation-4">
@@ -158,13 +245,141 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import publisherApi from '@/api/publisher'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import {
+  createManualReviewRequest,
+  listPublisherManualReviewApplications,
+} from '@/api/manualReviewWorkflow'
 import { useSnackbarStore } from '@/stores/snackbar'
+import { useUserStore } from '@/stores/user'
+import {
+  workflowMockEnabled,
+  mockListPendingAdminForPublisher,
+  mockSimulateAdminApprove,
+  mockSimulateAdminReject,
+} from '@workflow-mock'
 
 const router = useRouter()
+const route = useRoute()
 const snackbar = useSnackbarStore()
+const userStore = useUserStore()
+
+const useWorkflowMock = computed(() => workflowMockEnabled())
+
+const showCreateDialog = ref(false)
+const createSubmitting = ref(false)
+const createForm = ref({
+  detection_task_id: '',
+  task_type: 'image_detection',
+  reason: '',
+  priority: 'normal' as 'normal' | 'urgent',
+  batch_session_id: '',
+})
+
+const taskTypeItems = [
+  { title: '图像检测', value: 'image_detection' },
+  { title: '论文 AIGC', value: 'paper_aigc' },
+  { title: '学术资源', value: 'resource_check' },
+  { title: 'Review 检测', value: 'review_detection' },
+]
+
+const priorityItems = [
+  { title: '普通', value: 'normal' },
+  { title: '加急', value: 'urgent' },
+]
+
+const pendingSimulationRows = computed(() => {
+  if (!useWorkflowMock.value) return []
+  return mockListPendingAdminForPublisher().map((r) => ({
+    review_request_id: r.review_request_id,
+    detection_task_id: r.detection_task_id,
+    task_type: r.task_type,
+    reason: r.reason.length > 40 ? `${r.reason.slice(0, 40)}…` : r.reason,
+    created_at: r.created_at.slice(0, 19).replace('T', ' '),
+  }))
+})
+
+const simHeaders = [
+  { title: '申请单号', key: 'review_request_id', align: 'center' as const },
+  { title: '检测任务', key: 'detection_task_id', align: 'start' as const },
+  { title: '类型', key: 'task_type', align: 'center' as const },
+  { title: '理由摘要', key: 'reason', align: 'start' as const },
+  { title: '提交时间', key: 'created_at', align: 'center' as const },
+  { title: '操作', key: 'actions', align: 'center' as const, sortable: false },
+]
+
+function openCreateDialog() {
+  createForm.value.detection_task_id = fromTaskId.value || ''
+  createForm.value.reason = ''
+  createForm.value.batch_session_id = ''
+  createForm.value.priority = 'normal'
+  createForm.value.task_type = 'image_detection'
+  showCreateDialog.value = true
+}
+
+async function submitCreate() {
+  const tid = createForm.value.detection_task_id.trim()
+  const reason = createForm.value.reason.trim()
+  if (!tid) {
+    snackbar.showMessage('请填写关联检测任务 ID', 'warning')
+    return
+  }
+  if (reason.length < 10) {
+    snackbar.showMessage('申请理由请至少 10 个字', 'warning')
+    return
+  }
+  createSubmitting.value = true
+  try {
+    await createManualReviewRequest(
+      {
+        detection_task_id: tid,
+        task_type: createForm.value.task_type,
+        reason,
+        priority: createForm.value.priority,
+        batch_session_id: createForm.value.batch_session_id.trim() || undefined,
+      },
+      userStore.username || undefined,
+    )
+    snackbar.showMessage('人工审核申请已提交', 'success')
+    showCreateDialog.value = false
+    await fetchTasks(currentPage.value, pageSize.value)
+  } catch {
+    snackbar.showMessage('提交失败，请确认后端已实现 POST /manual-review-requests/ 或开启 Mock', 'error')
+  } finally {
+    createSubmitting.value = false
+  }
+}
+
+function simulateApprove(review_request_id: number) {
+  const res = mockSimulateAdminApprove(review_request_id)
+  if (!res.ok) snackbar.showMessage(res.error, 'warning')
+  else {
+    snackbar.showMessage(`已通过，专家任务 manual_review_id=${res.manual_review_id}`, 'success')
+    fetchTasks(currentPage.value, pageSize.value)
+  }
+}
+
+function simulateReject(review_request_id: number) {
+  const reason = window.prompt('请输入拒绝理由（Mock）', '材料不完整') || '材料不完整'
+  const res = mockSimulateAdminReject(review_request_id, reason)
+  if (!res.ok) snackbar.showMessage(res.error, 'warning')
+  else {
+    snackbar.showMessage('已拒绝该申请', 'success')
+    fetchTasks(currentPage.value, pageSize.value)
+  }
+}
+
+const fromTaskId = computed(() => {
+  const raw = route.query.task_id
+  if (raw == null || Array.isArray(raw)) return ''
+  const s = String(raw).trim()
+  return s || ''
+})
+
+function clearFromTaskHint() {
+  router.replace({ path: '/annual', query: {} })
+}
 
 interface Task {
   review_request_id: number
@@ -207,6 +422,7 @@ const statusOptions = [
   { title: '审核中', value: 'pending' },
   { title: '已下发', value: 'in_progress' },
   { title: '已完成', value: 'completed' },
+  { title: '已拒绝', value: 'failed' },
 ]
 
 const timeRangeOptions = [
@@ -225,6 +441,8 @@ const getStatusColor = (status: string) => {
       return 'info'
     case 'completed':
       return 'success'
+    case 'failed':
+      return 'error'
     default:
       return 'grey'
   }
@@ -238,6 +456,8 @@ const getStatusName = (status: string) => {
       return '已下发'
     case 'completed':
       return '已完成'
+    case 'failed':
+      return '已拒绝'
     default:
       return status
   }
@@ -348,8 +568,12 @@ const fetchTasks = async (page: number, pageSize: number) => {
       startTime: startTimeFilter,
       endTime: endTimeFilter
     }
-    const response = await publisherApi.getPublisherReviewTasks(params)
-    const { tasks: taskList, current_page, total_pages, total_count } = response.data
+    const response = await listPublisherManualReviewApplications(params)
+    const data = response.data as Record<string, unknown>
+    const taskList = Array.isArray(data.tasks) ? data.tasks : []
+    const current_page = Number(data.current_page) || page
+    const total_pages = Number(data.total_pages) || 1
+    const total_count = Number(data.total_count ?? data.total_tasks ?? taskList.length)
     
     tasks.value = taskList.map((task: any) => ({
       review_request_id: task.review_request_id,

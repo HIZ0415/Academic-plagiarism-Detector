@@ -1,17 +1,23 @@
-import io
-import uuid
-from PIL import Image
-import zipfile
-from pathlib import Path
-from django.core.files.storage import FileSystemStorage
 from ..models import FileManagement, ImageUpload, Log, User
 from django.core.paginator import Paginator, EmptyPage
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
-from ..models import ImageUpload
+from ..utils.image_preprocessing import (
+    detect_upload_kind,
+    preprocess_uploaded_image_resource,
+    save_original_upload,
+)
 
 ALPHA_ALLOWED_IMAGE_EXT = {'.png', '.jpg', '.jpeg'}
+
+
+class CustomPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 @api_view(["POST"])
@@ -22,13 +28,18 @@ def upload_file(request):
         return Response({"detail": "User does not have upload permission."}, status=403)
 
     # 获取上传的文件
-    uploaded_file = request.FILES['file']
+    uploaded_file = request.FILES.get("file")
+    if uploaded_file is None:
+        return Response({"detail": "No file provided."}, status=400)
+
     file_name = uploaded_file.name
     file_size = uploaded_file.size
     file_type = uploaded_file.content_type
-    suffix = Path(file_name).suffix.lower()
-    if suffix not in ALPHA_ALLOWED_IMAGE_EXT:
-        return Response({"message": "图像上传仅支持 .png/.jpg/.jpeg"}, status=400)
+    raw_bytes = uploaded_file.read()
+    try:
+        detect_upload_kind(file_name, file_type, raw_bytes)
+    except ValueError:
+        return Response({"message": "Unsupported upload type."}, status=400)
 
     # 存储文件到 FileManagement 表
     file_management = FileManagement.objects.create(
@@ -39,14 +50,12 @@ def upload_file(request):
         file_type=file_type
     )
 
-    # 使用 FileSystemStorage 保存上传文件，路径基于 MEDIA_ROOT 下的 uploads 目录
-    unique_filename = f"{uuid.uuid4().hex}_{file_name}"
-    fs = FileSystemStorage()
-    file_path = fs.save(f'uploads/{unique_filename}', uploaded_file)
-    file_url = fs.url(file_path)
-
-    # Alpha 阶段图像链路仅允许单张图片格式进入主流程
-    store_image(file_management, uploaded_file)
+    try:
+        file_path = save_original_upload(file_name, raw_bytes, "uploads")
+        image_count = preprocess_uploaded_image_resource(file_management, file_name, file_type, raw_bytes)
+    except ValueError as exc:
+        file_management.delete()
+        return Response({"message": str(exc)}, status=400)
 
     # 在Log表中记录上传操作
     Log.objects.create(
@@ -61,6 +70,7 @@ def upload_file(request):
             "message": "File uploaded successfully",
             "file_id": file_management.id,
             "file_url": f"/media/{file_path}",
+            "image_count": image_count,
         }
     )
 

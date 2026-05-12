@@ -1421,10 +1421,43 @@ def handle_review_request(request, reviewRequest_id):
     if choice == 0:
         review_request.status2 = 'refused'
     elif choice == 1:
-        review_request.status2 = 'accepted'
-
         # 获取所有图片
         images = review_request.imgs.all()
+        if not images.exists():
+            return Response({'error': '该申请未关联图片，无法生成专家任务'}, status=400)
+
+        org = review_request.organization or review_request.user.organization
+        # 申请阶段可能尚未绑定审稿人：通过时补齐（先显式 reviewer_ids，否则回落为组织内全部审稿人）
+        if review_request.reviewers.count() == 0:
+            reviewer_ids = request.data.get('reviewer_ids')
+            if reviewer_ids is not None:
+                if not isinstance(reviewer_ids, (list, tuple)):
+                    return Response({'error': 'reviewer_ids 须为 ID 数组'}, status=400)
+                picked = User.objects.filter(
+                    id__in=reviewer_ids,
+                    organization=org,
+                    role='reviewer',
+                    is_active=True,
+                )
+                for u in picked:
+                    review_request.reviewers.add(u)
+            if review_request.reviewers.count() == 0:
+                pool = User.objects.filter(organization=org, role='reviewer', is_active=True)
+                for u in pool:
+                    review_request.reviewers.add(u)
+        if review_request.reviewers.count() == 0:
+            return Response(
+                {
+                    'error': '无法通过：本组织当前没有可用的专家（审稿人）账号。请先添加审稿人后再审批，或由前端在通过请求中传入 reviewer_ids。',
+                },
+                status=400,
+            )
+
+        review_request.status2 = 'accepted'
+        if review_request.status1 == 'pending':
+            review_request.status1 = 'in_progress'
+        if not review_request.review_start_time:
+            review_request.review_start_time = timezone.now()
 
         # 遍历所有审阅人
         for reviewer in review_request.reviewers.all():
