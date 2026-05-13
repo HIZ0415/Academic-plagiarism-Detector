@@ -88,13 +88,13 @@
           </v-card-title>
           <v-card-text>
             <v-timeline density="compact" align="start" class="activity-timeline">
-              <template v-if="recentActivities && recentActivities.length > 0">
-                <v-timeline-item v-for="(activity, index) in recentActivities.slice(-5).reverse()" :key="index"
+              <template v-if="recentActivities.length > 0">
+                <v-timeline-item v-for="activity in recentActivities" :key="activity.id"
                   :dot-color="getStatusColor(activity.status)" size="small">
                   <div class="d-flex justify-space-between align-center w-100">
                     <div class="activity-info">
-                      <div class="text-subtitle-1">{{ activity.task_name }}</div>
-                      <div class="text-caption text-grey">{{ formatDateTime(activity.completion_time) }}</div>
+                      <div class="text-subtitle-1">{{ activity.title }}</div>
+                      <div class="text-caption text-grey">{{ formatDateTime(activity.timestamp) || '时间未知' }}</div>
                     </div>
                     <v-chip :color="getStatusColor(activity.status)" size="small" class="activity-status">
                       {{ getStatusType(activity.status) }}
@@ -102,18 +102,6 @@
                   </div>
                 </v-timeline-item>
                 <!-- 填充空白项以保持对齐 -->
-                <template v-if="recentActivities.length < 5">
-                  <v-timeline-item v-for="n in (5 - recentActivities.length)" :key="`empty-${n}`"
-                    dot-color="transparent" size="small">
-                    <div class="d-flex justify-space-between align-center w-100">
-                      <div class="activity-info">
-                        <div class="text-subtitle-1 text-grey-lighten-1">-</div>
-                        <div class="text-caption text-grey-lighten-1">-</div>
-                      </div>
-                      <v-chip color="transparent" size="small" class="activity-status">-</v-chip>
-                    </div>
-                  </v-timeline-item>
-                </template>
               </template>
               <div v-else class="text-center py-4">
                 <v-icon size="48" color="grey-lighten-1">mdi-information-outline</v-icon>
@@ -195,11 +183,10 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, onMounted, ref, computed, onUnmounted } from 'vue'
+import { onMounted, ref, computed, onUnmounted } from 'vue'
 import user, { isLoggedIn } from '@/api/user'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
-import { useRoute } from 'vue-router'
 import VerificationCodeInput from '@/components/VerificationCodeInput.vue'
 import publisher from '@/api/publisher'
 import reviewer from '@/api/reviewer'
@@ -207,7 +194,6 @@ import { useEffectiveRole } from '@/composables/useEffectiveRole'
 
 const snackbar = useSnackbarStore()
 const userStore = useUserStore()
-const route = useRoute()
 const { effectiveRole, isPreviewMode } = useEffectiveRole()
 
 // 编辑表单
@@ -286,9 +272,12 @@ const requestResetEmail = async () => {
     await user.requestPasswordReset(passwordForm.value.email)
     snackbar.showMessage('验证码已发送，请查收邮箱', 'success')
     startCountdown()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('发送验证码失败:', error)
-    const errorMsg = error.response?.data?.message || '发送验证码失败'
+    const errorMsg =
+      error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || '发送验证码失败'
+        : '发送验证码失败'
     snackbar.showMessage(errorMsg, 'error')
   } finally {
     sendingEmail.value = false
@@ -311,7 +300,7 @@ const resetPassword = async () => {
     })
     snackbar.showMessage('密码重置成功', 'success')
     closePasswordDialog()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('重置密码失败:', error)
     const errorMsg = '重置密码失败'
     snackbar.showMessage(errorMsg, 'error')
@@ -338,14 +327,69 @@ const stats = ref({
 
 // 在 script setup 部分添加接口定义
 interface RecentActivity {
-  task_name: string
-  completion_time: string
+  id: string
+  title: string
+  timestamp: string
   status: string
-  color: string
+  statusLabel: string
 }
 
 // 修改 recentActivities 的初始化
 const recentActivities = ref<RecentActivity[]>([])
+
+function normalizeActivityStatus(status?: string) {
+  switch (status) {
+    case 'completed':
+      return { value: 'completed', label: '成功' }
+    case 'pending':
+      return { value: 'pending', label: '等待' }
+    case 'in_progress':
+      return { value: 'in_progress', label: '进行中' }
+    case 'failed':
+      return { value: 'failed', label: '失败' }
+    default:
+      return { value: 'unknown', label: '未知' }
+  }
+}
+
+function pickActivityTime(raw: Record<string, unknown>) {
+  const candidates = [raw.completion_time, raw.review_time, raw.upload_time, raw.created_at, raw.time]
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate
+  }
+  return ''
+}
+
+function pickActivityTitle(raw: Record<string, unknown>, role: 'publisher' | 'reviewer') {
+  const candidates = [raw.task_name, raw.title, raw.operation_type, raw.task_type]
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
+  }
+  return role === 'reviewer' ? '人工审核任务更新' : '检测任务更新'
+}
+
+function normalizeActivities(items: unknown[], role: 'publisher' | 'reviewer') {
+  return items
+    .map((item, index) => {
+      const raw = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      const normalizedStatus = normalizeActivityStatus(typeof raw.status === 'string' ? raw.status : undefined)
+      const timestamp = pickActivityTime(raw)
+      const fallbackId = `${role}-${index}-${timestamp || 'na'}`
+      return {
+        id: String(raw.id ?? raw.task_id ?? raw.manual_review_id ?? fallbackId),
+        title: pickActivityTitle(raw, role),
+        timestamp,
+        status: normalizedStatus.value,
+        statusLabel: normalizedStatus.label,
+      } satisfies RecentActivity
+    })
+    .sort((a, b) => {
+      const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0
+      const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0
+      return timeB - timeA
+    })
+    .slice(0, 5)
+}
 
 // 获取用户信息
 onMounted(async () => {
@@ -367,12 +411,12 @@ onMounted(async () => {
       const response = (await publisher.getTaskSummary()).data
       stats.value.completedTasks = response.completed_task_count
       stats.value.uploadedTasks = response.total_task_count
-      recentActivities.value = response.recent_tasks
+      recentActivities.value = normalizeActivities(response.recent_tasks || [], 'publisher')
     } else {
       const res = (await reviewer.getTaskCount()).data
       stats.value.completedTasks = res.total_completed_tasks
       stats.value.uploadedTasks = res.total_received_tasks
-      recentActivities.value = (await reviewer.getRecentActivities()).data
+      recentActivities.value = normalizeActivities((await reviewer.getRecentActivities()).data || [], 'reviewer')
     }
   } catch (error) {
     console.error('获取用户信息失败:', error)
@@ -461,6 +505,10 @@ const getStatusColor = (status: string) => {
       return 'success'
     case 'pending':
       return 'info'
+    case 'in_progress':
+      return 'warning'
+    case 'failed':
+      return 'error'
     default:
       return 'grey'
   }

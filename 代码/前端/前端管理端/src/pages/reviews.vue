@@ -50,7 +50,7 @@
         :loading="loading"
         hide-default-footer
       >
-        <template v-slot:top>
+        <template #top>
           <div class="d-flex align-center pa-4">
             <div class="text-caption text-medium-emphasis">
               共 {{ totalRequests }} 条记录
@@ -58,13 +58,13 @@
           </div>
         </template>
 
-        <template v-slot:item.avatar="{ item }">
+        <template #[`item.avatar`]="{ item }">
           <v-avatar size="40">
             <v-img :src="item.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg'" :alt="item.username"></v-img>
           </v-avatar>
         </template>
 
-        <template v-slot:item.state="{ item }">
+        <template #[`item.state`]="{ item }">
           <v-chip
             :color="getStateColor(item.state)"
             size="small"
@@ -74,17 +74,40 @@
           </v-chip>
         </template>
 
-        <template v-slot:item.actions="{ item }">
-          <v-btn
-            icon
-            variant="text"
-            size="small"
-            color="primary"
-            class="mr-2"
-            @click="openReviewDialog(item)"
-          >
-            <v-icon>mdi-eye</v-icon>
-          </v-btn>
+        <template #[`item.actions`]="{ item }">
+          <div class="d-flex align-center justify-center ga-1">
+            <v-btn
+              icon
+              variant="text"
+              size="small"
+              color="primary"
+              class="mr-1"
+              @click="openReviewDialog(item)"
+            >
+              <v-icon>mdi-eye</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              variant="text"
+              size="small"
+              color="success"
+              :disabled="!canHandlePending(item)"
+              :loading="processingRequestId === item.id"
+              @click="approveRequest(item)"
+            >
+              <v-icon>mdi-check</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              :disabled="!canHandlePending(item)"
+              @click="startReject(item)"
+            >
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </div>
         </template>
       </v-data-table>
       
@@ -271,7 +294,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import reviewApi from '@/api/review'
 import { useSnackbarStore } from '@/stores/snackbar'
 
@@ -358,6 +381,7 @@ const reviewDetails = ref<{
 } | null>(null)
 const rejectReason = ref('')
 const showRejectDialog = ref(false)
+const processingRequestId = ref<number | null>(null)
 
 const getStateColor = (state: string) => {
   switch (state) {
@@ -401,14 +425,25 @@ const openReviewDialog = async (request: ReviewRequest) => {
   }
 }
 
-function startReject() {
+function canHandlePending(request: ReviewRequest | null) {
+  return !!request && request.state === 'pending' && processingRequestId.value !== request.id
+}
+
+function startReject(request?: ReviewRequest) {
+  if (request) {
+    selectedRequest.value = request
+  }
   rejectReason.value = ''
   showRejectDialog.value = true
 }
 
-async function approveRequest() {
+async function approveRequest(request?: ReviewRequest) {
+  if (request) {
+    selectedRequest.value = request
+  }
   if (!selectedRequest.value) return
   try {
+    processingRequestId.value = selectedRequest.value.id
     await reviewApi.handleReviewRequest(selectedRequest.value.id, { choice: 1, reason: '' })
     snackbar.showMessage('已通过审核，已进入专家分配队列', 'success')
     showReviewDialog.value = false
@@ -422,6 +457,8 @@ async function approveRequest() {
         ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
         : undefined
     snackbar.showMessage(msg || '处理审核请求失败', 'error')
+  } finally {
+    processingRequestId.value = null
   }
 }
 
@@ -432,6 +469,7 @@ async function confirmReject() {
   }
   if (!selectedRequest.value) return
   try {
+    processingRequestId.value = selectedRequest.value.id
     await reviewApi.handleReviewRequest(selectedRequest.value.id, {
       choice: 0,
       reason: rejectReason.value.trim(),
@@ -448,6 +486,8 @@ async function confirmReject() {
         ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
         : undefined
     snackbar.showMessage(msg || '处理审核请求失败', 'error')
+  } finally {
+    processingRequestId.value = null
   }
 }
 
@@ -551,7 +591,7 @@ const fetchRequests = async (page: number, pageSize: number) => {
     const response = await reviewApi.getReviewRequests(params)
     const { requests: requestList, current_page, total_pages, total_requests } = response.data
     
-    requests.value = requestList.map((request: any) => ({
+    requests.value = requestList.map((request: Record<string, unknown>) => ({
       id: request.id,
       username: request.username,
       avatar: request.avatar ? import.meta.env.VITE_API_URL + request.avatar : '',
@@ -675,4 +715,4 @@ onMounted(() => {
 :deep(.v-select .v-field__append-inner) {
   padding-top: 0;
 }
-</style> 
+</style>

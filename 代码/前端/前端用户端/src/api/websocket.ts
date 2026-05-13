@@ -1,5 +1,5 @@
 import { useMessageStore } from "@/stores/message"
-import { buildNotificationsWebSocketUrl } from '@shared/notificationsWsUrl'
+import { buildNotificationsWebSocketUrl } from '@shared/notificationsWsUrl.ts'
 
 let ws: WebSocket | null = null
 let reconnectTimer: number | null = null
