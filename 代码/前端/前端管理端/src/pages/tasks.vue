@@ -14,7 +14,7 @@
       </v-col>
       <v-col cols="12" md="6" class="d-flex flex-wrap justify-end gap-2">
         <v-chip v-if="useSocket" :color="wsConnected ? 'success' : 'warning'" size="small" variant="tonal">
-          WebSocket {{ wsConnected ? '已连接' : '未连接' }}
+          WebSocket {{ wsStatusText }}
         </v-chip>
         <v-switch
           v-model="autoRefresh"
@@ -84,7 +84,7 @@
         hover
         class="elevation-0"
       >
-        <template #item.task_name="{ item }">
+        <template #[`item.task_name`]="{ item }">
           <div>{{ item.task_name }}</div>
           <div
             v-if="item.status === 'failed' && item.error_message"
@@ -94,22 +94,22 @@
             {{ item.error_message }}
           </div>
         </template>
-        <template #item.task_type="{ item }">
+        <template #[`item.task_type`]="{ item }">
           <v-chip size="small" variant="tonal">{{ formatTaskType(item.task_type) }}</v-chip>
         </template>
-        <template #item.username="{ item }">
+        <template #[`item.username`]="{ item }">
           {{ item.username ?? '—' }}
         </template>
-        <template #item.status="{ item }">
+        <template #[`item.status`]="{ item }">
           <v-chip :color="statusColor(item.status)" size="small">{{ formatStatus(item.status) }}</v-chip>
         </template>
-        <template #item.upload_time="{ item }">
+        <template #[`item.upload_time`]="{ item }">
           {{ formatTime(item.upload_time) }}
         </template>
-        <template #item.completion_time="{ item }">
+        <template #[`item.completion_time`]="{ item }">
           {{ item.completion_time ? formatTime(item.completion_time) : '—' }}
         </template>
-        <template #item.actions="{ item }">
+        <template #[`item.actions`]="{ item }">
           <v-btn size="small" variant="text" color="primary" class="text-none" @click="openDetail(item)">
             详情
           </v-btn>
@@ -316,7 +316,12 @@ function restartPolling() {
   }, pollMs)
 }
 
-const { connected: wsConnected, connect: connectWs, disconnect: disconnectWs } = useAdminNotifySocket(() => {
+const {
+  connected: wsConnected,
+  statusText: wsStatusText,
+  connect: connectWs,
+  disconnect: disconnectWs,
+} = useAdminNotifySocket(() => {
   loadTasks()
 })
 
