@@ -1250,7 +1250,9 @@ def get_all_review_requests(request):
     page_size = int(request.query_params.get('page_size', 10))
 
     # 构建查询条件
-    review_requests = ReviewRequest.objects.all().order_by('-request_time')
+    review_requests = ReviewRequest.objects.select_related(
+        'user', 'organization', 'detection_result__detection_task'
+    ).order_by('-request_time')
     user_id = request.user.id
     user = User.objects.get(id=user_id)
     # 权限控制
@@ -1275,6 +1277,7 @@ def get_all_review_requests(request):
 
     request_data = []
     for req in page_obj.object_list:
+        task = getattr(req.detection_result, 'detection_task', None)
         request_data.append({
             "id": req.id,
             "username": req.user.username,
@@ -1282,6 +1285,11 @@ def get_all_review_requests(request):
             "state": req.status2,
             "time": timezone.localtime(req.request_time).strftime('%Y-%m-%d %H:%M:%S'),
             "organization": req.organization.name if req.organization else None,
+            "organization_id": req.organization_id,
+            "reason": req.reason or '',
+            "detection_task_id": task.id if task else None,
+            "task_type": task.task_type if task else None,
+            "file_type": task.task_type if task else None,
         })
 
     return Response({
@@ -1334,11 +1342,18 @@ def get_review_request_detail_admin(request, reviewRequest_id):
                 "avatar": reviewer.avatar.url if reviewer.avatar else None,
             })
 
+        task = getattr(review_request.detection_result, 'detection_task', None)
         return Response({
             "imgs": imgs,
             "persons": persons,
             "reason": review_request.reason,
             "organization": review_request.organization.name if review_request.organization else None,
+            "organization_id": review_request.organization_id,
+            "detection_task_id": task.id if task else None,
+            "task_type": task.task_type if task else None,
+            "file_type": task.task_type if task else None,
+            "status1": review_request.status1,
+            "status2": review_request.status2,
         })
 
     except ReviewRequest.DoesNotExist:
@@ -1403,6 +1418,17 @@ def handle_review_request(request, reviewRequest_id):
         review_request = ReviewRequest.objects.get(id=reviewRequest_id)
     except ReviewRequest.DoesNotExist:
         return Response({'error': 'ReviewRequest not found'}, status=404)
+
+    # 单组织内审批由组织管理员承担；软件管理员仅可查看列表（前端亦禁用操作）
+    if request.user.email == 'admin@mail.com':
+        return Response(
+            {'error': '软件管理员不审批组织内人工审核申请，请使用组织管理员账号登录'},
+            status=403,
+        )
+    operator = User.objects.get(id=request.user.id)
+    if operator.organization_id and review_request.organization_id:
+        if operator.organization_id != review_request.organization_id:
+            return Response({'error': '无权审批其他组织的申请'}, status=403)
 
     choice = request.data.get('choice')
     reason = request.data.get('reason', '')

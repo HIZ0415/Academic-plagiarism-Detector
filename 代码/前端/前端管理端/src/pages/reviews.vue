@@ -1,11 +1,23 @@
 <template>
   <v-container>
+    <v-alert
+      v-if="isSoftwareAdmin"
+      type="info"
+      variant="tonal"
+      class="mb-4"
+      title="当前为软件管理员（只读）"
+    >
+      按需求与概要设计，<strong>组织内</strong>人工审核申请由<strong>组织管理员</strong>审批（通过/拒绝），专家在用户端执行任务。
+      请使用组织管理员账号登录操作，例如联调账号 <code>org_admin@example.com</code> / <code>OrgAdmin123!</code>。
+    </v-alert>
+
     <!-- 标题 -->
-    <v-row class="mb-6">
+    <v-row class="mb-4">
       <v-col>
         <h1 class="text-h4 font-weight-bold">人工审核申请审批</h1>
         <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
-          处理发布者在用户端提交的<strong>人工复核申请</strong>；通过后任务进入审稿人任务池。本页仅<strong>组织管理员</strong>使用（与软件管理员的跨组织职责区分）。
+          审批对象为<strong>本组织发布者</strong>针对某次<strong>自动检测任务</strong>发起的复核申请（非个人账号级审批）。
+          通过后系统向本组织<strong>专家（审稿人）</strong>分配任务；拒绝须填写理由。
         </p>
       </v-col>
     </v-row>
@@ -75,37 +87,39 @@
         </template>
 
         <template #[`item.actions`]="{ item }">
-          <div class="d-flex align-center justify-center ga-1">
+          <div class="d-flex align-center justify-center flex-wrap ga-1">
             <v-btn
-              icon
-              variant="text"
               size="small"
+              variant="tonal"
               color="primary"
-              class="mr-1"
+              class="text-none"
+              prepend-icon="mdi-eye"
               @click="openReviewDialog(item)"
             >
-              <v-icon>mdi-eye</v-icon>
+              详情
             </v-btn>
             <v-btn
-              icon
-              variant="text"
               size="small"
+              variant="flat"
               color="success"
+              class="text-none"
+              prepend-icon="mdi-check"
               :disabled="!canHandlePending(item)"
               :loading="processingRequestId === item.id"
               @click="approveRequest(item)"
             >
-              <v-icon>mdi-check</v-icon>
+              通过
             </v-btn>
             <v-btn
-              icon
-              variant="text"
               size="small"
+              variant="outlined"
               color="error"
+              class="text-none"
+              prepend-icon="mdi-close"
               :disabled="!canHandlePending(item)"
               @click="startReject(item)"
             >
-              <v-icon>mdi-close</v-icon>
+              拒绝
             </v-btn>
           </div>
         </template>
@@ -264,8 +278,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="error" variant="text" :disabled="!selectedRequest || selectedRequest.state !== 'pending'" @click="startReject">拒绝</v-btn>
-          <v-btn color="success" :disabled="!selectedRequest || selectedRequest.state !== 'pending'" @click="approveRequest">通过</v-btn>
+          <v-btn color="error" variant="text" :disabled="!canHandlePending(selectedRequest)" @click="startReject">拒绝</v-btn>
+          <v-btn color="success" :disabled="!canHandlePending(selectedRequest)" @click="approveRequest">通过</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -294,11 +308,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import reviewApi from '@/api/review'
 import { useSnackbarStore } from '@/stores/snackbar'
+import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 
 const snackbar = useSnackbarStore()
+const { isSoftwareAdmin, canApproveManualReview } = useAdminCapabilities()
 
 interface ReviewRequest {
   id: number
@@ -307,21 +323,30 @@ interface ReviewRequest {
   state: string
   file_type: string
   time: string
-  detection_task_id?: string
+  organization?: string
+  detection_task_id?: string | number
   task_type?: string
   reason?: string
 }
 
-const headers = [
-  { title: '头像', key: 'avatar', align: 'center', sortable: false },
-  { title: '编辑', key: 'username', align: 'start' },
-  { title: '检测任务ID', key: 'detection_task_id', align: 'center', minWidth: 120 },
-  { title: '类型', key: 'task_type', align: 'center', minWidth: 100 },
-  { title: '申请理由', key: 'reason', align: 'start', minWidth: 160 },
-  { title: '审核状态', key: 'state', align: 'center' },
-  { title: '提交时间', key: 'time', align: 'center' },
-  { title: '操作', key: 'actions', align: 'center', sortable: false },
-] as const
+const headers = computed(() => {
+  const base = [
+    { title: '头像', key: 'avatar', align: 'center' as const, sortable: false },
+    { title: '发布者', key: 'username', align: 'start' as const },
+  ]
+  if (isSoftwareAdmin.value) {
+    base.push({ title: '所属组织', key: 'organization', align: 'start' as const })
+  }
+  base.push(
+    { title: '检测任务ID', key: 'detection_task_id', align: 'center' as const, minWidth: 120 },
+    { title: '任务类型', key: 'task_type', align: 'center' as const, minWidth: 100 },
+    { title: '申请理由', key: 'reason', align: 'start' as const, minWidth: 160 },
+    { title: '审批状态', key: 'state', align: 'center' as const },
+    { title: '提交时间', key: 'time', align: 'center' as const },
+    { title: '操作', key: 'actions', align: 'center' as const, sortable: false },
+  )
+  return base
+})
 
 // 分页相关
 const requests = ref<ReviewRequest[]>([])
@@ -426,7 +451,12 @@ const openReviewDialog = async (request: ReviewRequest) => {
 }
 
 function canHandlePending(request: ReviewRequest | null) {
-  return !!request && request.state === 'pending' && processingRequestId.value !== request.id
+  return (
+    canApproveManualReview.value &&
+    !!request &&
+    request.state === 'pending' &&
+    processingRequestId.value !== request.id
+  )
 }
 
 function startReject(request?: ReviewRequest) {
@@ -591,17 +621,25 @@ const fetchRequests = async (page: number, pageSize: number) => {
     const response = await reviewApi.getReviewRequests(params)
     const { requests: requestList, current_page, total_pages, total_requests } = response.data
     
-    requests.value = requestList.map((request: Record<string, unknown>) => ({
-      id: request.id,
-      username: request.username,
-      avatar: request.avatar ? import.meta.env.VITE_API_URL + request.avatar : '',
-      state: request.state,
-      file_type: request.file_type,
-      time: request.time,
-      detection_task_id: request.detection_task_id ?? request.detection_task ?? '—',
-      task_type: request.task_type ?? request.file_type ?? '—',
-      reason: request.reason ? (String(request.reason).length > 48 ? `${String(request.reason).slice(0, 48)}…` : String(request.reason)) : '—',
-    }))
+    requests.value = requestList.map((request: Record<string, unknown>) => {
+      const rawReason = request.reason != null ? String(request.reason) : ''
+      return {
+        id: request.id as number,
+        username: String(request.username ?? ''),
+        avatar: request.avatar ? import.meta.env.VITE_API_URL + request.avatar : '',
+        state: String(request.state ?? ''),
+        file_type: String(request.file_type ?? ''),
+        time: String(request.time ?? ''),
+        organization: request.organization != null ? String(request.organization) : '—',
+        detection_task_id: request.detection_task_id ?? request.detection_task ?? '—',
+        task_type: request.task_type ?? request.file_type ?? '—',
+        reason: rawReason
+          ? rawReason.length > 48
+            ? `${rawReason.slice(0, 48)}…`
+            : rawReason
+          : '—',
+      }
+    })
     
     currentPage.value = current_page
     totalPages.value = total_pages
