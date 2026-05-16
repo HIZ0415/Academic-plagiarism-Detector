@@ -13,9 +13,6 @@ interface WebSocketMessage {
 
 const websocket = {
   Init(): void {
-    if (import.meta.env.VITE_USE_FULL_FRONTEND_MOCK === 'true') {
-      return
-    }
     if (!('WebSocket' in window)) {
       console.log('您的浏览器不支持websocket', 'error')
       return
@@ -100,11 +97,13 @@ function reconnect(): void {
 
 
 // 刷新重连（不在登录页时）
-if (import.meta.env.VITE_USE_FULL_FRONTEND_MOCK !== 'true') {
-  const entries = performance.getEntriesByType('navigation')
-  if (entries.length > 0 && (entries[0] as PerformanceNavigationTiming).type === 'reload' && window.location.pathname !== '/login') {
-    websocket.Init()
-  }
+const entries = performance.getEntriesByType('navigation')
+if (
+  entries.length > 0 &&
+  (entries[0] as PerformanceNavigationTiming).type === 'reload' &&
+  window.location.pathname !== '/login'
+) {
+  websocket.Init()
 }
 
 export default websocket

@@ -1,26 +1,7 @@
 <template>
   <div class="task-detail task-detail-page pa-4 pb-12">
-    <v-alert v-if="isPreviewMode" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      <strong>界面预览：</strong>下方可切换<strong>学术图像 / 论文全文 / Review</strong>三类工作台。表单可填，提交不会调用后端。
-      <div class="d-flex flex-wrap align-center ga-2 mt-3">
-        <span class="text-caption text-medium-emphasis">预览任务类型：</span>
-        <v-btn-toggle
-          v-model="previewDemoKind"
-          mandatory
-          divided
-          density="compact"
-          variant="outlined"
-          color="primary"
-          @update:model-value="reloadPreviewDemo"
-        >
-          <v-btn value="image" size="small" class="text-none">学术图像</v-btn>
-          <v-btn value="paper" size="small" class="text-none">论文全文</v-btn>
-          <v-btn value="review" size="small" class="text-none">Review</v-btn>
-        </v-btn-toggle>
-      </div>
-    </v-alert>
     <v-alert
-      v-if="!isPreviewMode && isTextualTaskKind"
+      v-if="isTextualTaskKind"
       type="info"
       variant="tonal"
       density="compact"
@@ -58,8 +39,17 @@
       </v-expansion-panel>
     </v-expansion-panels>
 
+    <v-progress-linear v-if="pageLoading" indeterminate color="primary" class="mb-4" />
+
+    <v-alert v-else-if="pageError" type="error" variant="tonal" class="mb-4">
+      {{ pageError }}
+      <template #append>
+        <v-btn variant="tonal" size="small" class="text-none" @click="reloadDetail">重试加载</v-btn>
+      </template>
+    </v-alert>
+
     <!-- 主要内容区域：允许整页纵向滚动，避免底部「造假判定」等被裁切 -->
-    <div class="main-content rounded-lg">
+    <div v-else class="main-content rounded-lg">
       <!-- 顶部信息区域（与概要设计「协作上下文 + AI 摘要 + 进度」一致，去掉过大左右边距） -->
       <div class="info-section pa-4 pa-md-6">
         <div class="content-wrapper d-flex justify-center">
@@ -392,12 +382,9 @@ import { useSnackbarStore } from '@/stores/snackbar'
 import DrawingDialog from '@/components/DrawingDialog.vue'
 import publisher from '@/api/publisher'
 import { resolveBackendMediaUrl } from '@/utils/backendUrl'
-import { useEffectiveRole } from '@/composables/useEffectiveRole'
-
 const router = useRouter()
 const snackbar = useSnackbarStore()
 const route = useRoute()
-const { isPreviewMode } = useEffectiveRole()
 
 interface Image {
   id: number,
@@ -452,9 +439,6 @@ const textUnitPaperStances = ref<PaperStance[]>([])
 const textUnitMemos = ref<string[]>([])
 /** 非图像类 AI 摘要表（与侧栏卡片对应） */
 const textualAiSummaryList = ref<{ label: string; value: string }[]>([])
-/** 界面预览下切换 demo 形态 */
-const previewDemoKind = ref<'image' | 'paper' | 'review'>('image')
-
 const manual_review_id = computed(() => Number((route.params as RouteParams & { manual_review_id: string }).manual_review_id))
 
 const reviewRequestMeta = ref<{
@@ -484,8 +468,17 @@ function normTaskKind(k?: string) {
 
 const isImageTaskKind = computed(() => {
   const k = normTaskKind(reviewTaskKind.value)
-  return k === 'image' || k === 'image_detection' || k === ''
+  return !k.startsWith('paper') && !k.startsWith('review')
 })
+
+const pageLoading = ref(true)
+const pageError = ref('')
+const pageReady = computed(
+  () =>
+    !pageLoading.value &&
+    !pageError.value &&
+    (images.value.length > 0 || textualUnits.value.length > 0),
+)
 
 const isPaperTaskKind = computed(() => normTaskKind(reviewTaskKind.value).startsWith('paper'))
 const isReviewTaskKind = computed(() => normTaskKind(reviewTaskKind.value).startsWith('review'))
@@ -586,9 +579,6 @@ const convert = (index: number) => {
 
 
 const fetchDetectionResults = async () => {
-  if (isPreviewMode.value) {
-    return
-  }
   try {
     const id = await (await publisher.getDetectionID({ img_id: currentImage.value?.id })).data.
       detection_result_id
@@ -630,172 +620,6 @@ function createReviewDimensions(): Dimension[] {
     { name: '文本来源与抄袭嫌疑', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
     { name: '评审有效性与完整性', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
   ]
-}
-
-function syncPreviewKindFromRoute() {
-  const q = route.query.preview_kind
-  const s = ((Array.isArray(q) ? q[0] : q) ?? '').toString().toLowerCase()
-  if (s === 'paper' || s === 'paper_aigc') previewDemoKind.value = 'paper'
-  else if (s === 'review' || s === 'review_detection') previewDemoKind.value = 'review'
-  else previewDemoKind.value = 'image'
-}
-
-function loadImagePreviewMock() {
-  clearTextualWorkspace()
-  reviewTaskKind.value = 'image'
-  currentImageIndex.value = 0
-  images.value = [
-    { id: 9001, url: 'https://picsum.photos/seed/aprev1/800/600' },
-    { id: 9002, url: 'https://picsum.photos/seed/aprev2/800/600' },
-  ]
-  reviewRequestMeta.value = {
-    id: 1,
-    status: 'in_progress',
-    admin_gate_status: 'accepted',
-    request_time: '2026-01-01 12:00:00',
-  }
-  aiDetectionSummary.value = {
-    is_fake: true,
-    confidence_score: 0.62,
-    detection_time: '2026-01-01 12:05:00',
-  }
-  manualReviewStatus.value = 'undo'
-  imageJudgements.value = new Array(images.value.length).fill(null)
-  dimensionsPerImage.value = images.value.map(() => [
-    { name: '高斯模糊', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-    { name: '亮度/对比度调节', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-    { name: '智能修复', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-    { name: '暴力覆盖', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-    { name: '同图复制', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-    { name: '重叠切割', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-    { name: '跨图拼接', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-  ])
-  overall.value = { confidence_score: 0.62 }
-  detection_results.value = [
-    { method: '高斯模糊', probability: 0.12 },
-    { method: '亮度/对比度', probability: 0.15 },
-    { method: '智能修复', probability: 0.09 },
-    { method: '暴力覆盖', probability: 0.21 },
-    { method: '同图复制', probability: 0.08 },
-    { method: '重叠切割', probability: 0.11 },
-    { method: '跨图拼接', probability: 0.07 },
-  ]
-  urn.value = []
-}
-
-function loadPaperPreviewMock() {
-  images.value = []
-  imageJudgements.value = []
-  dimensionsPerImage.value = []
-  currentImageIndex.value = 0
-  reviewTaskKind.value = 'paper_aigc'
-  reviewRequestMeta.value = {
-    id: 2,
-    status: 'in_progress',
-    admin_gate_status: 'accepted',
-    request_time: '2026-01-02 09:00:00',
-  }
-  aiDetectionSummary.value = {
-    is_fake: true,
-    confidence_score: 0.71,
-    detection_time: '2026-01-02 09:10:00',
-  }
-  manualReviewStatus.value = 'undo'
-  overall.value = { confidence_score: 0.71 }
-  detection_results.value = []
-  urn.value = []
-  textualAiSummaryList.value = [
-    { label: '全文异常倾向', value: '71%' },
-    { label: '高敏段落（AI）', value: '5' },
-    { label: '引用一致性提示', value: '中' },
-    { label: '事实核查子结论', value: '待人工确认' },
-  ]
-  textualUnits.value = [
-    {
-      id: 1,
-      label: '摘要',
-      content:
-        '【示例摘要】本研究提出一种面向学术图像完整性检测的多任务学习框架。实验表明，在公开数据集上 F1 提升约 3.2%。由于系统尚未接入后端 segments，本段为占位正文；联调后此处应展示脱敏摘要及 AI 段落级高亮。',
-      aiNote: 'AI：生成痕迹偏高',
-    },
-    {
-      id: 2,
-      label: '方法 · 实验设置',
-      content:
-        '【示例方法节】我们在 PyTorch 2.1 上复现基线，批量大小 32，学习率 1e-4。数据增强包含随机裁剪与颜色抖动。若后端返回事实性子结论（如与公开实现不一致），将显示在本卡片上方参考区。',
-      aiNote: 'AI：与公开描述部分不一致',
-    },
-    {
-      id: 3,
-      label: '讨论与结论',
-      content:
-        '【示例讨论】局限性包括样本来源单一与人工标注成本。未来工作将扩展至多模态与跨语言场景。审核人请选择「同意系统倾向 / 存在重大异议」并填写分项理由。',
-      aiNote: 'AI：逻辑链基本自洽',
-    },
-  ]
-  dimensionsPerTextUnit.value = textualUnits.value.map(() => createPaperDimensions())
-  textUnitVerdicts.value = textualUnits.value.map(() => null)
-  textUnitPaperStances.value = textualUnits.value.map(() => null)
-  textUnitMemos.value = textualUnits.value.map(() => '')
-}
-
-function loadReviewPreviewMock() {
-  images.value = []
-  imageJudgements.value = []
-  dimensionsPerImage.value = []
-  currentImageIndex.value = 0
-  reviewTaskKind.value = 'review_detection'
-  reviewRequestMeta.value = {
-    id: 3,
-    status: 'in_progress',
-    admin_gate_status: 'accepted',
-    request_time: '2026-01-03 14:00:00',
-  }
-  aiDetectionSummary.value = {
-    is_fake: false,
-    confidence_score: 0.38,
-    detection_time: '2026-01-03 14:05:00',
-  }
-  manualReviewStatus.value = 'undo'
-  overall.value = { confidence_score: 0.38 }
-  detection_results.value = []
-  urn.value = []
-  textualAiSummaryList.value = [
-    { label: '模板化倾向', value: '0.42' },
-    { label: '文本异常片段', value: '2' },
-    { label: '立场风险提示', value: '低' },
-    { label: '综合建议（AI）', value: '建议人工复核结论段' },
-  ]
-  textualUnits.value = [
-    {
-      id: 1,
-      label: '评审意见 · 总体评价',
-      content:
-        '【示例 Review】论文创新点明确，实验充分。但结论部分对局限性的讨论略显模板化，与同类评审用语高度相似。此处为占位文本；正式环境由后端返回 Review 原文与系统标注可疑片段。',
-      aiNote: 'AI：模板化风险',
-    },
-    {
-      id: 2,
-      label: '评审意见 · 具体意见',
-      content:
-        '【示例意见】建议补充与 SOTA 的对比实验，并说明数据伦理合规性。若存在利益冲突声明缺失，请在本单元结论中选择「确认造假 / 疑似造假」等并说明理由。',
-      aiNote: 'AI：未见明显抄袭拼接',
-    },
-  ]
-  dimensionsPerTextUnit.value = textualUnits.value.map(() => createReviewDimensions())
-  textUnitVerdicts.value = textualUnits.value.map(() => null)
-  textUnitPaperStances.value = textualUnits.value.map(() => null)
-  textUnitMemos.value = textualUnits.value.map(() => '')
-}
-
-function loadDetailPreviewMock() {
-  if (previewDemoKind.value === 'paper') loadPaperPreviewMock()
-  else if (previewDemoKind.value === 'review') loadReviewPreviewMock()
-  else loadImagePreviewMock()
-}
-
-function reloadPreviewDemo() {
-  loadDetailPreviewMock()
 }
 
 function parseSegmentsFromResponse(resp: Record<string, unknown>): TextualUnit[] {
@@ -884,70 +708,138 @@ function initTextualTaskFromResponse(response: Record<string, unknown>) {
   }
 }
 
-onMounted(async () => {
-  if (isPreviewMode.value) {
-    syncPreviewKindFromRoute()
-    loadDetailPreviewMock()
+function applySubMethodsFromDetail(response: Record<string, unknown>) {
+  const subs = response.sub_methods
+  if (!Array.isArray(subs) || !subs.length) return
+  detection_results.value = subs.map((s: Record<string, unknown>) => ({
+    method: String(s.method ?? ''),
+    probability: Number(s.probability ?? 0),
+  }))
+  urn.value = subs.map((s: Record<string, unknown>) => ({
+    method: String(s.method ?? ''),
+    probability: Number(s.probability ?? 0),
+    mask_image: String(s.mask_image ?? ''),
+    mask_matrix: s.mask_matrix ?? null,
+    visible: false,
+  }))
+  const overallPayload = response.overall as { confidence_score?: number } | undefined
+  if (overallPayload?.confidence_score != null) {
+    overall.value = { confidence_score: overallPayload.confidence_score }
+  }
+}
+
+function hydrateSavedImageReviews(reviewersResults: unknown) {
+  if (!Array.isArray(reviewersResults)) return
+  for (const rr of reviewersResults as Array<{
+    image_id: number
+    scores?: (number | null)[]
+    reasons?: (string | null)[]
+    result?: boolean | null
+  }>) {
+    const idx = images.value.findIndex((img) => img.id === rr.image_id)
+    if (idx < 0) continue
+    if (rr.result !== undefined && rr.result !== null) {
+      imageJudgements.value[idx] = rr.result
+    }
+    const dims = dimensionsPerImage.value[idx]
+    if (!dims) continue
+    const scores = rr.scores || []
+    const reasons = rr.reasons || []
+    for (let j = 0; j < 7; j++) {
+      if (scores[j] != null) dims[j].value = scores[j]
+      if (reasons[j]) dims[j].reason = String(reasons[j])
+    }
+  }
+}
+
+function initImageWorkspaceFromDetail(response: Record<string, unknown>) {
+  const rawImgs = (response as { imgs?: Image[] }).imgs?.length
+    ? (response as { imgs: Image[] }).imgs
+    : ((response as { image_urls?: string[]; image_ids?: number[] }).image_urls || []).map(
+        (url: string, i: number) => ({
+          id: (response as { image_ids?: number[] }).image_ids?.[i] as number,
+          url,
+        }),
+      )
+
+  images.value = rawImgs.filter((x: Image) => x && x.id != null && x.url)
+  if (!images.value.length) {
+    pageError.value = '未获取到可审核的图片。请确认管理端已通过申请，且检测任务下有关联图像。'
+    return false
+  }
+
+  aiDetectionSummary.value = (response.ai_detection_result as typeof aiDetectionSummary.value) ?? null
+  imageJudgements.value = new Array(images.value.length).fill(null)
+  dimensionsPerImage.value = images.value.map(() => [
+    { name: '高斯模糊', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
+    { name: '亮度/对比度调节', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
+    { name: '智能修复', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
+    { name: '暴力覆盖', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
+    { name: '同图复制', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
+    { name: '重叠切割', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
+    { name: '跨图拼接', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
+  ])
+  applySubMethodsFromDetail(response)
+  hydrateSavedImageReviews(response.reviewers_results)
+  currentImageIndex.value = 0
+  if (!detection_results.value.length) {
+    fetchDetectionResults().catch(() => {})
+  }
+  if (!urn.value.length) {
+    fetchMaskImage().catch(() => {})
+  }
+  return true
+}
+
+async function loadReviewDetail() {
+  pageLoading.value = true
+  pageError.value = ''
+  images.value = []
+  clearTextualWorkspace()
+
+  if (!manual_review_id.value || Number.isNaN(manual_review_id.value)) {
+    pageError.value = '无效的任务编号'
+    pageLoading.value = false
     return
   }
-  try {
-    const response = (await reviewer.getReviewTaskDetail(manual_review_id.value)).data as Record<string, unknown>
-    reviewTaskKind.value = String(response.task_kind || 'image')
 
+  try {
+    const response = (await reviewer.getReviewTaskDetail(manual_review_id.value)).data as Record<
+      string,
+      unknown
+    >
+    reviewTaskKind.value = String(response.task_kind || response.task_type || 'image')
     reviewRequestMeta.value = (response.review_request as typeof reviewRequestMeta.value) ?? null
     manualReviewStatus.value = (response.manual_review_status as string) || 'undo'
 
-    const k = normTaskKind(reviewTaskKind.value)
-    const imageLike = k === 'image' || k === 'image_detection' || k === ''
-
-    if (imageLike) {
-      const rawImgs = (response as { imgs?: Image[]; image_urls?: string[]; image_ids?: number[] }).imgs?.length
-        ? (response as { imgs: Image[] }).imgs
-        : ((response as { image_urls?: string[]; image_ids?: number[] }).image_urls || []).map((url: string, i: number) => ({
-            id: (response as { image_ids?: number[] }).image_ids?.[i],
-            url,
-          }))
-
-      images.value = rawImgs.filter((x: Image) => x && x.id != null && x.url)
-      if (!images.value.length) {
-        snackbar.showMessage('未获取到任务图片，请确认管理端已审批通过且任务已分配', 'error')
-        return
+    if (isImageTaskKind.value) {
+      const ok = initImageWorkspaceFromDetail(response)
+      if (!ok) {
+        snackbar.showMessage(pageError.value, 'error')
       }
-
-      aiDetectionSummary.value = (response.ai_detection_result as typeof aiDetectionSummary.value) ?? null
-
-      imageJudgements.value = new Array(images.value.length).fill(null)
-
-      dimensionsPerImage.value = images.value.map(() => [
-        { name: '高斯模糊', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-        { name: '亮度/对比度调节', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-        { name: '智能修复', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-        { name: '暴力覆盖', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-        { name: '同图复制', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-        { name: '重叠切割', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-        { name: '跨图拼接', value: null, reason: '', showFakeArea: false, drawingPaths: [] },
-      ])
-      fetchMaskImage()
-      fetchDetectionResults()
     } else {
       initTextualTaskFromResponse(response)
       if (!textualUnits.value.length) {
-        snackbar.showMessage('未获取到论文/Review 材料单元', 'error')
+        pageError.value = '未获取到论文/Review 材料单元，请稍后重试或联系管理员。'
+        snackbar.showMessage(pageError.value, 'error')
       }
     }
-  } catch {
-    snackbar.showMessage('获取任务详情失败', 'error')
+  } catch (e: unknown) {
+    console.error(e)
+    pageError.value = '获取任务详情失败，请确认已用专家账号登录且 Django 服务正常。'
+    snackbar.showMessage(pageError.value, 'error')
+  } finally {
+    pageLoading.value = false
   }
-})
+}
 
-watch(
-  () => route.query.preview_kind,
-  () => {
-    if (!isPreviewMode.value) return
-    syncPreviewKindFromRoute()
-    loadDetailPreviewMock()
-  }
-)
+function reloadDetail() {
+  loadReviewDetail()
+}
+
+onMounted(() => {
+  loadReviewDetail()
+})
 
 const currentImage = computed(() => {
   if (
@@ -1011,9 +903,6 @@ function handleNextTextUnit() {
 }
 
 const fetchMaskImage = async () => {
-  if (isPreviewMode.value) {
-    return
-  }
   try {
     const res = (await reviewer.getMaskImage({ img_id: currentImage.value?.id })).data
     urn.value = res.sub_methods.map((item: Omit<SubMethod, 'visible'>) => ({
@@ -1288,12 +1177,6 @@ const handleSubmit = async () => {
   const result = checkAnswerCompletion()
   if (!result.complete) {
     snackbar.showMessage(result.message, 'error')
-    return
-  }
-  if (isPreviewMode.value) {
-    snackbar.showMessage('界面预览：校验通过，未调用提交接口', 'success')
-    manualReviewStatus.value = 'completed'
-    router.push('/review')
     return
   }
   try {
@@ -1762,3 +1645,4 @@ watch(() => currentDrawingDimension.value, (newVal, oldVal) => {
   border-radius: 4px;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
+</style>

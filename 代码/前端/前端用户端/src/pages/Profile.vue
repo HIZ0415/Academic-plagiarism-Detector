@@ -1,8 +1,5 @@
 <template>
   <v-container>
-    <v-alert v-if="isPreviewMode" type="info" variant="tonal" density="compact" class="mb-4">
-      当前为<strong>界面预览</strong>，未请求用户资料与统计；登录后将显示真实数据。
-    </v-alert>
     <v-row>
       <v-col cols="12" md="4">
         <!-- 个人信息卡片 -->
@@ -194,7 +191,7 @@ import { useEffectiveRole } from '@/composables/useEffectiveRole'
 
 const snackbar = useSnackbarStore()
 const userStore = useUserStore()
-const { effectiveRole, isPreviewMode } = useEffectiveRole()
+const { effectiveRole } = useEffectiveRole()
 
 // 编辑表单
 const showEditDialog = ref(false)
@@ -393,7 +390,7 @@ function normalizeActivities(items: unknown[], role: 'publisher' | 'reviewer') {
 
 // 获取用户信息
 onMounted(async () => {
-  if (isPreviewMode.value || !isLoggedIn.value) {
+  if (!isLoggedIn.value) {
     return
   }
   try {

@@ -85,16 +85,6 @@
         </div>
 
         <v-alert
-          v-if="fullFrontendMock"
-          type="success"
-          variant="tonal"
-          density="comfortable"
-          class="mb-6 text-body-2"
-        >
-          已启用 <strong>VITE_USE_FULL_FRONTEND_MOCK</strong>：可直接<strong>登录</strong>（邮箱格式正确、密码不少于 6 位即可），无需 Django；检测与人工审核接口走前端桩，角色以上方「编辑 / 专家」为准。
-        </v-alert>
-
-        <v-alert
           v-if="loginType === 'register'"
           type="info"
           variant="tonal"
@@ -188,14 +178,6 @@
           </div>
         </v-form>
 
-        <v-divider class="my-8" />
-        <div class="text-subtitle-2 font-weight-medium mb-2">本地前端调试（无后端联调）</div>
-        <v-alert type="warning" variant="tonal" density="compact" class="mb-4 text-body-2">
-          使用上方 <strong>编辑 / 专家</strong> 切换后，点击下方可进入对应角色的界面预览（不调用登录接口）。数据与通知需登录后才会真实加载。
-        </v-alert>
-        <v-btn block color="secondary" variant="tonal" prepend-icon="mdi-eye-outline" @click="enterUiPreview">
-          进入界面预览
-        </v-btn>
       </div>
     </div>
 
@@ -355,12 +337,8 @@ import ForgotPassword from '@/components/ForgotPassword.vue'
 import { useSnackbarStore } from '@/stores/snackbar';
 const snackbar = useSnackbarStore();
 import user from '@/api/user'
-import { fullFrontendMockEnabled } from '@/utils/mockMode'
 import { useUserStore } from '@/stores/user';
 const userStore = useUserStore();
-const fullFrontendMock = fullFrontendMockEnabled()
-import { useUiPreviewStore } from '@/stores/uiPreview'
-const uiPreview = useUiPreviewStore()
 import VerificationCodeInput from '@/components/VerificationCodeInput.vue'
 
 const router = useRouter()
@@ -480,14 +458,6 @@ const validateCaptcha = () => {
   return true
 }
 
-const enterUiPreview = () => {
-  const role = selectedRole.value as 'publisher' | 'reviewer'
-  uiPreview.enable(role)
-  const label = role === 'publisher' ? '编辑' : '专家'
-  snackbar.showMessage(`已进入界面预览（${label}）`, 'success')
-  router.push(role === 'publisher' ? '/upload' : '/review')
-}
-
 const isFormValid = computed(() => {
   if (!agreement.value) return false
   if (!captchaInput.value) return false
@@ -523,7 +493,6 @@ const handleSubmit = async () => {
       password: password.value,
       role: selectedRole.value
     }).then(async (res) => {
-      uiPreview.disable()
       localStorage.setItem("2-token", res.data.access)
       localStorage.setItem("2-refresh", res.data.refresh)
       localStorage.setItem("2-isLoggedIn", "true")

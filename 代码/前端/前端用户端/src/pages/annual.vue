@@ -19,10 +19,6 @@
       您从检测任务 <code>{{ fromTaskId }}</code> 跳转而来；可直接点击「发起人工审核申请」预填该任务 ID，或在下列列表中跟踪进度。
     </v-alert>
 
-    <v-alert v-if="useWorkflowMock" type="warning" variant="tonal" density="compact" class="mb-4 text-body-2">
-      已开启 <strong>VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW</strong> 或 <strong>VITE_USE_FULL_FRONTEND_MOCK</strong>：人工审核全流程数据在用户端浏览器本地；管理端 dev（通常 :3001）与用户端（通常 :3000）origin 不同则<strong>无法共享</strong> Mock 数据——无后端时请展开下方「模拟管理端审批」，或使用真实后端联调。
-    </v-alert>
-
     <v-row class="mb-4">
       <v-col cols="12" class="d-flex flex-wrap align-center ga-2 justify-space-between">
         <div class="d-flex flex-wrap ga-2">
@@ -35,23 +31,6 @@
         </v-btn>
       </v-col>
     </v-row>
-
-    <v-expansion-panels v-if="useWorkflowMock" class="mb-4">
-      <v-expansion-panel>
-        <v-expansion-panel-title class="text-body-2 font-weight-medium">
-          本地联调 · 模拟管理端审批（仅 Mock；通过后专家任务池可出现对应任务）
-        </v-expansion-panel-title>
-        <v-expansion-panel-text>
-          <v-data-table :headers="simHeaders" :items="pendingSimulationRows" hide-default-footer density="compact">
-            <template #item.actions="{ item }">
-              <v-btn size="small" color="success" variant="tonal" class="text-none me-2" @click="simulateApprove(item.review_request_id)">通过</v-btn>
-              <v-btn size="small" color="error" variant="tonal" class="text-none" @click="simulateReject(item.review_request_id)">拒绝</v-btn>
-            </template>
-          </v-data-table>
-          <div v-if="!pendingSimulationRows.length" class="text-caption text-medium-emphasis mt-2">暂无待管理审批的申请。</div>
-        </v-expansion-panel-text>
-      </v-expansion-panel>
-    </v-expansion-panels>
 
     <v-card class="elevation-2">
       <v-data-table
@@ -253,19 +232,10 @@ import {
 } from '@/api/manualReviewWorkflow'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
-import {
-  workflowMockEnabled,
-  mockListPendingAdminForPublisher,
-  mockSimulateAdminApprove,
-  mockSimulateAdminReject,
-} from '@workflow-mock'
-
 const router = useRouter()
 const route = useRoute()
 const snackbar = useSnackbarStore()
 const userStore = useUserStore()
-
-const useWorkflowMock = computed(() => workflowMockEnabled())
 
 const showCreateDialog = ref(false)
 const createSubmitting = ref(false)
@@ -287,26 +257,6 @@ const taskTypeItems = [
 const priorityItems = [
   { title: '普通', value: 'normal' },
   { title: '加急', value: 'urgent' },
-]
-
-const pendingSimulationRows = computed(() => {
-  if (!useWorkflowMock.value) return []
-  return mockListPendingAdminForPublisher().map((r) => ({
-    review_request_id: r.review_request_id,
-    detection_task_id: r.detection_task_id,
-    task_type: r.task_type,
-    reason: r.reason.length > 40 ? `${r.reason.slice(0, 40)}…` : r.reason,
-    created_at: r.created_at.slice(0, 19).replace('T', ' '),
-  }))
-})
-
-const simHeaders = [
-  { title: '申请单号', key: 'review_request_id', align: 'center' as const },
-  { title: '检测任务', key: 'detection_task_id', align: 'start' as const },
-  { title: '类型', key: 'task_type', align: 'center' as const },
-  { title: '理由摘要', key: 'reason', align: 'start' as const },
-  { title: '提交时间', key: 'created_at', align: 'center' as const },
-  { title: '操作', key: 'actions', align: 'center' as const, sortable: false },
 ]
 
 function openCreateDialog() {
@@ -331,42 +281,20 @@ async function submitCreate() {
   }
   createSubmitting.value = true
   try {
-    await createManualReviewRequest(
-      {
-        detection_task_id: tid,
-        task_type: createForm.value.task_type,
-        reason,
-        priority: createForm.value.priority,
-        batch_session_id: createForm.value.batch_session_id.trim() || undefined,
-      },
-      userStore.username || undefined,
-    )
+    await createManualReviewRequest({
+      detection_task_id: tid,
+      task_type: createForm.value.task_type,
+      reason,
+      priority: createForm.value.priority,
+      batch_session_id: createForm.value.batch_session_id.trim() || undefined,
+    })
     snackbar.showMessage('人工审核申请已提交', 'success')
     showCreateDialog.value = false
     await fetchTasks(currentPage.value, pageSize.value)
   } catch {
-    snackbar.showMessage('提交失败，请确认后端已实现 POST /manual-review-requests/ 或开启 Mock', 'error')
+    snackbar.showMessage('提交失败，请确认 Django 已启动且 POST /manual-review-requests/ 可用', 'error')
   } finally {
     createSubmitting.value = false
-  }
-}
-
-function simulateApprove(review_request_id: number) {
-  const res = mockSimulateAdminApprove(review_request_id)
-  if (!res.ok) snackbar.showMessage(res.error, 'warning')
-  else {
-    snackbar.showMessage(`已通过，专家任务 manual_review_id=${res.manual_review_id}`, 'success')
-    fetchTasks(currentPage.value, pageSize.value)
-  }
-}
-
-function simulateReject(review_request_id: number) {
-  const reason = window.prompt('请输入拒绝理由（Mock）', '材料不完整') || '材料不完整'
-  const res = mockSimulateAdminReject(review_request_id, reason)
-  if (!res.ok) snackbar.showMessage(res.error, 'warning')
-  else {
-    snackbar.showMessage('已拒绝该申请', 'success')
-    fetchTasks(currentPage.value, pageSize.value)
   }
 }
 

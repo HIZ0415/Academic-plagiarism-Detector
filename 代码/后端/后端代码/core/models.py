@@ -194,7 +194,8 @@ class User(AbstractUser):
         if self.role == 'publisher':
             self.permission = 1110
         elif self.role == 'reviewer':
-            self.permission = 1
+            # 1001：上传 + 提交人工审核（bit0/bit1）；审核权限在 post_review 中另校验 role
+            self.permission = 1001
         else:
             self.permission = None
         super().save(*args, **kwargs)
