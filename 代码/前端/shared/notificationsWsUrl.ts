@@ -3,6 +3,8 @@
  * 用户端与管理端共用。
  */
 export function buildNotificationsWebSocketUrl(token: string | null): string {
+  const tq = token ? `?token=${encodeURIComponent(token)}` : ''
+
   const explicit = (import.meta.env.VITE_WS_URL as string | undefined)?.trim()
   if (explicit && explicit !== 'undefined' && explicit !== 'null') {
     let u = explicit.replace(/\/$/, '')
@@ -12,12 +14,17 @@ export function buildNotificationsWebSocketUrl(token: string | null): string {
     return u
   }
 
+  // 开发态：走当前页面的 host（用户端 3000 / 管理端 3001），由 Vite 代理 /ws → Django
+  if (import.meta.env.DEV && typeof window !== 'undefined' && window.location?.host) {
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${wsProto}//${window.location.host}/ws/notifications/${tq}`
+  }
+
   const raw = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
   if (raw && raw !== 'undefined' && raw !== 'null') {
     try {
       const u = new URL(raw.startsWith('http') ? raw : `http://${raw}`)
       const wsProto = u.protocol === 'https:' ? 'wss:' : 'ws:'
-      const tq = token ? `?token=${encodeURIComponent(token)}` : ''
       return `${wsProto}//${u.host}/ws/notifications/${tq}`
     } catch {
       /* fallthrough */
@@ -26,10 +33,8 @@ export function buildNotificationsWebSocketUrl(token: string | null): string {
 
   if (typeof window !== 'undefined' && window.location?.host) {
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const tq = token ? `?token=${encodeURIComponent(token)}` : ''
     return `${wsProto}//${window.location.host}/ws/notifications/${tq}`
   }
 
-  const tq = token ? `?token=${encodeURIComponent(token)}` : ''
   return `ws://127.0.0.1:8000/ws/notifications/${tq}`
 }

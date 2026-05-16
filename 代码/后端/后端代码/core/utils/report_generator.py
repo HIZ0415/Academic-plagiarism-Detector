@@ -27,8 +27,19 @@ except Exception as e:
     logging.getLogger(__name__).warning(f"字体注册失败，PDF报告将使用默认字体: {e}")
 
 
+def _font(bold=False):
+    """有 SimSun 则用宋体，否则回退 Helvetica（避免字体缺失导致 500）。"""
+    try:
+        name = 'SimSun-Bold' if bold else 'SimSun'
+        pdfmetrics.getFont(name)
+        return name
+    except Exception:
+        return 'Helvetica-Bold' if bold else 'Helvetica'
+
+
 # ─── 工具函数：自动换行绘制 ───────────────────────────────
-def _draw_multiline(c, x, y, text, max_chars=48, leading=14, font='SimSun', size=9):
+def _draw_multiline(c, x, y, text, max_chars=48, leading=14, font=None, size=9):
+    font = font or _font()
     c.setFont(font, size)
     for line in textwrap.wrap(text, width=max_chars):
         c.drawString(x, y, line)
@@ -178,147 +189,158 @@ def generate_detection_task_report(task: DetectionTask) -> str:
 from ..models import ManualReview, ImageReview
 
 
+def _manual_review_result_label(result):
+    if result is True:
+        return "判定存在疑似造假"
+    if result is False:
+        return "未发现明显异常"
+    return "未判定"
+
+
+def _iter_manual_image_reviews(review: ManualReview):
+    seen = set()
+    for ir in review.img_reviews.all():
+        if ir.id not in seen:
+            seen.add(ir.id)
+            yield ir
+    for ir in review.image_reviews.all():
+        if ir.id not in seen:
+            seen.add(ir.id)
+            yield ir
+
+
 def generate_manual_review_report(review: ManualReview) -> str:
     """
     生成人工审核 PDF 报告，返回相对路径，并写入 review.report_file
     """
-    # 生成路径
     rel_path = f"reports/manual_review_{review.id}_report.pdf"
     abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)
 
+    rr = review.review_request
+    detection_task = None
+    task_type = ""
+    if rr and rr.detection_result:
+        detection_task = rr.detection_result.detection_task
+        task_type = (detection_task.task_type or "") if detection_task else ""
+
     c = canvas.Canvas(abs_path, pagesize=A4)
     W, H = A4
     MARGIN = 40
+    fn, fb = _font(), _font(bold=True)
 
-    # ─────────────────────── 封面页 ──────────────────────────
     c.bookmarkPage("cover")
     c.addOutlineEntry("人工审核概览", "cover", level=0)
 
     y = H - MARGIN - 20
-    c.setFont("SimSun-Bold", 30)
-    c.drawCentredString(W / 2, y, '“听泉鉴图”人工审核报告')
-    y -= 60
-
-    c.setFont("SimSun", 18)
-    c.drawString(MARGIN, y, f"审核编号：{review.id}")
-    y -= 30
-    # 获取关联的任务名称（通过 DetectionTask）
-    task_name = "无"
-    if review.review_request and review.review_request.detection_result:
-        detection_task = review.review_request.detection_result.detection_task
-        if detection_task and detection_task.task_name:
-            task_name = detection_task.task_name
-
-    c.drawString(MARGIN, y, f"关联任务名称：{task_name}")
-
-    y -= 30
-    c.drawString(MARGIN, y, f"提交用户：{review.reviewer.username}")
-    y -= 30
-
-    start_time = timezone.localtime(review.review_time).strftime("%Y-%m-%d %H:%M")
-    end_time = review.review_request and review.review_request.review_end_time
-    finish_time = end_time and timezone.localtime(end_time).strftime("%Y-%m-%d %H:%M") or '尚未完成'
-
-    c.drawString(MARGIN, y, f"开始时间：{start_time}")
-    y -= 30
-    c.drawString(MARGIN, y, f"结束时间：{finish_time}")
-    y -= 30
-
-    # 审核者列表
-    # 因为 ManualReview 只有一个 reviewer 字段
-    if review.reviewer:
-        reviewer_names = review.reviewer.username
-    else:
-        reviewer_names = "未指定"
-
-    c.drawString(MARGIN, y, f"审核人员：{reviewer_names}")
+    c.setFont(fb, 22)
+    c.drawCentredString(W / 2, y, "学术内容诚信检测 — 人工审核报告")
     y -= 50
 
-    # 审核图片列表
-    image_ids = ", ".join(str(img.id) for img in review.imgs.all())
-    c.setFont("SimSun-Bold", 14)
-    c.drawString(MARGIN, y, "审核图像列表：")
-    y -= 20
-    c.setFont("SimSun", 12)
-    for img in review.imgs.all():
-        y = _draw_multiline(c, MARGIN + 10, y, f"图片 {img.id} —— 路径：{img.image.name}", max_chars=90)
-        y -= 10
-        if y < MARGIN + 50:
-            c.showPage()
-            y = H - MARGIN
-    y -= 20
+    c.setFont(fn, 12)
+    c.drawString(MARGIN, y, f"人工审核记录 ID：{review.id}")
+    y -= 22
+    if rr:
+        c.drawString(MARGIN, y, f"申请单号：{rr.id}")
+        y -= 22
+    if detection_task:
+        c.drawString(MARGIN, y, f"检测任务 ID：{detection_task.id}（{task_type or '—'}）")
+        y -= 22
+        if detection_task.task_name:
+            c.drawString(MARGIN, y, f"任务名称：{detection_task.task_name}")
+            y -= 22
 
-    # ─────────────────────── 每张图片审核详情 ──────────────────────────
-    for img_review in review.img_reviews.all():
-        image_upload = img_review.img
-        page_label = f"图片 {image_upload.id} 的人工审核"
-        c.bookmarkPage(f"manual_img_{image_upload.id}")
-        c.addOutlineEntry(page_label, f"manual_img_{image_upload.id}", level=1)
+    publisher_name = rr.user.username if rr and rr.user_id else "—"
+    c.drawString(MARGIN, y, f"发布者：{publisher_name}")
+    y -= 22
+    c.drawString(MARGIN, y, f"专家：{review.reviewer.username if review.reviewer_id else '未指定'}")
+    y -= 22
 
-        c.setFont("SimSun-Bold", 14)
-        c.drawString(MARGIN, y, page_label)
+    start_time = timezone.localtime(review.review_time).strftime("%Y-%m-%d %H:%M")
+    end_time = rr.review_end_time if rr else None
+    finish_time = (
+        timezone.localtime(end_time).strftime("%Y-%m-%d %H:%M") if end_time else "尚未完成"
+    )
+    c.drawString(MARGIN, y, f"审核时间：{start_time} — {finish_time}")
+    y -= 30
+
+    if rr and (rr.reason or "").strip():
+        c.setFont(fb, 13)
+        c.drawString(MARGIN, y, "发布者申请说明：")
+        y -= 18
+        c.setFont(fn, 11)
+        y = _draw_multiline(c, MARGIN, y, (rr.reason or "")[:800], max_chars=70, font=fn, size=11)
         y -= 20
 
-        # 图像预览
-        image_path = image_upload.image.path
-        if os.path.exists(image_path):
-            c.drawImage(ImageReader(image_path), MARGIN, y - 120, width=120, height=120, preserveAspectRatio=True)
+    image_reviews = list(_iter_manual_image_reviews(review))
+    is_textual = "paper" in task_type.lower() or "review" in task_type.lower()
 
-        # 审核结果
-        c.setFont("SimSun", 12)
-        y -= 140
-        result_text = "判定为假图" if img_review.result else "判定为真图"
-        c.drawString(MARGIN, y, f"最终判定：{result_text}")
+    c.setFont(fb, 14)
+    section_title = "材料单元审核明细" if is_textual else "图像审核明细"
+    c.drawString(MARGIN, y, section_title)
+    y -= 22
+
+    if not image_reviews:
+        c.setFont(fn, 11)
+        y = _draw_multiline(c, MARGIN, y, "暂无结构化审核条目。", max_chars=70, font=fn, size=11)
         y -= 20
-        c.drawString(MARGIN, y, f"审核时间：{timezone.localtime(img_review.review_time):%Y-%m-%d %H:%M}")
-        y -= 20
-
-        # 各个评分项与理由
-        c.setFont("SimSun-Bold", 12)
-        c.drawString(MARGIN, y, "各维度评分与理由：")
-        y -= 20
-        c.setFont("SimSun", 12)
-
-        methods = {
-            1: ("Method-1", img_review.score1, img_review.reason1),
-            2: ("Method-2", img_review.score2, img_review.reason2),
-            3: ("Method-3", img_review.score3, img_review.reason3),
-            4: ("Method-4", img_review.score4, img_review.reason4),
-            5: ("Method-5", img_review.score5, img_review.reason5),
-            6: ("Method-6", img_review.score6, img_review.reason6),
-            7: ("Method-7", img_review.score7, img_review.reason7),
-        }
-
-        for method_id, (method_name, score, reason) in methods.items():
-            y = _draw_multiline(c, MARGIN + 10, y, f"{method_name}：得分 {score}, 理由：“{reason or '无'}”",
-                                max_chars=80, font='SimSun', size=11)
-            y -= 10
-            if y < MARGIN + 50:
+    else:
+        for idx, img_review in enumerate(image_reviews, start=1):
+            if y < MARGIN + 120:
                 c.showPage()
                 y = H - MARGIN
 
-        # JSON 格式的点集
-        points_data = {}
-        try:
-            points_data = json.loads(img_review.points1) if img_review.points1 else []
-        except Exception:
-            pass
-        c.setFont("SimSun", 10)
-        y -= 10
-        c.drawString(MARGIN, y, "点集数据示例（Method-1）:")
-        y -= 20
-        sample_points = str(points_data)[:80] + ('...' if len(str(points_data)) > 80 else '')
-        y = _draw_multiline(c, MARGIN + 10, y, sample_points, max_chars=80, font='SimSun', size=10)
-        y -= 30
+            label = f"单元 {idx}" if is_textual else f"图片 {getattr(img_review.img, 'id', idx)}"
+            c.setFont(fb, 12)
+            c.drawString(MARGIN, y, label)
+            y -= 18
 
-        if y < MARGIN + 50:
-            c.showPage()
-            y = H - MARGIN
+            image_upload = img_review.img
+            if image_upload and not is_textual:
+                try:
+                    image_path = image_upload.image.path if image_upload.image else None
+                    if image_path and os.path.exists(image_path):
+                        c.drawImage(
+                            ImageReader(image_path),
+                            MARGIN,
+                            y - 100,
+                            width=100,
+                            height=100,
+                            preserveAspectRatio=True,
+                        )
+                        y -= 110
+                except Exception:
+                    pass
 
-        c.showPage()
+            c.setFont(fn, 11)
+            c.drawString(MARGIN, y, f"最终判定：{_manual_review_result_label(img_review.result)}")
+            y -= 18
+            rt = img_review.review_time
+            if rt:
+                c.drawString(
+                    MARGIN,
+                    y,
+                    f"记录时间：{timezone.localtime(rt).strftime('%Y-%m-%d %H:%M')}",
+                )
+                y -= 18
 
-    # ─────────────────────── 保存文件 ──────────────────────────
+            c.setFont(fb, 11)
+            c.drawString(MARGIN, y, "各维度评分与理由：")
+            y -= 16
+            c.setFont(fn, 10)
+            for i in range(1, 8):
+                score = getattr(img_review, f"score{i}", None)
+                reason = getattr(img_review, f"reason{i}", None)
+                if score is None and not reason:
+                    continue
+                line = f"维度 {i}：得分 {score if score is not None else '—'}；理由：{reason or '无'}"
+                y = _draw_multiline(c, MARGIN + 8, y, line, max_chars=78, font=fn, size=10)
+                y -= 6
+                if y < MARGIN + 60:
+                    c.showPage()
+                    y = H - MARGIN
+            y -= 12
+
     c.save()
     review.report_file = rel_path
     review.save(update_fields=["report_file"])
@@ -327,16 +349,6 @@ def generate_manual_review_report(review: ManualReview) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 #  任务 019 – 统一报告生成（论文 / Review）
 # ═══════════════════════════════════════════════════════════════════════════════
-
-# 安全字体选择：有 SimSun 就用，没有用 Helvetica
-def _font(bold=False):
-    try:
-        name = 'SimSun-Bold' if bold else 'SimSun'
-        pdfmetrics.getFont(name)
-        return name
-    except Exception:
-        return 'Helvetica-Bold' if bold else 'Helvetica'
-
 
 def _load_result_json(task, result_type=None):
     """读取 Celery 落盘的检测结果 JSON。"""

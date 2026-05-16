@@ -71,11 +71,20 @@
         </v-card>
       </v-col>
       <v-col v-else cols="12" sm="6" md="4">
-        <v-card variant="tonal" class="h-100">
-          <v-card-title class="text-subtitle-1">人工审核审批</v-card-title>
+        <v-card variant="tonal" color="deep-purple-lighten-5" class="h-100" border>
+          <v-card-title class="text-subtitle-1">人工审核审批（组织管理员）</v-card-title>
           <v-card-text class="text-body-2 text-medium-emphasis">
-            软件管理员不审批单组织内申请；请使用组织管理员账号从侧栏进入。
+            软件管理员侧重跨组织治理，<strong>不执行</strong>本组织内「通过/拒绝」。
+            联调请使用组织管理员登录后进入侧栏「人工审核审批」：
           </v-card-text>
+          <v-card-text class="text-body-2 pt-0">
+            <code>org_admin@example.com</code> / <code>OrgAdmin123!</code>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn color="deep-purple" variant="tonal" class="text-none" to="/reviews" prepend-icon="mdi-eye">
+              只读查看队列
+            </v-btn>
+          </v-card-actions>
         </v-card>
       </v-col>
     </v-row>

@@ -3,7 +3,10 @@
     <v-row class="mb-2">
       <v-col>
         <h1 class="text-h4 font-weight-bold">人工审核申请</h1>
-        <p class="text-body-2 text-medium-emphasis mb-0">发布者侧：查看已提交的审核申请与进度；与检测历史详情中「人工审核申请」入口一致（概要设计用户端 `/annual`）。</p>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          发布者（编辑）侧：发起人工审核申请 → 组织管理员审批 → 专家鉴定 → <strong>本页查看进度与最终结果</strong>。
+          专家提交后请点击「查看结果」进入汇总页（<code>/manual-review-result</code>）。
+        </p>
       </v-col>
     </v-row>
 
@@ -19,10 +22,6 @@
       您从检测任务 <code>{{ fromTaskId }}</code> 跳转而来；可直接点击「发起人工审核申请」预填该任务 ID，或在下列列表中跟踪进度。
     </v-alert>
 
-    <v-alert v-if="useWorkflowMock" type="warning" variant="tonal" density="compact" class="mb-4 text-body-2">
-      已开启 <strong>VITE_USE_MOCK_MANUAL_REVIEW_WORKFLOW</strong> 或 <strong>VITE_USE_FULL_FRONTEND_MOCK</strong>：人工审核全流程数据在用户端浏览器本地；管理端 dev（通常 :3001）与用户端（通常 :3000）origin 不同则<strong>无法共享</strong> Mock 数据——无后端时请展开下方「模拟管理端审批」，或使用真实后端联调。
-    </v-alert>
-
     <v-row class="mb-4">
       <v-col cols="12" class="d-flex flex-wrap align-center ga-2 justify-space-between">
         <div class="d-flex flex-wrap ga-2">
@@ -35,23 +34,6 @@
         </v-btn>
       </v-col>
     </v-row>
-
-    <v-expansion-panels v-if="useWorkflowMock" class="mb-4">
-      <v-expansion-panel>
-        <v-expansion-panel-title class="text-body-2 font-weight-medium">
-          本地联调 · 模拟管理端审批（仅 Mock；通过后专家任务池可出现对应任务）
-        </v-expansion-panel-title>
-        <v-expansion-panel-text>
-          <v-data-table :headers="simHeaders" :items="pendingSimulationRows" hide-default-footer density="compact">
-            <template #item.actions="{ item }">
-              <v-btn size="small" color="success" variant="tonal" class="text-none me-2" @click="simulateApprove(item.review_request_id)">通过</v-btn>
-              <v-btn size="small" color="error" variant="tonal" class="text-none" @click="simulateReject(item.review_request_id)">拒绝</v-btn>
-            </template>
-          </v-data-table>
-          <div v-if="!pendingSimulationRows.length" class="text-caption text-medium-emphasis mt-2">暂无待管理审批的申请。</div>
-        </v-expansion-panel-text>
-      </v-expansion-panel>
-    </v-expansion-panels>
 
     <v-card class="elevation-2">
       <v-data-table
@@ -96,17 +78,34 @@
           </div>
         </template>
 
+        <template v-slot:item.detection_task_id="{ item }">
+          <code class="text-body-2">{{ item.detection_task_id || '—' }}</code>
+        </template>
+
         <template v-slot:item.actions="{ item }">
-          <v-btn
-            icon
-            variant="text"
-            size="small"
-            color="primary"
-            class="mr-2"
-            @click="goToTaskDetail(item)"
-          >
-            <v-icon>mdi-eye</v-icon>
-          </v-btn>
+          <div class="d-flex flex-wrap justify-center ga-1">
+            <v-btn
+              size="small"
+              variant="tonal"
+              color="primary"
+              class="text-none"
+              :disabled="!canViewResult(item)"
+              @click="goToReviewResult(item)"
+            >
+              查看结果
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="outlined"
+              color="secondary"
+              class="text-none"
+              :disabled="!canDownloadReport(item)"
+              :loading="downloadingReportId === item.review_request_id"
+              @click="downloadManualReport(item)"
+            >
+              下载报告
+            </v-btn>
+          </div>
         </template>
       </v-data-table>
       
@@ -251,21 +250,14 @@ import {
   createManualReviewRequest,
   listPublisherManualReviewApplications,
 } from '@/api/manualReviewWorkflow'
+import publisher from '@/api/publisher'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
-import {
-  workflowMockEnabled,
-  mockListPendingAdminForPublisher,
-  mockSimulateAdminApprove,
-  mockSimulateAdminReject,
-} from '@workflow-mock'
-
+import { savePdfFromAxiosResponse } from '@/utils/downloadPdf'
 const router = useRouter()
 const route = useRoute()
 const snackbar = useSnackbarStore()
 const userStore = useUserStore()
-
-const useWorkflowMock = computed(() => workflowMockEnabled())
 
 const showCreateDialog = ref(false)
 const createSubmitting = ref(false)
@@ -287,26 +279,6 @@ const taskTypeItems = [
 const priorityItems = [
   { title: '普通', value: 'normal' },
   { title: '加急', value: 'urgent' },
-]
-
-const pendingSimulationRows = computed(() => {
-  if (!useWorkflowMock.value) return []
-  return mockListPendingAdminForPublisher().map((r) => ({
-    review_request_id: r.review_request_id,
-    detection_task_id: r.detection_task_id,
-    task_type: r.task_type,
-    reason: r.reason.length > 40 ? `${r.reason.slice(0, 40)}…` : r.reason,
-    created_at: r.created_at.slice(0, 19).replace('T', ' '),
-  }))
-})
-
-const simHeaders = [
-  { title: '申请单号', key: 'review_request_id', align: 'center' as const },
-  { title: '检测任务', key: 'detection_task_id', align: 'start' as const },
-  { title: '类型', key: 'task_type', align: 'center' as const },
-  { title: '理由摘要', key: 'reason', align: 'start' as const },
-  { title: '提交时间', key: 'created_at', align: 'center' as const },
-  { title: '操作', key: 'actions', align: 'center' as const, sortable: false },
 ]
 
 function openCreateDialog() {
@@ -331,42 +303,20 @@ async function submitCreate() {
   }
   createSubmitting.value = true
   try {
-    await createManualReviewRequest(
-      {
-        detection_task_id: tid,
-        task_type: createForm.value.task_type,
-        reason,
-        priority: createForm.value.priority,
-        batch_session_id: createForm.value.batch_session_id.trim() || undefined,
-      },
-      userStore.username || undefined,
-    )
+    await createManualReviewRequest({
+      detection_task_id: tid,
+      task_type: createForm.value.task_type,
+      reason,
+      priority: createForm.value.priority,
+      batch_session_id: createForm.value.batch_session_id.trim() || undefined,
+    })
     snackbar.showMessage('人工审核申请已提交', 'success')
     showCreateDialog.value = false
     await fetchTasks(currentPage.value, pageSize.value)
   } catch {
-    snackbar.showMessage('提交失败，请确认后端已实现 POST /manual-review-requests/ 或开启 Mock', 'error')
+    snackbar.showMessage('提交失败，请确认 Django 已启动且 POST /manual-review-requests/ 可用', 'error')
   } finally {
     createSubmitting.value = false
-  }
-}
-
-function simulateApprove(review_request_id: number) {
-  const res = mockSimulateAdminApprove(review_request_id)
-  if (!res.ok) snackbar.showMessage(res.error, 'warning')
-  else {
-    snackbar.showMessage(`已通过，专家任务 manual_review_id=${res.manual_review_id}`, 'success')
-    fetchTasks(currentPage.value, pageSize.value)
-  }
-}
-
-function simulateReject(review_request_id: number) {
-  const reason = window.prompt('请输入拒绝理由（Mock）', '材料不完整') || '材料不完整'
-  const res = mockSimulateAdminReject(review_request_id, reason)
-  if (!res.ok) snackbar.showMessage(res.error, 'warning')
-  else {
-    snackbar.showMessage('已拒绝该申请', 'success')
-    fetchTasks(currentPage.value, pageSize.value)
   }
 }
 
@@ -383,18 +333,21 @@ function clearFromTaskHint() {
 
 interface Task {
   review_request_id: number
+  detection_task_id: string
+  task_type: string
   request_time: string
   status: string
   progress: string
 }
 
 const headers = [
-  { title: '任务ID', key: 'review_request_id', align: 'start' },
-  { title: '提交时间', key: 'request_time', align: 'center' },
-  { title: '状态', key: 'status', align: 'center' },
-  { title: '进度', key: 'progress', align: 'center' },
-  { title: '操作', key: 'actions', align: 'center', sortable: false },
-] as const
+  { title: '申请单号', key: 'review_request_id', align: 'start' as const },
+  { title: '检测任务 ID', key: 'detection_task_id', align: 'center' as const },
+  { title: '提交时间', key: 'request_time', align: 'center' as const },
+  { title: '状态', key: 'status', align: 'center' as const },
+  { title: '专家进度', key: 'progress', align: 'center' as const },
+  { title: '操作', key: 'actions', align: 'center' as const, sortable: false },
+]
 
 // 分页相关
 const tasks = ref<Task[]>([])
@@ -419,10 +372,10 @@ const filters = ref<{
 })
 
 const statusOptions = [
-  { title: '审核中', value: 'pending' },
-  { title: '已下发', value: 'in_progress' },
+  { title: '待管理端审批', value: 'pending' },
+  { title: '专家审核中', value: 'in_progress' },
   { title: '已完成', value: 'completed' },
-  { title: '已拒绝', value: 'failed' },
+  { title: '管理端已拒绝', value: 'failed' },
 ]
 
 const timeRangeOptions = [
@@ -451,13 +404,13 @@ const getStatusColor = (status: string) => {
 const getStatusName = (status: string) => {
   switch (status) {
     case 'pending':
-      return '审核中'
+      return '待管理端审批'
     case 'in_progress':
-      return '已下发'
+      return '专家审核中'
     case 'completed':
       return '已完成'
     case 'failed':
-      return '已拒绝'
+      return '管理端已拒绝'
     default:
       return status
   }
@@ -465,18 +418,80 @@ const getStatusName = (status: string) => {
 
 const getProgressValue = (progress: string) => {
   const [completed, total] = progress.split('/').map(Number)
-  return ((total - completed) / total) * 100
+  if (!total || Number.isNaN(completed) || Number.isNaN(total)) return 0
+  return Math.round((completed / total) * 100)
 }
 
 const getProgressColor = (progress: string) => {
   const [completed, total] = progress.split('/').map(Number)
-  if (completed === total) return 'success'
+  if (!total) return 'grey'
+  if (completed >= total) return 'success'
   if (completed > 0) return 'info'
   return 'warning'
 }
 
-const goToTaskDetail = (task: Task) => {
-  router.push(`/task/${task.review_request_id}`)
+function canViewResult(item: Task) {
+  return item.status === 'completed'
+}
+
+function canDownloadReport(item: Task) {
+  return item.status === 'completed' || item.status === 'in_progress'
+}
+
+const downloadingReportId = ref<number | null>(null)
+
+function formatReportDownloadError(e: unknown): string {
+  const ax = e as {
+    response?: { status?: number; data?: Blob | { detail?: string } }
+  }
+  const d = ax.response?.data
+  if (d && typeof d === 'object' && 'detail' in d && typeof d.detail === 'string') {
+    return d.detail
+  }
+  if (d instanceof Blob) {
+    return '报告生成失败（请重启 Django 后重试）'
+  }
+  if (ax.response?.status === 202) {
+    return '报告正在生成，请稍后重试'
+  }
+  return '报告下载失败，请确认专家已提交且后端服务正常'
+}
+
+async function downloadManualReport(item: Task) {
+  if (!canDownloadReport(item)) return
+  downloadingReportId.value = item.review_request_id
+  try {
+    const res = await publisher.downloadReviewReport({ review_request_id: item.review_request_id })
+    savePdfFromAxiosResponse(res, `manual_review_${item.review_request_id}_report.pdf`)
+    snackbar.showMessage('人工审核报告已下载', 'success')
+  } catch (e) {
+    snackbar.showMessage(formatReportDownloadError(e), 'error')
+  } finally {
+    downloadingReportId.value = null
+  }
+}
+
+function goToReviewResult(task: Task) {
+  router.push({
+    path: '/manual-review-result',
+    query: {
+      review_request_id: String(task.review_request_id),
+      task_id: task.detection_task_id || '',
+      task_type: task.task_type || 'image_detection',
+    },
+  })
+}
+
+function formatLoadListError(e: unknown): string {
+  const ax = e as { response?: { status?: number; data?: { error?: string; message?: string } } }
+  const status = ax.response?.status
+  const d = ax.response?.data
+  if (status === 403) {
+    return '当前账号不是发布者（编辑）。请使用 publisher_test@example.com 登录并选择「编辑」。'
+  }
+  if (typeof d?.error === 'string') return d.error
+  if (typeof d?.message === 'string') return d.message
+  return '获取任务列表失败，请确认已用编辑账号登录且 Django 已启动'
 }
 
 // 时间验证相关
@@ -575,11 +590,13 @@ const fetchTasks = async (page: number, pageSize: number) => {
     const total_pages = Number(data.total_pages) || 1
     const total_count = Number(data.total_count ?? data.total_tasks ?? taskList.length)
     
-    tasks.value = taskList.map((task: any) => ({
-      review_request_id: task.review_request_id,
-      request_time: task.request_time,
-      status: task.status,
-      progress: task.progress
+    tasks.value = taskList.map((task: Record<string, unknown>) => ({
+      review_request_id: Number(task.review_request_id),
+      detection_task_id: String(task.detection_task_id ?? ''),
+      task_type: String(task.task_type ?? ''),
+      request_time: String(task.request_time ?? ''),
+      status: String(task.status ?? ''),
+      progress: String(task.progress ?? '0/1'),
     }))
     
     currentPage.value = current_page
@@ -587,7 +604,9 @@ const fetchTasks = async (page: number, pageSize: number) => {
     totalTasks.value = total_count
   } catch (error) {
     console.error('获取任务列表失败:', error)
-    snackbar.showMessage('获取任务列表失败', 'error')
+    tasks.value = []
+    totalTasks.value = 0
+    snackbar.showMessage(formatLoadListError(error), 'error')
   } finally {
     loading.value = false
   }
@@ -618,8 +637,14 @@ const formatDateFilter = (timestamp: number) => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
-// 初始化
-onMounted(() => {
+onMounted(async () => {
+  if (!userStore.isLoaded) {
+    await userStore.fetchUserInfo()
+  }
+  if (userStore.role !== 'publisher') {
+    snackbar.showMessage('人工审核申请页仅供发布者（编辑）使用', 'warning')
+    return
+  }
   fetchTasks(currentPage.value, pageSize.value)
 })
 </script>

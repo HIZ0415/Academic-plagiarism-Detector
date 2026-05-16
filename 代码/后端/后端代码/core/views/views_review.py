@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from ..models import ReviewRequest, DetectionTask, ImageUpload, User, Log
 from core.util import send_notification
 from core.models import Notification
+from core.utils.serializers_safe import serialize_value
 
 
 @api_view(['GET'])
@@ -567,8 +568,10 @@ def get_publisher_review_tasks(request):
     tasks = []
     for review_request in page_obj.object_list:
         reviewers_count = review_request.reviewers.count()
+        assigned_count = review_request.manual_reviews.count()
+        denominator = reviewers_count or assigned_count or 1
         completed_reviews_count = review_request.manual_reviews.filter(status='completed').count()
-        progress = f"{completed_reviews_count}/{reviewers_count}"
+        progress = f"{completed_reviews_count}/{denominator}"
 
         if review_request.status2 == 'refused':
             ui_status = 'failed'
@@ -646,6 +649,79 @@ def get_reviewer_request_detail(request, reviewRequest_id):
     })
 
 
+def _normalize_review_scores(raw_scores):
+    scores = []
+    for s in list(raw_scores or []):
+        if s is None or s == '':
+            scores.append(0)
+            continue
+        try:
+            scores.append(int(s))
+        except (TypeError, ValueError):
+            scores.append(0)
+    while len(scores) < 7:
+        scores.append(0)
+    return scores[:7]
+
+
+def _resolve_final_result(item):
+    final_result = item.get('final')
+    if final_result is not None:
+        if isinstance(final_result, str):
+            return final_result.lower() in ('1', 'true', 'yes')
+        return bool(final_result)
+    verdict = (item.get('verdict') or '').lower()
+    if verdict in ('confirmed_fake', 'suspected'):
+        return True
+    if verdict in ('no_issue', 'not_fake', 'clean'):
+        return False
+    return None
+
+
+def _fmt_dt(value):
+    if value is None:
+        return None
+    try:
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+    except (AttributeError, TypeError, ValueError):
+        return str(value)
+
+
+def _manual_review_task_kind(detection_task) -> str:
+    if detection_task is None:
+        return 'image'
+    task_type = (detection_task.task_type or '').lower()
+    if 'paper' in task_type:
+        return 'paper'
+    if 'review' in task_type:
+        return 'review'
+    return 'image'
+
+
+def _serialize_sub_methods_for_review(detection_result, request):
+    rows = []
+    for sub in detection_result.sub_results.all():
+        rows.append({
+            'method': sub.method,
+            'probability': sub.probability,
+            'mask_image': serialize_value(sub.mask_image, request) if sub.mask_image else None,
+            'mask_matrix': sub.mask_matrix,
+        })
+    return rows
+
+
+def _build_text_segments_for_task(detection_task, review_request):
+    reason = (review_request.reason or '').strip()
+    label = '申请说明'
+    content = reason or f'检测任务 #{detection_task.id}（{detection_task.task_type or "unknown"}）'
+    return [{
+        'id': 1,
+        'label': label,
+        'content': content,
+        'ai_note': f'自动检测类型：{detection_task.task_type or "—"}',
+    }]
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_reviewer_manual_request(request):
@@ -654,79 +730,75 @@ def get_reviewer_manual_request(request):
     if user.role != 'reviewer':
         return Response({'error': 'Only reviewers can view tasks'}, status=403)
 
-    # 获取查询参数
-    status = request.query_params.get('status', '')
-    query = request.query_params.get('query', '')
+    status = request.query_params.get('status', '').strip()
+    query = request.query_params.get('query', '').strip()
     start_time = request.query_params.get('start_time', None)
     end_time = request.query_params.get('end_time', None)
-    review_request_status = request.query_params.get('review_request_status', '')
-    admin_gate_status = request.query_params.get('admin_gate_status', '')
+    review_request_status = request.query_params.get('review_request_status', '').strip()
+    admin_gate_status = request.query_params.get('admin_gate_status', '').strip()
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 10))
 
-    # 确保 page_size 不超过 100
     if page_size > 100:
         page_size = 100
 
-    # 构建查询条件
-    review_requests = ReviewRequest.objects.filter(reviewers=user).select_related(
-        'detection_result__detection_task', 'user'
-    ).prefetch_related('detection_result__detection_task__image_uploads')
-    review_requests = review_requests.order_by('-request_time')
+    # 专家任务池以 ManualReview 为准（管理端通过后创建），避免仅依赖 ReviewRequest.reviewers 预绑定
+    manual_reviews = ManualReview.objects.filter(reviewer=user).select_related(
+        'review_request',
+        'review_request__user',
+        'review_request__detection_result__detection_task',
+    ).order_by('-review_time')
+
+    if not admin_gate_status:
+        manual_reviews = manual_reviews.filter(review_request__status2='accepted')
+    else:
+        manual_reviews = manual_reviews.filter(review_request__status2=admin_gate_status)
 
     if query:
-        review_requests = review_requests.filter(user__username__startswith=query)
+        manual_reviews = manual_reviews.filter(review_request__user__username__startswith=query)
     if start_time:
-        review_requests = review_requests.filter(request_time__gte=start_time)
+        manual_reviews = manual_reviews.filter(review_request__request_time__gte=start_time)
     if end_time:
-        review_requests = review_requests.filter(request_time__lte=end_time)
+        manual_reviews = manual_reviews.filter(review_request__request_time__lte=end_time)
+    if review_request_status:
+        manual_reviews = manual_reviews.filter(review_request__status1=review_request_status)
+    if status:
+        manual_reviews = manual_reviews.filter(status=status)
 
-    # 分页
-    paginator = Paginator(review_requests, page_size)
+    paginator = Paginator(manual_reviews, page_size)
     try:
         page_obj = paginator.page(page)
     except Exception:
         return Response({'error': 'Invalid page number'}, status=400)
 
-    # 构建返回数据
     results = []
-    for review_request in page_obj.object_list:
+    for manual_review in page_obj.object_list:
+        review_request = manual_review.review_request
         publisher = review_request.user
+        detection_result = getattr(review_request, 'detection_result', None)
+        detection_task = (
+            detection_result.detection_task
+            if detection_result is not None
+            else None
+        )
         image_count = review_request.imgs.count()
-        manual_review = review_request.manual_reviews.filter(reviewer=user).first()
-
-        if manual_review:
-            if review_request_status and review_request.status1 != review_request_status:
-                continue
-            if admin_gate_status and review_request.status2 != admin_gate_status:
-                continue
-            if status:
-                if manual_review.status == status:
-                    results.append({
-                        'manual_review_id': manual_review.id,
-                        'manual_review_time': manual_review.review_time.strftime('%Y-%m-%d %H:%M:%S'),
-                        'publisher_username': publisher.username,
-                        'publisher_avatar': publisher.avatar.url if publisher.avatar else None,
-                        'image_count': image_count,
-                        'status': manual_review.status,
-                        'review_request_id': review_request.id,
-                        'review_request_status': review_request.status1,
-                        'admin_gate_status': review_request.status2,
-                        'task_kind': 'image',
-                    })
-            else:
-                results.append({
-                    'manual_review_id': manual_review.id,
-                    'manual_review_time': manual_review.review_time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'publisher_username': publisher.username,
-                    'publisher_avatar': publisher.avatar.url if publisher.avatar else None,
-                    'image_count': image_count,
-                    'status': manual_review.status,
-                    'review_request_id': review_request.id,
-                    'review_request_status': review_request.status1,
-                    'admin_gate_status': review_request.status2,
-                    'task_kind': 'image',
-                })
+        task_kind = _manual_review_task_kind(detection_task)
+        results.append({
+            'manual_review_id': manual_review.id,
+            'manual_review_time': manual_review.review_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'publisher_username': publisher.username,
+            'publisher_avatar': publisher.avatar.url if publisher.avatar else None,
+            'image_count': image_count,
+            'status': manual_review.status,
+            'review_request_id': review_request.id,
+            'review_request_status': review_request.status1,
+            'admin_gate_status': review_request.status2,
+            'task_kind': task_kind,
+            'detection_task_id': detection_task.id if detection_task else None,
+            'task_type': detection_task.task_type if detection_task else None,
+            'reason': review_request.reason or '',
+            'organization': review_request.organization.name if review_request.organization else None,
+        })
 
     return Response({
         'results': results,
@@ -734,7 +806,7 @@ def get_reviewer_manual_request(request):
         'total_pages': paginator.num_pages,
         'total_count': paginator.count,
         'has_next': page_obj.has_next(),
-        'has_previous': page_obj.has_previous()
+        'has_previous': page_obj.has_previous(),
     })
 
 
@@ -755,27 +827,39 @@ def get_review_detail(request, manual_review_id):
     # 获取关联的ReviewRequest对象
     review_request = manual_review.review_request
 
-    # 获取关联的DetectionResult对象
     detection_result = review_request.detection_result
+    if not detection_result:
+        return Response({'error': 'No detection result found for the review request'}, status=404)
 
-    # 获取关联的DetectionTask对象
     detection_task = detection_result.detection_task
 
     qs_imgs = manual_review.imgs.all()
-    imgs = [{'id': image_upload.id, 'url': image_upload.image.url} for image_upload in qs_imgs]
+    if not qs_imgs.exists():
+        qs_imgs = review_request.imgs.all()
+    if not qs_imgs.exists() and detection_task:
+        qs_imgs = ImageUpload.objects.filter(detection_task=detection_task).order_by('id')
+
+    imgs = []
+    for image_upload in qs_imgs:
+        url = serialize_value(image_upload.image, request) if image_upload.image else None
+        if url:
+            imgs.append({'id': image_upload.id, 'url': url})
     image_ids = [x['id'] for x in imgs]
     image_urls = [x['url'] for x in imgs]
 
-    # 获取AI检测结果
     ai_detection_result = {
         'is_fake': detection_result.is_fake,
         'confidence_score': detection_result.confidence_score,
-        'detection_time': detection_result.detection_time.strftime('%Y-%m-%d %H:%M:%S')
+        'detection_time': _fmt_dt(detection_result.detection_time),
+        'llm_judgment': detection_result.llm_judgment or '',
     }
+    sub_methods = _serialize_sub_methods_for_review(detection_result, request)
 
-    # 获取审核员的检测结果
     reviewers_results = []
-    for image_review in manual_review.img_reviews.all():
+    image_review_qs = manual_review.image_reviews.all()
+    if not image_review_qs.exists():
+        image_review_qs = manual_review.img_reviews.all()
+    for image_review in image_review_qs:
         scores = [
             image_review.score1,
             image_review.score2,
@@ -798,27 +882,47 @@ def get_review_detail(request, manual_review_id):
 
         result = image_review.result
 
+        img = image_review.img
         reviewers_results.append({
-            'image_id': image_review.img.id,
+            'image_id': img.id if img else None,
             'scores': scores,
             'reasons': reasons,
-            'result': result
+            'result': result,
         })
 
+    task_kind = _manual_review_task_kind(detection_task)
+    segments = []
+    if task_kind in ('paper', 'review') and detection_task:
+        segments = _build_text_segments_for_task(detection_task, review_request)
+
+    publisher = review_request.user
     return Response({
         'imgs': imgs,
         'image_urls': image_urls,
         'image_ids': image_ids,
         'ai_detection_result': ai_detection_result,
+        'sub_methods': sub_methods,
+        'overall': {
+            'is_fake': detection_result.is_fake,
+            'confidence_score': detection_result.confidence_score,
+        },
         'count': len(image_ids),
         'reviewers_results': reviewers_results,
+        'segments': segments,
+        'text_units': segments,
         'review_request': {
             'id': review_request.id,
             'status': review_request.status1,
             'admin_gate_status': review_request.status2,
-            'request_time': review_request.request_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'request_time': _fmt_dt(review_request.request_time),
+            'reason': review_request.reason or '',
         },
         'manual_review_status': manual_review.status,
+        'task_kind': task_kind,
+        'task_type': detection_task.task_type if detection_task else None,
+        'detection_task_id': detection_task.id if detection_task else None,
+        'publisher_username': publisher.username,
+        'publisher_avatar': publisher.avatar.url if publisher.avatar else None,
     })
 
 
@@ -899,23 +1003,38 @@ def post_review(request, manual_review_id):
     if not results:
         return Response({'error': 'result is required'}, status=400)
 
+    task_kind = (data.get('task_kind') or '').lower()
+    is_textual_task = 'paper' in task_kind or 'review' in task_kind
+
     for item in results:
-        img_id = item.get('img_id')
-        scores = item.get('score', [])
-        reasons = item.get('reason', [])
-        points_list = item.get('points', [])  # 获取 points 列表
-        final_result = item.get('final')
+        img_id = item.get('img_id') or item.get('segment_id')
+        scores = _normalize_review_scores(item.get('score', []))
+        reasons = list(item.get('reason', []) or [])
+        points_list = list(item.get('points', []) or [])
+        final_result = _resolve_final_result(item)
+
+        if is_textual_task and not img_id:
+            fallback_img = manual_review.imgs.first()
+            if fallback_img:
+                img_id = fallback_img.id
 
         if not img_id:
             return Response({'error': 'img_id is required in each result item'}, status=400)
-        if len(scores) != 7:
-            return Response({'error': 'scores must contain exactly 7 elements'}, status=400)
+
+        while len(reasons) < 7:
+            reasons.append('')
+        while len(points_list) < 7:
+            points_list.append([])
+
         if len(reasons) != 7:
             return Response({'error': 'reasons must contain exactly 7 elements'}, status=400)
         if len(points_list) != 7:
             return Response({'error': 'points must contain exactly 7 elements (one for each method)'}, status=400)
         if final_result is None:
-            return Response({'error': 'final is required in each result item'}, status=400)
+            return Response(
+                {'error': 'final or verdict (confirmed_fake / suspected / no_issue) is required in each result item'},
+                status=400,
+            )
 
         try:
             image_upload = ImageUpload.objects.get(id=img_id)
@@ -979,15 +1098,22 @@ def post_review(request, manual_review_id):
     )
 
     # wyt shit here
+    dt = getattr(review_request.detection_result, 'detection_task', None)
+    task_id_q = str(dt.id) if dt else ''
+    task_type_q = dt.task_type if dt else ''
+    result_url = (
+        f'/manual-review-result?review_request_id={review_request.id}'
+        f'&task_id={task_id_q}&task_type={task_type_q}'
+    )
     send_notification(
         receiver_id=review_request.user.id,
         receiver_name=review_request.user.username,
         sender_id=user.id,
         sender_name=user.username,
         category=Notification.R2P,
-        title='任务完成通知',
-        content=f'审稿人 {user.username} 已完成人工审核任务',
-        url=f'/task/{review_request.id}'
+        title='人工审核结果已出',
+        content=f'专家 {user.username} 已完成申请单 #{review_request.id} 的审核，请在「人工审核申请」中查看结果。',
+        url=result_url,
     )
 
     return Response({'message': 'Review submitted successfully'}, status=201)

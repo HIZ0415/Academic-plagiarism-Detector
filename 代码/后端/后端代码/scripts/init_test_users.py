@@ -91,6 +91,21 @@ def main() -> None:
         is_staff=True,
         is_superuser=True,
     )
+    # 组织管理员：审批本组织人工审核申请（与 admin@mail.com 软件管理员区分）
+    sync_user(
+        email='org_admin@example.com',
+        username='org_admin',
+        role='admin',
+        password='OrgAdmin123!',
+        organization=org,
+        is_staff=True,
+        is_superuser=False,
+    )
+    org_admin = User.objects.get(email='org_admin@example.com')
+    if org.admin_user_id != org_admin.id:
+        org.admin_user = org_admin
+        org.save(update_fields=['admin_user'])
+        print(f'linked organization admin: {org_admin.email}')
     sync_user(
         email='publisher_test@example.com',
         username='publisher_test',

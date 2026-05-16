@@ -38,9 +38,9 @@
         />
 
         <v-list-item
-          v-if="isLoggedIn && userStore.admin_type === 'organization_admin'"
+          v-if="isLoggedIn && canViewManualReviewQueue"
           prepend-icon="mdi-gavel"
-          title="人工审核申请"
+          :title="canApproveManualReview ? '人工审核审批' : '人工审核（只读）'"
           value="reviewRequests"
           @click="goToReviews"
         />
@@ -113,9 +113,9 @@
             @click="navigate('/files')"
           />
           <v-list-item
-            v-if="isLoggedIn && userStore.admin_type === 'organization_admin'"
+            v-if="isLoggedIn && canViewManualReviewQueue"
             prepend-icon="mdi-gavel"
-            title="人工审核申请审批"
+            :title="canApproveManualReview ? '人工审核审批' : '人工审核（只读）'"
             @click="navigate('/reviews')"
           />
           <v-list-item v-if="isLoggedIn" prepend-icon="mdi-clipboard-text-clock" title="操作与审计日志" @click="navigate('/logs')" />
@@ -214,7 +214,9 @@ const userStore = useUserStore();
 
 import { useSnackbarStore } from '@/stores/snackbar';
 import notification from './api/notification'
+import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
 const snackbar = useSnackbarStore();
+const { canViewManualReviewQueue, canApproveManualReview } = useAdminCapabilities()
 
 // 通知相关
 const notifications = ref([
