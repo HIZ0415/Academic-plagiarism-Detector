@@ -568,8 +568,10 @@ def get_publisher_review_tasks(request):
     tasks = []
     for review_request in page_obj.object_list:
         reviewers_count = review_request.reviewers.count()
+        assigned_count = review_request.manual_reviews.count()
+        denominator = reviewers_count or assigned_count or 1
         completed_reviews_count = review_request.manual_reviews.filter(status='completed').count()
-        progress = f"{completed_reviews_count}/{reviewers_count}"
+        progress = f"{completed_reviews_count}/{denominator}"
 
         if review_request.status2 == 'refused':
             ui_status = 'failed'
@@ -1096,15 +1098,22 @@ def post_review(request, manual_review_id):
     )
 
     # wyt shit here
+    dt = getattr(review_request.detection_result, 'detection_task', None)
+    task_id_q = str(dt.id) if dt else ''
+    task_type_q = dt.task_type if dt else ''
+    result_url = (
+        f'/manual-review-result?review_request_id={review_request.id}'
+        f'&task_id={task_id_q}&task_type={task_type_q}'
+    )
     send_notification(
         receiver_id=review_request.user.id,
         receiver_name=review_request.user.username,
         sender_id=user.id,
         sender_name=user.username,
         category=Notification.R2P,
-        title='任务完成通知',
-        content=f'审稿人 {user.username} 已完成人工审核任务',
-        url=f'/task/{review_request.id}'
+        title='人工审核结果已出',
+        content=f'专家 {user.username} 已完成申请单 #{review_request.id} 的审核，请在「人工审核申请」中查看结果。',
+        url=result_url,
     )
 
     return Response({'message': 'Review submitted successfully'}, status=201)

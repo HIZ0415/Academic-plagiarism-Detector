@@ -3,7 +3,10 @@
     <v-row class="mb-2">
       <v-col>
         <h1 class="text-h4 font-weight-bold">人工审核申请</h1>
-        <p class="text-body-2 text-medium-emphasis mb-0">发布者侧：查看已提交的审核申请与进度；与检测历史详情中「人工审核申请」入口一致（概要设计用户端 `/annual`）。</p>
+        <p class="text-body-2 text-medium-emphasis mb-0">
+          发布者（编辑）侧：发起人工审核申请 → 组织管理员审批 → 专家鉴定 → <strong>本页查看进度与最终结果</strong>。
+          专家提交后请点击「查看结果」进入汇总页（<code>/manual-review-result</code>）。
+        </p>
       </v-col>
     </v-row>
 
@@ -75,16 +78,20 @@
           </div>
         </template>
 
+        <template v-slot:item.detection_task_id="{ item }">
+          <code class="text-body-2">{{ item.detection_task_id || '—' }}</code>
+        </template>
+
         <template v-slot:item.actions="{ item }">
           <v-btn
-            icon
-            variant="text"
             size="small"
+            variant="tonal"
             color="primary"
-            class="mr-2"
-            @click="goToTaskDetail(item)"
+            class="text-none"
+            :disabled="!canViewResult(item)"
+            @click="goToReviewResult(item)"
           >
-            <v-icon>mdi-eye</v-icon>
+            查看结果
           </v-btn>
         </template>
       </v-data-table>
@@ -311,18 +318,21 @@ function clearFromTaskHint() {
 
 interface Task {
   review_request_id: number
+  detection_task_id: string
+  task_type: string
   request_time: string
   status: string
   progress: string
 }
 
 const headers = [
-  { title: '任务ID', key: 'review_request_id', align: 'start' },
-  { title: '提交时间', key: 'request_time', align: 'center' },
-  { title: '状态', key: 'status', align: 'center' },
-  { title: '进度', key: 'progress', align: 'center' },
-  { title: '操作', key: 'actions', align: 'center', sortable: false },
-] as const
+  { title: '申请单号', key: 'review_request_id', align: 'start' as const },
+  { title: '检测任务 ID', key: 'detection_task_id', align: 'center' as const },
+  { title: '提交时间', key: 'request_time', align: 'center' as const },
+  { title: '状态', key: 'status', align: 'center' as const },
+  { title: '专家进度', key: 'progress', align: 'center' as const },
+  { title: '操作', key: 'actions', align: 'center' as const, sortable: false },
+]
 
 // 分页相关
 const tasks = ref<Task[]>([])
@@ -347,10 +357,10 @@ const filters = ref<{
 })
 
 const statusOptions = [
-  { title: '审核中', value: 'pending' },
-  { title: '已下发', value: 'in_progress' },
+  { title: '待管理端审批', value: 'pending' },
+  { title: '专家审核中', value: 'in_progress' },
   { title: '已完成', value: 'completed' },
-  { title: '已拒绝', value: 'failed' },
+  { title: '管理端已拒绝', value: 'failed' },
 ]
 
 const timeRangeOptions = [
@@ -379,13 +389,13 @@ const getStatusColor = (status: string) => {
 const getStatusName = (status: string) => {
   switch (status) {
     case 'pending':
-      return '审核中'
+      return '待管理端审批'
     case 'in_progress':
-      return '已下发'
+      return '专家审核中'
     case 'completed':
       return '已完成'
     case 'failed':
-      return '已拒绝'
+      return '管理端已拒绝'
     default:
       return status
   }
@@ -393,18 +403,43 @@ const getStatusName = (status: string) => {
 
 const getProgressValue = (progress: string) => {
   const [completed, total] = progress.split('/').map(Number)
-  return ((total - completed) / total) * 100
+  if (!total || Number.isNaN(completed) || Number.isNaN(total)) return 0
+  return Math.round((completed / total) * 100)
 }
 
 const getProgressColor = (progress: string) => {
   const [completed, total] = progress.split('/').map(Number)
-  if (completed === total) return 'success'
+  if (!total) return 'grey'
+  if (completed >= total) return 'success'
   if (completed > 0) return 'info'
   return 'warning'
 }
 
-const goToTaskDetail = (task: Task) => {
-  router.push(`/task/${task.review_request_id}`)
+function canViewResult(item: Task) {
+  return item.status === 'completed'
+}
+
+function goToReviewResult(task: Task) {
+  router.push({
+    path: '/manual-review-result',
+    query: {
+      review_request_id: String(task.review_request_id),
+      task_id: task.detection_task_id || '',
+      task_type: task.task_type || 'image_detection',
+    },
+  })
+}
+
+function formatLoadListError(e: unknown): string {
+  const ax = e as { response?: { status?: number; data?: { error?: string; message?: string } } }
+  const status = ax.response?.status
+  const d = ax.response?.data
+  if (status === 403) {
+    return '当前账号不是发布者（编辑）。请使用 publisher_test@example.com 登录并选择「编辑」。'
+  }
+  if (typeof d?.error === 'string') return d.error
+  if (typeof d?.message === 'string') return d.message
+  return '获取任务列表失败，请确认已用编辑账号登录且 Django 已启动'
 }
 
 // 时间验证相关
@@ -503,11 +538,13 @@ const fetchTasks = async (page: number, pageSize: number) => {
     const total_pages = Number(data.total_pages) || 1
     const total_count = Number(data.total_count ?? data.total_tasks ?? taskList.length)
     
-    tasks.value = taskList.map((task: any) => ({
-      review_request_id: task.review_request_id,
-      request_time: task.request_time,
-      status: task.status,
-      progress: task.progress
+    tasks.value = taskList.map((task: Record<string, unknown>) => ({
+      review_request_id: Number(task.review_request_id),
+      detection_task_id: String(task.detection_task_id ?? ''),
+      task_type: String(task.task_type ?? ''),
+      request_time: String(task.request_time ?? ''),
+      status: String(task.status ?? ''),
+      progress: String(task.progress ?? '0/1'),
     }))
     
     currentPage.value = current_page
@@ -515,7 +552,9 @@ const fetchTasks = async (page: number, pageSize: number) => {
     totalTasks.value = total_count
   } catch (error) {
     console.error('获取任务列表失败:', error)
-    snackbar.showMessage('获取任务列表失败', 'error')
+    tasks.value = []
+    totalTasks.value = 0
+    snackbar.showMessage(formatLoadListError(error), 'error')
   } finally {
     loading.value = false
   }
@@ -546,8 +585,14 @@ const formatDateFilter = (timestamp: number) => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
-// 初始化
-onMounted(() => {
+onMounted(async () => {
+  if (!userStore.isLoaded) {
+    await userStore.fetchUserInfo()
+  }
+  if (userStore.role !== 'publisher') {
+    snackbar.showMessage('人工审核申请页仅供发布者（编辑）使用', 'warning')
+    return
+  }
   fetchTasks(currentPage.value, pageSize.value)
 })
 </script>

@@ -116,9 +116,15 @@
                 <!-- <v-btn variant="text" size="small" @click.stop="openDetail(item)" :class="{ 'text-grey': item.status === 'read' }">
                   详情
                 </v-btn> -->
-                <v-btn v-if="item.url" :href="getUrl(item.url)" target="_blank" variant="text" size="small"
-                  class="text-primary" :class="{ 'text-grey': item.status === 'read' }">
-                  跳转
+                <v-btn
+                  v-if="item.url"
+                  variant="text"
+                  size="small"
+                  class="text-primary"
+                  :class="{ 'text-grey': item.status === 'read' }"
+                  @click.stop="navigateNotificationUrl(item.url)"
+                >
+                  查看
                 </v-btn>
               </v-list-item-title>
 
@@ -236,9 +242,34 @@ const openDetail = (item: Notification) => {
 
 
 const getUrl = (url: string) => {
-  return import.meta.env.VITE_API_URL
+  if (!url) return '#'
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const base = window.location.origin
+  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`
 }
 
+function navigateNotificationUrl(url: string) {
+  if (!url) return
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    window.open(url, '_blank')
+    return
+  }
+  const path = url.startsWith('/') ? url : `/${url}`
+  const qIndex = path.indexOf('?')
+  if (qIndex >= 0) {
+    const pathname = path.slice(0, qIndex)
+    const search = path.slice(qIndex)
+    const params = new URLSearchParams(search)
+    const query: Record<string, string> = {}
+    params.forEach((v, k) => {
+      query[k] = v
+    })
+    router.push({ path: pathname, query })
+  } else {
+    router.push(path)
+  }
+  showDrawer.value = false
+}
 
 const getCategoryLabel = (category: string) => {
   switch (category) {
