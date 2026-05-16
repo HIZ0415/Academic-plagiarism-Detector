@@ -1128,28 +1128,49 @@ interface ImageItem {
 }
 
 function verdictToFinal(v: TextualVerdict): boolean | null {
-  if (v === 'confirmed_fake') return true
+  if (v === 'confirmed_fake' || v === 'suspected') return true
   if (v === 'no_issue') return false
-  if (v === 'suspected') return null
   return null
+}
+
+function normalizeDimensionScores(dims: Dimension[]): number[] {
+  const padded = dims.map((dim) => (dim.value == null ? 0 : Number(dim.value)))
+  while (padded.length < 7) padded.push(0)
+  return padded.slice(0, 7)
+}
+
+function normalizeDimensionReasons(dims: Dimension[]): string[] {
+  const padded = dims.map((dim) => String(dim.reason ?? '').trim())
+  while (padded.length < 7) padded.push('')
+  return padded.slice(0, 7)
+}
+
+function normalizeDimensionPoints(dims: Dimension[]): unknown[][] {
+  const padded = dims.map((dim) => dim.drawingPaths ?? [])
+  while (padded.length < 7) padded.push([])
+  return padded.slice(0, 7)
 }
 
 const constructData = () => {
   if (!isImageTaskKind.value) {
     return {
       task_kind: reviewTaskKind.value,
-      result: textualUnits.value.map((u, i) => ({
-        segment_id: u.id,
-        img_id: u.id,
-        unit_label: u.label,
-        verdict: textUnitVerdicts.value[i],
-        paper_stance: textUnitPaperStances.value[i],
-        memo: textUnitMemos.value[i],
-        score: dimensionsPerTextUnit.value[i].map(dim => dim.value),
-        reason: dimensionsPerTextUnit.value[i].map(dim => dim.reason),
-        final: verdictToFinal(textUnitVerdicts.value[i]),
-        points: dimensionsPerTextUnit.value[i].map(dim => dim.drawingPaths),
-      })),
+      result: textualUnits.value.map((u, i) => {
+        const dims = dimensionsPerTextUnit.value[i] ?? []
+        const fallbackImgId = images.value[0]?.id
+        return {
+          segment_id: u.id,
+          img_id: fallbackImgId ?? u.id,
+          unit_label: u.label,
+          verdict: textUnitVerdicts.value[i],
+          paper_stance: textUnitPaperStances.value[i],
+          memo: textUnitMemos.value[i],
+          score: normalizeDimensionScores(dims),
+          reason: normalizeDimensionReasons(dims),
+          final: verdictToFinal(textUnitVerdicts.value[i]),
+          points: normalizeDimensionPoints(dims),
+        }
+      }),
     }
   }
   const data: { task_kind: string; result: ImageItem[] } = {
@@ -1157,12 +1178,13 @@ const constructData = () => {
     result: [],
   }
   for (let i = 0; i < images.value.length; i++) {
+    const dims = dimensionsPerImage.value[i] ?? []
     const item: ImageItem = {
       img_id: images.value[i].id,
-      score: dimensionsPerImage.value[i].map(dim => dim.value),
-      reason: dimensionsPerImage.value[i].map(dim => dim.reason),
+      score: normalizeDimensionScores(dims),
+      reason: normalizeDimensionReasons(dims),
       final: imageJudgements.value[i],
-      points: dimensionsPerImage.value[i].map(dim => dim.drawingPaths),
+      points: normalizeDimensionPoints(dims),
     }
     data.result.push(item)
   }
@@ -1184,8 +1206,15 @@ const handleSubmit = async () => {
     snackbar.showMessage('提交成功，发布者将收到进度更新', 'success')
     manualReviewStatus.value = 'completed'
     router.push('/review')
-  } catch {
-    snackbar.showMessage('提交失败', 'error')
+  } catch (e: unknown) {
+    const ax = e as { response?: { data?: { error?: string; message?: string; detail?: string } } }
+    const d = ax.response?.data
+    const msg =
+      (typeof d?.error === 'string' && d.error) ||
+      (typeof d?.message === 'string' && d.message) ||
+      (typeof d?.detail === 'string' && d.detail) ||
+      '提交失败，请检查表单是否填写完整'
+    snackbar.showMessage(msg, 'error')
   }
 }
 

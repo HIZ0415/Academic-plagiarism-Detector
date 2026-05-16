@@ -647,6 +647,35 @@ def get_reviewer_request_detail(request, reviewRequest_id):
     })
 
 
+def _normalize_review_scores(raw_scores):
+    scores = []
+    for s in list(raw_scores or []):
+        if s is None or s == '':
+            scores.append(0)
+            continue
+        try:
+            scores.append(int(s))
+        except (TypeError, ValueError):
+            scores.append(0)
+    while len(scores) < 7:
+        scores.append(0)
+    return scores[:7]
+
+
+def _resolve_final_result(item):
+    final_result = item.get('final')
+    if final_result is not None:
+        if isinstance(final_result, str):
+            return final_result.lower() in ('1', 'true', 'yes')
+        return bool(final_result)
+    verdict = (item.get('verdict') or '').lower()
+    if verdict in ('confirmed_fake', 'suspected'):
+        return True
+    if verdict in ('no_issue', 'not_fake', 'clean'):
+        return False
+    return None
+
+
 def _fmt_dt(value):
     if value is None:
         return None
@@ -977,10 +1006,10 @@ def post_review(request, manual_review_id):
 
     for item in results:
         img_id = item.get('img_id') or item.get('segment_id')
-        scores = list(item.get('score', []) or [])
+        scores = _normalize_review_scores(item.get('score', []))
         reasons = list(item.get('reason', []) or [])
         points_list = list(item.get('points', []) or [])
-        final_result = item.get('final')
+        final_result = _resolve_final_result(item)
 
         if is_textual_task and not img_id:
             fallback_img = manual_review.imgs.first()
@@ -990,27 +1019,20 @@ def post_review(request, manual_review_id):
         if not img_id:
             return Response({'error': 'img_id is required in each result item'}, status=400)
 
-        while len(scores) < 7:
-            scores.append(0)
         while len(reasons) < 7:
             reasons.append('')
         while len(points_list) < 7:
             points_list.append([])
 
-        if len(scores) != 7:
-            return Response({'error': 'scores must contain exactly 7 elements'}, status=400)
         if len(reasons) != 7:
             return Response({'error': 'reasons must contain exactly 7 elements'}, status=400)
         if len(points_list) != 7:
             return Response({'error': 'points must contain exactly 7 elements (one for each method)'}, status=400)
         if final_result is None:
-            verdict = item.get('verdict')
-            if verdict == 'confirmed_fake':
-                final_result = True
-            elif verdict == 'no_issue':
-                final_result = False
-            else:
-                return Response({'error': 'final is required in each result item'}, status=400)
+            return Response(
+                {'error': 'final or verdict (confirmed_fake / suspected / no_issue) is required in each result item'},
+                status=400,
+            )
 
         try:
             image_upload = ImageUpload.objects.get(id=img_id)
