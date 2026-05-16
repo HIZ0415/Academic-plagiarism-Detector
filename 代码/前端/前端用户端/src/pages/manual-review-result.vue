@@ -141,6 +141,37 @@
         </v-card>
       </template>
 
+      <v-card variant="outlined" class="pa-4 mt-4">
+        <div class="text-subtitle-1 font-weight-bold mb-3">报告下载</div>
+        <p class="text-body-2 text-medium-emphasis mb-3">
+          自动检测报告在 AI 完成后即可下载；人工审核报告在管理端通过且专家提交后生成。
+        </p>
+        <div class="d-flex flex-wrap ga-3">
+          <v-btn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="mdi-file-download-outline"
+            class="text-none"
+            :loading="downloadingDetectionReport"
+            :disabled="!taskId || taskId === '-'"
+            @click="downloadDetectionReport"
+          >
+            下载 AI 检测报告
+          </v-btn>
+          <v-btn
+            color="secondary"
+            variant="outlined"
+            prepend-icon="mdi-file-document-check-outline"
+            class="text-none"
+            :loading="downloadingManualReport"
+            :disabled="!canDownloadManualReport"
+            @click="downloadManualReviewReport"
+          >
+            下载人工审核报告
+          </v-btn>
+        </div>
+      </v-card>
+
       <div class="d-flex flex-wrap ga-3 mt-4">
         <v-btn color="primary" variant="tonal" class="text-none" @click="goAnnual">返回人工审核申请列表</v-btn>
         <v-btn color="primary" variant="outlined" class="text-none" @click="goBack">返回检测历史</v-btn>
@@ -153,9 +184,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getPublisherManualReviewSummary } from '@/api/manualReviewWorkflow'
+import publisher from '@/api/publisher'
+import { useSnackbarStore } from '@/stores/snackbar'
+import { savePdfFromAxiosResponse } from '@/utils/downloadPdf'
 
 const route = useRoute()
 const router = useRouter()
+const snackbar = useSnackbarStore()
 
 const taskId = computed(() => String(route.query.task_id || route.query.detail_id || '-'))
 const reviewRequestId = computed(() => String(route.query.review_request_id || '').trim())
@@ -205,6 +240,46 @@ const statusChipColor = computed(() => {
   if (p.manual_review_status === 'completed') return 'success'
   return 'warning'
 })
+
+const canDownloadManualReport = computed(() => {
+  const p = summaryPayload.value
+  if (!p || !reviewRequestId.value) return false
+  if (p.admin_state === 'refused') return false
+  return p.admin_state === 'accepted'
+})
+
+const downloadingDetectionReport = ref(false)
+const downloadingManualReport = ref(false)
+
+async function downloadDetectionReport() {
+  const tid = taskId.value
+  if (!tid || tid === '-') return
+  downloadingDetectionReport.value = true
+  try {
+    const res = await publisher.downloadReport(tid)
+    savePdfFromAxiosResponse(res, `task_${tid}_report.pdf`)
+    snackbar.showMessage('AI 检测报告已下载', 'success')
+  } catch {
+    snackbar.showMessage('AI 检测报告下载失败', 'error')
+  } finally {
+    downloadingDetectionReport.value = false
+  }
+}
+
+async function downloadManualReviewReport() {
+  const rid = reviewRequestId.value
+  if (!rid || !canDownloadManualReport.value) return
+  downloadingManualReport.value = true
+  try {
+    const res = await publisher.downloadReviewReport({ review_request_id: Number(rid) })
+    savePdfFromAxiosResponse(res, `manual_review_${rid}_report.pdf`)
+    snackbar.showMessage('人工审核报告已下载', 'success')
+  } catch {
+    snackbar.showMessage('人工审核报告下载失败', 'error')
+  } finally {
+    downloadingManualReport.value = false
+  }
+}
 
 async function load() {
   loading.value = true

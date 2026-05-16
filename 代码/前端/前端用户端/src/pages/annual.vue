@@ -83,16 +83,29 @@
         </template>
 
         <template v-slot:item.actions="{ item }">
-          <v-btn
-            size="small"
-            variant="tonal"
-            color="primary"
-            class="text-none"
-            :disabled="!canViewResult(item)"
-            @click="goToReviewResult(item)"
-          >
-            查看结果
-          </v-btn>
+          <div class="d-flex flex-wrap justify-center ga-1">
+            <v-btn
+              size="small"
+              variant="tonal"
+              color="primary"
+              class="text-none"
+              :disabled="!canViewResult(item)"
+              @click="goToReviewResult(item)"
+            >
+              查看结果
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="outlined"
+              color="secondary"
+              class="text-none"
+              :disabled="!canDownloadReport(item)"
+              :loading="downloadingReportId === item.review_request_id"
+              @click="downloadManualReport(item)"
+            >
+              下载报告
+            </v-btn>
+          </div>
         </template>
       </v-data-table>
       
@@ -237,8 +250,10 @@ import {
   createManualReviewRequest,
   listPublisherManualReviewApplications,
 } from '@/api/manualReviewWorkflow'
+import publisher from '@/api/publisher'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
+import { savePdfFromAxiosResponse } from '@/utils/downloadPdf'
 const router = useRouter()
 const route = useRoute()
 const snackbar = useSnackbarStore()
@@ -417,6 +432,26 @@ const getProgressColor = (progress: string) => {
 
 function canViewResult(item: Task) {
   return item.status === 'completed'
+}
+
+function canDownloadReport(item: Task) {
+  return item.status === 'completed' || item.status === 'in_progress'
+}
+
+const downloadingReportId = ref<number | null>(null)
+
+async function downloadManualReport(item: Task) {
+  if (!canDownloadReport(item)) return
+  downloadingReportId.value = item.review_request_id
+  try {
+    const res = await publisher.downloadReviewReport({ review_request_id: item.review_request_id })
+    savePdfFromAxiosResponse(res, `manual_review_${item.review_request_id}_report.pdf`)
+    snackbar.showMessage('人工审核报告已下载', 'success')
+  } catch {
+    snackbar.showMessage('报告下载失败，请确认专家已提交审核', 'error')
+  } finally {
+    downloadingReportId.value = null
+  }
 }
 
 function goToReviewResult(task: Task) {
