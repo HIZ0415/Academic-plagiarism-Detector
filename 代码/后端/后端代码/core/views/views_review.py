@@ -647,6 +647,15 @@ def get_reviewer_request_detail(request, reviewRequest_id):
     })
 
 
+def _fmt_dt(value):
+    if value is None:
+        return None
+    try:
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+    except (AttributeError, TypeError, ValueError):
+        return str(value)
+
+
 def _manual_review_task_kind(detection_task) -> str:
     if detection_task is None:
         return 'image'
@@ -787,10 +796,10 @@ def get_review_detail(request, manual_review_id):
     # 获取关联的ReviewRequest对象
     review_request = manual_review.review_request
 
-    # 获取关联的DetectionResult对象
     detection_result = review_request.detection_result
+    if not detection_result:
+        return Response({'error': 'No detection result found for the review request'}, status=404)
 
-    # 获取关联的DetectionTask对象
     detection_task = detection_result.detection_task
 
     qs_imgs = manual_review.imgs.all()
@@ -810,14 +819,16 @@ def get_review_detail(request, manual_review_id):
     ai_detection_result = {
         'is_fake': detection_result.is_fake,
         'confidence_score': detection_result.confidence_score,
-        'detection_time': detection_result.detection_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'detection_time': _fmt_dt(detection_result.detection_time),
         'llm_judgment': detection_result.llm_judgment or '',
     }
     sub_methods = _serialize_sub_methods_for_review(detection_result, request)
 
-    # 获取审核员的检测结果
     reviewers_results = []
-    for image_review in manual_review.img_reviews.all():
+    image_review_qs = manual_review.image_reviews.all()
+    if not image_review_qs.exists():
+        image_review_qs = manual_review.img_reviews.all()
+    for image_review in image_review_qs:
         scores = [
             image_review.score1,
             image_review.score2,
@@ -840,11 +851,12 @@ def get_review_detail(request, manual_review_id):
 
         result = image_review.result
 
+        img = image_review.img
         reviewers_results.append({
-            'image_id': image_review.img.id,
+            'image_id': img.id if img else None,
             'scores': scores,
             'reasons': reasons,
-            'result': result
+            'result': result,
         })
 
     task_kind = _manual_review_task_kind(detection_task)
@@ -871,7 +883,7 @@ def get_review_detail(request, manual_review_id):
             'id': review_request.id,
             'status': review_request.status1,
             'admin_gate_status': review_request.status2,
-            'request_time': review_request.request_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'request_time': _fmt_dt(review_request.request_time),
             'reason': review_request.reason or '',
         },
         'manual_review_status': manual_review.status,
