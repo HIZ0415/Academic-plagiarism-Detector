@@ -440,6 +440,23 @@ function canDownloadReport(item: Task) {
 
 const downloadingReportId = ref<number | null>(null)
 
+function formatReportDownloadError(e: unknown): string {
+  const ax = e as {
+    response?: { status?: number; data?: Blob | { detail?: string } }
+  }
+  const d = ax.response?.data
+  if (d && typeof d === 'object' && 'detail' in d && typeof d.detail === 'string') {
+    return d.detail
+  }
+  if (d instanceof Blob) {
+    return '报告生成失败（请重启 Django 后重试）'
+  }
+  if (ax.response?.status === 202) {
+    return '报告正在生成，请稍后重试'
+  }
+  return '报告下载失败，请确认专家已提交且后端服务正常'
+}
+
 async function downloadManualReport(item: Task) {
   if (!canDownloadReport(item)) return
   downloadingReportId.value = item.review_request_id
@@ -447,8 +464,8 @@ async function downloadManualReport(item: Task) {
     const res = await publisher.downloadReviewReport({ review_request_id: item.review_request_id })
     savePdfFromAxiosResponse(res, `manual_review_${item.review_request_id}_report.pdf`)
     snackbar.showMessage('人工审核报告已下载', 'success')
-  } catch {
-    snackbar.showMessage('报告下载失败，请确认专家已提交审核', 'error')
+  } catch (e) {
+    snackbar.showMessage(formatReportDownloadError(e), 'error')
   } finally {
     downloadingReportId.value = null
   }
