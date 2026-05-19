@@ -630,11 +630,6 @@ function Ensure-BackendDependencies {
         return
     }
 
-    if ($importsHealthy -and -not $ForceRefresh -and $requirementsHash -ne $recordedHash) {
-        Set-Content -LiteralPath $stampPath -Value $requirementsHash -Encoding UTF8
-        return
-    }
-
     Write-Step "Installing or updating backend dependencies"
     Invoke-CommandChecked -Executable $BackendPython -Arguments @("-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "pip", "setuptools", "wheel") -WorkingDirectory $BackendDir
     Invoke-CommandChecked -Executable $BackendPython -Arguments @("-m", "pip", "install", "--disable-pip-version-check", "-r", $BackendRequirements) -WorkingDirectory $BackendDir
@@ -1261,22 +1256,27 @@ $env:PYTHONUTF8 = "1"
 $env:AI_SERVICE_TIMEOUT_SECONDS = "120"
 # URL 一律用 ASCII 拼接，兼容 Windows PowerShell 5.1 与各类文件编码
 $aiHealthUrl = "http://" + $BindHost + ":" + $AiPort + "/health"
-$aiProcess = Start-ManagedProcess -Name "ai-service" -Executable $BackendPython -Arguments @("ai_http_service.py", "--host", $BindHost, "--port", "$AiPort") -WorkingDirectory $AiDir -HealthUrl $aiHealthUrl -LogsDir $LogsDir -Port $AiPort -TimeoutSeconds 120
+try {
+    $aiProcess = Start-ManagedProcess -Name "ai-service" -Executable $BackendPython -Arguments @("ai_http_service.py", "--host", $BindHost, "--port", "$AiPort") -WorkingDirectory $AiDir -HealthUrl $aiHealthUrl -LogsDir $LogsDir -Port $AiPort -TimeoutSeconds 120
 
-$env:DJANGO_SETTINGS_MODULE = "fake_image_detector.local_settings"
-$env:AI_SERVICE_URL = "http://" + $BindHost + ":" + $AiPort
-$env:AI_SERVICE_TIMEOUT = "1200"
-$djangoHealthUrl = "http://" + $BindHost + ":" + $BackendPort + "/admin/"
-$djangoListen = $BindHost + ":" + $BackendPort
-$backendProcess = Start-ManagedProcess -Name "django" -Executable $BackendPython -Arguments @("-m", "daphne", "-b", $BindHost, "-p", "$BackendPort", "fake_image_detector.asgi:application") -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
+    $env:DJANGO_SETTINGS_MODULE = "fake_image_detector.local_settings"
+    $env:AI_SERVICE_URL = "http://" + $BindHost + ":" + $AiPort
+    $env:AI_SERVICE_TIMEOUT = "1200"
+    $djangoHealthUrl = "http://" + $BindHost + ":" + $BackendPort + "/admin/"
+    $backendProcess = Start-ManagedProcess -Name "django" -Executable $BackendPython -Arguments @("-m", "daphne", "-b", $BindHost, "-p", "$BackendPort", "fake_image_detector.asgi:application") -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
 
-$userHealthUrl = "http://" + $BindHost + ":" + $UserPort + "/"
-$adminHealthUrl = "http://" + $BindHost + ":" + $AdminPort + "/"
-$userProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $UserFrontendDir -Name "frontend-user" -BindHost $BindHost -Port $UserPort -LogsDir $LogsDir -HealthUrl $userHealthUrl
-$adminProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $AdminFrontendDir -Name "frontend-admin" -BindHost $BindHost -Port $AdminPort -LogsDir $LogsDir -HealthUrl $adminHealthUrl
+    $userHealthUrl = "http://" + $BindHost + ":" + $UserPort + "/"
+    $adminHealthUrl = "http://" + $BindHost + ":" + $AdminPort + "/"
+    $userProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $UserFrontendDir -Name "frontend-user" -BindHost $BindHost -Port $UserPort -LogsDir $LogsDir -HealthUrl $userHealthUrl
+    $adminProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $AdminFrontendDir -Name "frontend-admin" -BindHost $BindHost -Port $AdminPort -LogsDir $LogsDir -HealthUrl $adminHealthUrl
 
-$state = @($aiProcess, $backendProcess, $userProcess, $adminProcess)
-$state | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding UTF8
+    $state = @($aiProcess, $backendProcess, $userProcess, $adminProcess)
+    $state | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding UTF8
+}
+catch {
+    Stop-ManagedProcesses -StatePath $StatePath -Ports $Ports -Quiet
+    throw
+}
 
 Write-Host ""
 Write-Host "Local validation environment is ready:" -ForegroundColor Green
