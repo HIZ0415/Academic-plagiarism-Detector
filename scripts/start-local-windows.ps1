@@ -803,9 +803,11 @@ function Repair-LocalSqliteMigrationHistory {
     $repairScript = @"
 import os
 import sqlite3
+import sys
 from pathlib import Path
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fake_image_detector.local_settings")
+sys.path.insert(0, r'''$BackendDir''')
 
 from django.conf import settings
 

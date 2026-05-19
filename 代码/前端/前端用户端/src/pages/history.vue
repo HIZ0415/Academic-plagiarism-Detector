@@ -94,7 +94,10 @@
                   人工审核申请
                 </v-btn>
                 <v-btn color="primary" variant="tonal" class="text-none" :disabled="detailTask.status !== 'completed'" @click="goSpecialDetail(detailTask)">
-                  查看专项结果
+                  高级检测
+                </v-btn>
+                <v-btn color="secondary" variant="outlined" class="text-none" @click="goRepeatDetection(detailTask)">
+                  再次检测
                 </v-btn>
                 <v-btn
                   variant="outlined"
@@ -193,7 +196,10 @@
           <div class="d-flex justify-center gap-2">
             <v-btn size="small" color="primary" variant="text" @click="handleNext(item)"
               :disabled="!canEnterDetail(item)">
-              更多操作
+              查看报告
+            </v-btn>
+            <v-btn size="small" color="secondary" variant="text" @click="goRepeatDetection(item)">
+              再次检测
             </v-btn>
             <v-btn size="small" color="error" variant="text" @click="handleDelete(item)"
               :disabled="item.status !== 'completed'">
@@ -639,6 +645,18 @@ const backToList = () => {
 
 const goUpload = () => {
   router.push('/upload')
+}
+
+const goRepeatDetection = (task: Task) => {
+  router.push({
+    path: '/upload',
+    query: {
+      task_id: task.task_id,
+      task_type: task.task_type || 'unknown',
+      source: 'history-repeat',
+      ...(task.batch_session_id ? { batch_session_id: task.batch_session_id } : {}),
+    },
+  })
 }
 
 const goSpecialDetail = (task: Task) => {

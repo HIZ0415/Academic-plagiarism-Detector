@@ -47,8 +47,9 @@
             <div class="text-subtitle-1 font-weight-bold mb-3">C. 操作</div>
             <div class="d-flex flex-column ga-3">
               <v-btn color="primary" variant="elevated" @click="goSpecialDetail" :disabled="task.status !== 'completed'">
-                查看专项结果
+                高级检测
               </v-btn>
+              <v-btn color="secondary" variant="outlined" @click="goRepeatDetection">再次检测</v-btn>
               <v-btn color="primary" variant="outlined" @click="goHistory">返回检测历史</v-btn>
               <v-btn color="error" variant="text" @click="deleteTask" :disabled="task.status !== 'completed'">
                 删除任务
@@ -173,6 +174,17 @@ async function deleteTask() {
 
 function goHistory() {
   router.push('/history')
+}
+
+function goRepeatDetection() {
+  router.push({
+    path: '/upload',
+    query: {
+      task_id: taskId.value,
+      task_type: task.value.task_type || 'unknown',
+      source: 'history-repeat',
+    },
+  })
 }
 
 function goSpecialDetail() {
