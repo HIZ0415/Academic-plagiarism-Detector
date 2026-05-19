@@ -54,11 +54,10 @@
         <v-card class="h-100">
           <v-card-title class="text-h6">检测历史与审核协作</v-card-title>
           <v-card-text class="text-body-2">
-            查看各子任务状态与结果摘要；可按批次 ID 筛选同一批送检记录；发起<strong>人工审核申请</strong>（与专家在 <code>/review</code> 执行的审核不同）。
+            查看各子任务状态与结果摘要；可按批次 ID 筛选同一批送检记录。若对自动结果有疑义，请在<strong>检测历史详情</strong>中发起人工审核申请（与专家在 <code>/review</code> 执行的审核不同）。
           </v-card-text>
-          <v-card-actions class="ga-2">
+          <v-card-actions>
             <v-btn variant="outlined" to="/history" prepend-icon="mdi-history">检测历史</v-btn>
-            <v-btn variant="outlined" to="/annual" prepend-icon="mdi-gavel">人工审核申请</v-btn>
           </v-card-actions>
         </v-card>
       </v-col>

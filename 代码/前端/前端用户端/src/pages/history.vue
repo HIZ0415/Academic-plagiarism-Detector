@@ -83,7 +83,33 @@
             </v-card>
 
             <v-card variant="outlined" class="pa-4">
+              <div class="text-subtitle-1 font-weight-bold mb-3">报告与操作</div>
+              <p class="text-body-2 text-medium-emphasis mb-3">
+                AI 检测完成后可下载自动检测报告；若已发起人工审核，可另下载含专家意见的审核报告。
+              </p>
               <div class="d-flex flex-wrap align-center ga-3">
+                <v-btn
+                  color="secondary"
+                  variant="tonal"
+                  prepend-icon="mdi-file-download-outline"
+                  class="text-none"
+                  :loading="downloadingDetectionReport"
+                  :disabled="detailTask.status !== 'completed'"
+                  @click="handleDownloadDetectionReport"
+                >
+                  下载 AI 检测报告
+                </v-btn>
+                <v-btn
+                  color="secondary"
+                  variant="outlined"
+                  prepend-icon="mdi-file-document-check-outline"
+                  class="text-none"
+                  :loading="downloadingManualReport"
+                  :disabled="!canDownloadManualReviewReport"
+                  @click="handleDownloadManualReviewReport"
+                >
+                  下载人工审核报告
+                </v-btn>
                 <v-btn
                   color="primary"
                   prepend-icon="mdi-gavel"
@@ -244,6 +270,7 @@ import { useSnackbarStore } from '@/stores/snackbar'
 import publisher from '@/api/publisher'
 import { getManualReviewApplicationByDetectionTask } from '@/api/manualReviewWorkflow'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
+import { savePdfFromAxiosResponse } from '@/utils/downloadPdf'
 
 const router = useRouter()
 const route = useRoute()
@@ -745,6 +772,48 @@ const canViewManualReviewResult = computed(() => {
   if (w.admin_state === 'refused') return false
   return w.manual_review_status === 'completed'
 })
+
+const canDownloadManualReviewReport = computed(() => {
+  if (detailTask.value.status !== 'completed') return false
+  const w = manualReviewWorkflowPayload.value
+  if (!w?.found || !w.review_request_id) return false
+  if (w.admin_state === 'refused') return false
+  return w.admin_state === 'accepted'
+})
+
+const downloadingDetectionReport = ref(false)
+const downloadingManualReport = ref(false)
+
+async function handleDownloadDetectionReport() {
+  const tid = detailTask.value.task_id
+  if (!tid || detailTask.value.status !== 'completed') return
+  downloadingDetectionReport.value = true
+  try {
+    const res = await publisher.downloadReport(tid)
+    savePdfFromAxiosResponse(res, `task_${tid}_report.pdf`)
+    snackbar.showMessage('AI 检测报告已下载', 'success')
+  } catch {
+    snackbar.showMessage('AI 检测报告下载失败，请确认任务已完成且后端已生成报告', 'error')
+  } finally {
+    downloadingDetectionReport.value = false
+  }
+}
+
+async function handleDownloadManualReviewReport() {
+  const w = manualReviewWorkflowPayload.value
+  const rid = w?.review_request_id
+  if (!rid || !canDownloadManualReviewReport.value) return
+  downloadingManualReport.value = true
+  try {
+    const res = await publisher.downloadReviewReport({ review_request_id: rid })
+    savePdfFromAxiosResponse(res, `manual_review_${rid}_report.pdf`)
+    snackbar.showMessage('人工审核报告已下载', 'success')
+  } catch {
+    snackbar.showMessage('人工审核报告下载失败（专家未完成时可能暂无终稿）', 'error')
+  } finally {
+    downloadingManualReport.value = false
+  }
+}
 
 const goManualReview = () => {
   const w = manualReviewWorkflowPayload.value

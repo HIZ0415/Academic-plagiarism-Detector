@@ -225,8 +225,55 @@ def get_publisher_manual_review_summary(request, review_request_id: int):
             }
         )
 
+    segment_rows = []
+    task_type_lower = (task.task_type or "").lower()
+    is_textual = "paper" in task_type_lower or "review" in task_type_lower
+    if is_textual:
+        label_base = "论文材料单元" if "paper" in task_type_lower else "Review 材料单元"
+        idx = 0
+        if (rr.reason or "").strip():
+            idx += 1
+            segment_rows.append(
+                {
+                    "segmentId": str(idx),
+                    "label": "申请说明",
+                    "aiNote": f"自动检测类型：{task.task_type or '—'}",
+                    "manualResult": "—",
+                    "comment": "发布者申请理由（专家审核针对下方材料单元）",
+                    "contentPreview": (rr.reason or "")[:500],
+                }
+            )
+        for mr in completed_mrs:
+            for ir in mr.image_reviews.all().order_by("id"):
+                idx += 1
+                manual_label = (
+                    "疑似造假"
+                    if ir.result is True
+                    else ("未发现明显异常" if ir.result is False else "—")
+                )
+                segment_rows.append(
+                    {
+                        "segmentId": str(idx),
+                        "label": f"{label_base} {idx}",
+                        "reviewer": mr.reviewer.username,
+                        "manualResult": manual_label,
+                        "comment": _comment_from_image_review(ir),
+                        "contentPreview": _comment_from_image_review(ir),
+                    }
+                )
+        if not segment_rows and completed_mrs:
+            segment_rows.append(
+                {
+                    "segmentId": "1",
+                    "label": label_base,
+                    "manualResult": reviewer_rows[0]["decision"] if reviewer_rows else "—",
+                    "comment": reviewer_rows[0]["comment"] if reviewer_rows else "—",
+                    "contentPreview": rr.reason or "—",
+                }
+            )
+
     image_rows = []
-    if task.task_type == "image_detection" or rr.imgs.exists():
+    if not is_textual and (task.task_type == "image_detection" or rr.imgs.exists()):
         for img in rr.imgs.all().order_by("id"):
             dr = img.detection_results.filter(detection_task=task).first() or img.detection_results.first()
             ai_label = "疑似异常" if dr and dr.is_fake else "未见明显异常"
@@ -267,7 +314,10 @@ def get_publisher_manual_review_summary(request, review_request_id: int):
         "review_request_id": rr.id,
         "detection_task_id": str(task.id),
         "task_type": task.task_type,
+        "request_reason": rr.reason or "",
         "admin_state": admin_state,
+        "admin_reject_reason": rr.check_reason or "",
+        "publisher_status": rr.status1,
         "manual_review_status": manual_review_status,
         "manual_review_id": first_mr.id if first_mr else None,
         "summary": {
@@ -277,5 +327,6 @@ def get_publisher_manual_review_summary(request, review_request_id: int):
         },
         "reviewerRows": reviewer_rows,
         "imageRows": image_rows,
+        "segmentRows": segment_rows,
     }
     return Response(payload, status=status.HTTP_200_OK)

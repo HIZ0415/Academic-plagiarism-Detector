@@ -1,6 +1,6 @@
 ﻿import requests
 BASE='http://127.0.0.1:8000'
-r=requests.post(f'{BASE}/api/login/',json={'email':'publisher_test@example.com','password':'Test123456','role':'publisher'})
+r=requests.post(f'{BASE}/api/login/',json={'email':'publisher_test@example.com','password':'Publisher123!','role':'publisher'})
 h={'Authorization':'Bearer '+r.json()['access']}
 print('[1] login OK')
 rv=requests.post(f'{BASE}/api/review/submit/',json={'task_name':'report-test','text':'This paper presents a novel approach. The results are convincing.'},headers=h)

@@ -568,12 +568,22 @@ def detection_result_detail(request, result_id):
 @permission_classes([IsAuthenticated])
 def detection_result_by_image(request, image_id):
     # 通过image_id获取对应的DetectionResult
-    dr = get_object_or_404(
-        DetectionResult.objects.filter(
-            Q(detection_task__user=request.user) | Q(image_upload__file_management__user=request.user)
-        ),
-        image_upload__id=image_id,
-    )
+    user = request.user
+    if getattr(user, 'role', None) == 'reviewer':
+        dr = get_object_or_404(
+            DetectionResult.objects.filter(
+                image_upload__id=image_id,
+                image_upload__manual_reviews__reviewer=user,
+            ).distinct(),
+            image_upload__id=image_id,
+        )
+    else:
+        dr = get_object_or_404(
+            DetectionResult.objects.filter(
+                Q(detection_task__user=user) | Q(image_upload__file_management__user=user)
+            ),
+            image_upload__id=image_id,
+        )
 
     # -------- 解析 fields & include_matrix ------------------------------
     raw_fields = request.query_params.get("fields")

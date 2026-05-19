@@ -633,7 +633,12 @@ from django.http import FileResponse
 def generate_manual_review_report_view(request, review_id):
     review = (
         ManualReview.objects
-        .select_related('review_request', 'review_request__user', 'reviewer')
+        .select_related(
+            'review_request',
+            'review_request__user',
+            'review_request__detection_result__detection_task',
+            'reviewer',
+        )
         .filter(id=review_id)
         .first()
     )
@@ -671,7 +676,13 @@ def generate_manual_review_report_view(request, review_id):
 
     # 若还没生成过报告，先尝试生成
     if not review.report_file:
-        generate_manual_review_report(review)
+        try:
+            generate_manual_review_report(review)
+        except Exception as exc:
+            return Response(
+                {"detail": f"Report generation failed: {exc}"},
+                status=500,
+            )
         review.refresh_from_db()
     if not review.report_file:
         return Response({"detail": "Report is still being generated."}, status=202)

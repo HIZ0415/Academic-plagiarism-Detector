@@ -8,22 +8,9 @@
       :width="rail ? 56 : 200">
       <v-list>
         <v-list-item
-          v-if="isLoggedIn"
           :prepend-avatar="userStore.avatar"
           :subtitle="drawerSubtitle"
           :title="userStore.displayName"
-        />
-        <v-list-item
-          v-else-if="isPreviewMode"
-          prepend-icon="mdi-account-badge"
-          :subtitle="drawerSubtitle"
-          :title="`界面预览（${roleLabel}）`"
-        />
-        <v-list-item
-          v-else
-          prepend-icon="mdi-login"
-          subtitle="请登录以使用全部功能"
-          title="未登录"
         />
       </v-list>
 
@@ -39,29 +26,23 @@
           @click="gotoAnnual"></v-list-item>
         <v-list-item v-if="effectiveRole === 'reviewer'" prepend-icon="mdi-clipboard-check-multiple" title="人工审核"
           value="review" @click="goToReview"></v-list-item>
-        <v-list-item v-if="isLoggedIn || isPreviewMode" prepend-icon="mdi-account" title="个人主页" value="profile"
-          @click="goToProfile"></v-list-item>
-        <v-list-item v-if="!isLoggedIn && !isPreviewMode" prepend-icon="mdi-login" title="登录" value="login" @click="goToLogin"></v-list-item>
-        <v-list-item v-if="isLoggedIn" prepend-icon="mdi-logout" title="退出登录" value="logout" @click="handleLogout"></v-list-item>
-        <v-list-item v-if="isPreviewMode" prepend-icon="mdi-exit-run" title="退出预览" value="exit-preview" @click="handleExitPreview"></v-list-item>
+        <v-list-item prepend-icon="mdi-account" title="个人主页" value="profile" @click="goToProfile"></v-list-item>
+        <v-list-item prepend-icon="mdi-logout" title="退出登录" value="logout" @click="handleLogout"></v-list-item>
       </v-list>
     </v-navigation-drawer>
 
     <v-app-bar class="app-bar">
       <v-app-bar-nav-icon @click="drawer = !drawer" v-if="!isMobile"></v-app-bar-nav-icon>
       <v-toolbar-title>学术内容诚信检测系统</v-toolbar-title>
-      <v-chip v-if="isPreviewMode" class="ms-2 d-none d-sm-flex" size="small" color="warning" variant="flat">界面预览</v-chip>
       <v-spacer></v-spacer>
-      <v-btn v-if="isLoggedIn" variant="text" prepend-icon="mdi-logout" class="d-none d-sm-flex text-none" @click="handleLogout">退出</v-btn>
-      <v-btn v-if="isPreviewMode" variant="text" prepend-icon="mdi-exit-run" class="d-none d-sm-flex text-none" @click="handleExitPreview">退出预览</v-btn>
+      <v-btn variant="text" prepend-icon="mdi-logout" class="d-none d-sm-flex text-none" @click="handleLogout">退出</v-btn>
       <v-btn :icon="theme === 'light' ? 'mdi-weather-sunny' : 'mdi-weather-night'" @click="toggleTheme"></v-btn>
-      <v-btn v-if="isLoggedIn" :color="hasUnreadNotifications ? 'red' : ''"
-        :icon="hasUnreadNotifications ? 'mdi-bell-badge' : 'mdi-bell-outline'" @click="toggleNotification()"></v-btn>
+      <v-btn
+        :color="hasUnreadNotifications ? 'red' : ''"
+        :icon="hasUnreadNotifications ? 'mdi-bell-badge' : 'mdi-bell-outline'"
+        @click="toggleNotification()"
+      ></v-btn>
     </v-app-bar>
-
-    <v-alert v-if="isPreviewMode" type="warning" variant="tonal" density="compact" class="preview-banner ma-0 rounded-0" prominent>
-      当前为<strong>界面预览</strong>（未登录）。导航与页面可盲改，接口调用需后端可用；正式使用请「退出预览」后登录。
-    </v-alert>
 
     <v-main>
       <v-container fluid>
@@ -91,21 +72,13 @@
         <v-icon>mdi-clipboard-check-multiple</v-icon>
         <span>人工审核</span>
       </v-btn>
-      <v-btn v-if="isLoggedIn || isPreviewMode" to="/profile" value="profile">
+      <v-btn to="/profile" value="profile">
         <v-icon>mdi-account</v-icon>
         <span>我的</span>
       </v-btn>
-      <v-btn v-if="!isLoggedIn && !isPreviewMode" @click="goToLogin" value="login">
-        <v-icon>mdi-login</v-icon>
-        <span>登录</span>
-      </v-btn>
-      <v-btn v-if="isLoggedIn" @click="handleLogout" value="logout">
+      <v-btn @click="handleLogout" value="logout">
         <v-icon>mdi-logout</v-icon>
         <span>退出</span>
-      </v-btn>
-      <v-btn v-if="isPreviewMode" @click="handleExitPreview" value="exit-preview">
-        <v-icon>mdi-exit-run</v-icon>
-        <span>退预览</span>
       </v-btn>
     </v-bottom-navigation>
 
@@ -143,9 +116,15 @@
                 <!-- <v-btn variant="text" size="small" @click.stop="openDetail(item)" :class="{ 'text-grey': item.status === 'read' }">
                   详情
                 </v-btn> -->
-                <v-btn v-if="item.url" :href="getUrl(item.url)" target="_blank" variant="text" size="small"
-                  class="text-primary" :class="{ 'text-grey': item.status === 'read' }">
-                  跳转
+                <v-btn
+                  v-if="item.url"
+                  variant="text"
+                  size="small"
+                  class="text-primary"
+                  :class="{ 'text-grey': item.status === 'read' }"
+                  @click.stop="navigateNotificationUrl(item.url)"
+                >
+                  查看
                 </v-btn>
               </v-list-item-title>
 
@@ -192,7 +171,6 @@ import { useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import { isLoggedIn } from './api/user'
 import websocket from './api/websocket'
-import { fullFrontendMockEnabled } from '@/utils/mockMode'
 import { marked } from 'marked'
 
 
@@ -203,7 +181,7 @@ import Snackbar from '@/components/Snackbar.vue'
 import { useUserStore } from '@/stores/user';
 const userStore = useUserStore();
 import { useEffectiveRole } from '@/composables/useEffectiveRole'
-const { effectiveRole, isPreviewMode, roleLabel, drawerSubtitle, previewStore } = useEffectiveRole()
+const { effectiveRole, drawerSubtitle } = useEffectiveRole()
 
 import { useSnackbarStore } from '@/stores/snackbar';
 import notification from './api/notification'
@@ -264,9 +242,34 @@ const openDetail = (item: Notification) => {
 
 
 const getUrl = (url: string) => {
-  return import.meta.env.VITE_API_URL
+  if (!url) return '#'
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const base = window.location.origin
+  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`
 }
 
+function navigateNotificationUrl(url: string) {
+  if (!url) return
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    window.open(url, '_blank')
+    return
+  }
+  const path = url.startsWith('/') ? url : `/${url}`
+  const qIndex = path.indexOf('?')
+  if (qIndex >= 0) {
+    const pathname = path.slice(0, qIndex)
+    const search = path.slice(qIndex)
+    const params = new URLSearchParams(search)
+    const query: Record<string, string> = {}
+    params.forEach((v, k) => {
+      query[k] = v
+    })
+    router.push({ path: pathname, query })
+  } else {
+    router.push(path)
+  }
+  showDrawer.value = false
+}
 
 const getCategoryLabel = (category: string) => {
   switch (category) {
@@ -352,12 +355,6 @@ const handleLogout = async () => {
   }
 }
 
-const handleExitPreview = () => {
-  previewStore.disable()
-  snackbar.showMessage('已退出界面预览', 'success')
-  router.push('/login')
-}
-
 const toggleTheme = () => {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('app_theme', theme.value)
@@ -412,14 +409,11 @@ watch(
       timer = null
     }
     if (logged) {
-      if (!fullFrontendMockEnabled()) {
-        websocket.Init()
-      }
+      websocket.Init()
       await userStore.fetchUserInfo()
       fetchUnRead()
-      const intervalMs = fullFrontendMockEnabled() ? 45000 : 60000
-      timer = window.setInterval(fetchUnRead, intervalMs)
-    } else if (!fullFrontendMockEnabled()) {
+      timer = window.setInterval(fetchUnRead, 60000)
+    } else {
       void websocket.Close()
     }
   },
