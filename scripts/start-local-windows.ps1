@@ -616,7 +616,7 @@ function Ensure-BackendDependencies {
     $stampPath = Join-Path $LocalDevDir "backend-requirements.sha256"
     $requirementsHash = (Get-FileHash -LiteralPath $BackendRequirements -Algorithm SHA256).Hash
     $recordedHash = if (Test-Path -LiteralPath $stampPath) { (Get-Content -LiteralPath $stampPath -Raw).Trim() } else { "" }
-    $importProbe = "import django, rest_framework, corsheaders, channels, celery, pymysql, paramiko, scp, numpy, PIL, fitz, reportlab, cv2, sklearn"
+    $importProbe = "import django, rest_framework, corsheaders, channels, daphne, celery, pymysql, paramiko, scp, numpy, PIL, fitz, reportlab, cv2, sklearn"
     $importsHealthy = $false
 
     try {
@@ -627,11 +627,6 @@ function Ensure-BackendDependencies {
     }
 
     if ($importsHealthy -and -not $ForceRefresh -and $requirementsHash -eq $recordedHash) {
-        return
-    }
-
-    if ($importsHealthy -and -not $ForceRefresh -and $requirementsHash -ne $recordedHash) {
-        Set-Content -LiteralPath $stampPath -Value $requirementsHash -Encoding UTF8
         return
     }
 
@@ -803,9 +798,11 @@ function Repair-LocalSqliteMigrationHistory {
     $repairScript = @"
 import os
 import sqlite3
+import sys
 from pathlib import Path
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fake_image_detector.local_settings")
+sys.path.insert(0, r'''$BackendDir''')
 
 from django.conf import settings
 
@@ -1259,22 +1256,27 @@ $env:PYTHONUTF8 = "1"
 $env:AI_SERVICE_TIMEOUT_SECONDS = "120"
 # URL 一律用 ASCII 拼接，兼容 Windows PowerShell 5.1 与各类文件编码
 $aiHealthUrl = "http://" + $BindHost + ":" + $AiPort + "/health"
-$aiProcess = Start-ManagedProcess -Name "ai-service" -Executable $BackendPython -Arguments @("ai_http_service.py", "--host", $BindHost, "--port", "$AiPort") -WorkingDirectory $AiDir -HealthUrl $aiHealthUrl -LogsDir $LogsDir -Port $AiPort -TimeoutSeconds 120
+try {
+    $aiProcess = Start-ManagedProcess -Name "ai-service" -Executable $BackendPython -Arguments @("ai_http_service.py", "--host", $BindHost, "--port", "$AiPort") -WorkingDirectory $AiDir -HealthUrl $aiHealthUrl -LogsDir $LogsDir -Port $AiPort -TimeoutSeconds 120
 
-$env:DJANGO_SETTINGS_MODULE = "fake_image_detector.local_settings"
-$env:AI_SERVICE_URL = "http://" + $BindHost + ":" + $AiPort
-$env:AI_SERVICE_TIMEOUT = "1200"
-$djangoHealthUrl = "http://" + $BindHost + ":" + $BackendPort + "/admin/"
-$djangoListen = $BindHost + ":" + $BackendPort
-$backendProcess = Start-ManagedProcess -Name "django" -Executable $BackendPython -Arguments @("manage.py", "runserver", $djangoListen) -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
+    $env:DJANGO_SETTINGS_MODULE = "fake_image_detector.local_settings"
+    $env:AI_SERVICE_URL = "http://" + $BindHost + ":" + $AiPort
+    $env:AI_SERVICE_TIMEOUT = "1200"
+    $djangoHealthUrl = "http://" + $BindHost + ":" + $BackendPort + "/admin/"
+    $backendProcess = Start-ManagedProcess -Name "django" -Executable $BackendPython -Arguments @("-m", "daphne", "-b", $BindHost, "-p", "$BackendPort", "fake_image_detector.asgi:application") -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
 
-$userHealthUrl = "http://" + $BindHost + ":" + $UserPort + "/"
-$adminHealthUrl = "http://" + $BindHost + ":" + $AdminPort + "/"
-$userProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $UserFrontendDir -Name "frontend-user" -BindHost $BindHost -Port $UserPort -LogsDir $LogsDir -HealthUrl $userHealthUrl
-$adminProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $AdminFrontendDir -Name "frontend-admin" -BindHost $BindHost -Port $AdminPort -LogsDir $LogsDir -HealthUrl $adminHealthUrl
+    $userHealthUrl = "http://" + $BindHost + ":" + $UserPort + "/"
+    $adminHealthUrl = "http://" + $BindHost + ":" + $AdminPort + "/"
+    $userProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $UserFrontendDir -Name "frontend-user" -BindHost $BindHost -Port $UserPort -LogsDir $LogsDir -HealthUrl $userHealthUrl
+    $adminProcess = Start-FrontendDevServer -NodeToolchain $NodeToolchain -FrontendDir $AdminFrontendDir -Name "frontend-admin" -BindHost $BindHost -Port $AdminPort -LogsDir $LogsDir -HealthUrl $adminHealthUrl
 
-$state = @($aiProcess, $backendProcess, $userProcess, $adminProcess)
-$state | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding UTF8
+    $state = @($aiProcess, $backendProcess, $userProcess, $adminProcess)
+    $state | ConvertTo-Json | Set-Content -LiteralPath $StatePath -Encoding UTF8
+}
+catch {
+    Stop-ManagedProcesses -StatePath $StatePath -Ports $Ports -Quiet
+    throw
+}
 
 Write-Host ""
 Write-Host "Local validation environment is ready:" -ForegroundColor Green

@@ -15,7 +15,7 @@
     </v-row>
 
     <v-alert v-if="route.query.task_id" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      已从检测历史关联任务 ID <code>{{ route.query.task_id }}</code>。专项结果请在历史中点击「进入专项详情」；新检测请在本页重新选择文件或粘贴 Review。
+      正在基于历史任务 <code>{{ route.query.task_id }}</code> 发起再次检测。旧任务结果请回到检测历史点击「查看报告」；本页只用于重新选择文件或粘贴 Review 后创建新检测。
     </v-alert>
 
     <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
