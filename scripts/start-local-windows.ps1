@@ -616,7 +616,7 @@ function Ensure-BackendDependencies {
     $stampPath = Join-Path $LocalDevDir "backend-requirements.sha256"
     $requirementsHash = (Get-FileHash -LiteralPath $BackendRequirements -Algorithm SHA256).Hash
     $recordedHash = if (Test-Path -LiteralPath $stampPath) { (Get-Content -LiteralPath $stampPath -Raw).Trim() } else { "" }
-    $importProbe = "import django, rest_framework, corsheaders, channels, celery, pymysql, paramiko, scp, numpy, PIL, fitz, reportlab, cv2, sklearn"
+    $importProbe = "import django, rest_framework, corsheaders, channels, daphne, celery, pymysql, paramiko, scp, numpy, PIL, fitz, reportlab, cv2, sklearn"
     $importsHealthy = $false
 
     try {
@@ -1268,7 +1268,7 @@ $env:AI_SERVICE_URL = "http://" + $BindHost + ":" + $AiPort
 $env:AI_SERVICE_TIMEOUT = "1200"
 $djangoHealthUrl = "http://" + $BindHost + ":" + $BackendPort + "/admin/"
 $djangoListen = $BindHost + ":" + $BackendPort
-$backendProcess = Start-ManagedProcess -Name "django" -Executable $BackendPython -Arguments @("manage.py", "runserver", $djangoListen) -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
+$backendProcess = Start-ManagedProcess -Name "django" -Executable $BackendPython -Arguments @("-m", "daphne", "-b", $BindHost, "-p", "$BackendPort", "fake_image_detector.asgi:application") -WorkingDirectory $BackendDir -HealthUrl $djangoHealthUrl -LogsDir $LogsDir -Port $BackendPort -TimeoutSeconds 120
 
 $userHealthUrl = "http://" + $BindHost + ":" + $UserPort + "/"
 $adminHealthUrl = "http://" + $BindHost + ":" + $AdminPort + "/"
