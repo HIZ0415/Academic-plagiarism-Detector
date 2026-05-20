@@ -172,12 +172,17 @@ def _build_aigc_result(task, paper_text: str, paragraphs_data=None) -> dict:
     high_count = sum(1 for p in paragraphs if p["risk_level"] == "high")
     summary = f"检测完成：AI 贡献占比约 {round(ratio * 100, 1)}%，高风险段落 {high_count} 段。"
 
+    from core.utils.factual_check import build_factual_conclusions
+    factual = build_factual_conclusions(paragraphs, paper_text)
+
     return {
         "task_id": task.id,
         "overall_risk_level": _risk_level(ratio),
         "ai_contribution_ratio": ratio,
         "summary": summary,
         "paragraphs": paragraphs,
+        "factual_conclusions": factual,
+        "factual_issues": factual,
     }
 
 

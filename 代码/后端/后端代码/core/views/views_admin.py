@@ -22,6 +22,7 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from core.util import send_notification
 from core.models import Notification
 
@@ -1169,6 +1170,8 @@ def get_files(request):
     # 获取查询参数
     query = request.query_params.get('query', '')
     categories = request.query_params.get('categories', '')
+    resource_type = request.query_params.get('resource_type', '')
+    fake_degree = request.query_params.get('fake_degree', '')
     start_time = request.query_params.get('startTime', None)
     end_time = request.query_params.get('endTime', None)
     organization_name = request.query_params.get('organization', None)  # 修改为 organization_name
@@ -1203,6 +1206,22 @@ def get_files(request):
         files = files.filter(user__username__startswith=query)
     if categories:
         files = files.filter(tag=categories)
+    if resource_type:
+        if resource_type == 'image':
+            files = files.filter(file_type__icontains='image')
+        elif resource_type == 'paper':
+            files = files.filter(Q(file_type__icontains='pdf') | Q(file_name__iendswith='.pdf'))
+        elif resource_type == 'review':
+            files = files.filter(Q(file_type__icontains='text') | Q(file_name__iendswith='.txt'))
+    if fake_degree:
+        img_qs = ImageUpload.objects.filter(file_management_id__in=files.values_list('id', flat=True))
+        if fake_degree == 'high':
+            img_qs = img_qs.filter(isFake=True)
+        elif fake_degree == 'low':
+            img_qs = img_qs.filter(isFake=False)
+        elif fake_degree == 'unknown':
+            img_qs = img_qs.filter(isDetect=False)
+        files = files.filter(id__in=img_qs.values_list('file_management_id', flat=True).distinct())
     if start_time:
         files = files.filter(upload_time__gte=start_time)
     if end_time:

@@ -121,7 +121,9 @@ import time
 def submit_detection2(request):
     submit_time = time.time()
     user_id = request.user.id
-    mode = int(request.data.get('mode') or 1)
+    detection_mode = (request.data.get('detection_mode') or '').strip().lower()
+    mode = int(request.data.get('mode') or (3 if detection_mode == 'precise' else 1))
+    batch_session_id = (request.data.get('batch_session_id') or '')[:64]
     user = User.objects.get(id=user_id)
     organization = user.organization  # 获取用户所属组织
     organization.reset_usage()  # 重置组织内所有用户的共享次数
@@ -176,7 +178,9 @@ def submit_detection2(request):
         status='pending',  # 初始状态为"排队中"
         cmd_block_size=cmd_block_size,
         urn_k=urn_k,
-        if_use_llm=if_use_llm
+        if_use_llm=if_use_llm,
+        batch_session_id=batch_session_id,
+        detection_mode='precise' if if_use_llm else 'fast',
     )
 
     # 在Log表中记录检测任务的创建
@@ -321,7 +325,10 @@ def download_task_report(request, task_id):
     # 如果报告文件不存在或已丢失，自动重新生成（任务 019）
     abs_path = None
     if task.report_file:
-        abs_path = os.path.join(settings.MEDIA_ROOT, task.report_file.name)
+        try:
+            abs_path = task.report_file.path
+        except (ValueError, AttributeError):
+            abs_path = os.path.join(settings.MEDIA_ROOT, task.report_file.name)
 
     if not abs_path or not os.path.exists(abs_path):
         try:
@@ -681,11 +688,22 @@ def get_user_tasks(request):
     page = int( request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 10))
     status = request.query_params.get('status', '')
+    task_type = request.query_params.get('task_type', '')
+    keyword = (request.query_params.get('keyword') or request.query_params.get('query') or '').strip()
     start_time = request.query_params.get('startTime', None)
     end_time = request.query_params.get('endTime', None)
 
     # 获取当前用户的所有检测任务并应用筛选条件
     tasks = DetectionTask.objects.filter(user=request.user).order_by('-upload_time')
+
+    if task_type:
+        tasks = tasks.filter(task_type=task_type)
+    if keyword:
+        q = Q(task_name__icontains=keyword)
+        digits = keyword.replace('DT-', '').replace('dt-', '').strip()
+        if digits.isdigit():
+            q |= Q(id=int(digits))
+        tasks = tasks.filter(q)
     
     if status:
         if status not in TASK_STATUS_WHITELIST:
@@ -712,6 +730,8 @@ def get_user_tasks(request):
             'status': task.status,
             'completion_time': timezone.localtime(task.completion_time).strftime('%Y-%m-%d %H:%M:%S') if task.completion_time else None,
             'error_message': task.error_message or '',
+            'batch_session_id': task.batch_session_id or '',
+            'detection_mode': task.detection_mode or ('precise' if task.if_use_llm else 'fast'),
         } for task in page_obj.object_list
     ]
 

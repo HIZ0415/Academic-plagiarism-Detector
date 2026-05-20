@@ -309,6 +309,8 @@ class DetectionTask(models.Model):
     cmd_block_size = models.IntegerField(null=True, blank=True)
     urn_k = models.FloatField(null=True, blank=True)
     if_use_llm = models.BooleanField(default=False)  # 是否使用大语言模型
+    batch_session_id = models.CharField(max_length=64, blank=True, default='')
+    detection_mode = models.CharField(max_length=16, blank=True, default='fast')  # fast | precise
 
     class Meta:
         indexes = [
@@ -485,6 +487,48 @@ class Feedback(models.Model):
 
     def __str__(self):
         return f"Feedback by {self.user.username} on review {self.manual_review.id}"
+
+
+class UserReport(models.Model):
+    """用户举报（人工审核任务/评论等），管理端处理。"""
+    STATUS_CHOICES = [
+        ('pending', '待处理'),
+        ('resolved', '已处理'),
+        ('dismissed', '已驳回'),
+    ]
+    TARGET_CHOICES = [
+        ('manual_review', '人工审核任务'),
+        ('detection_task', '检测任务'),
+        ('feedback', '评论'),
+    ]
+
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports_filed')
+    target_type = models.CharField(max_length=32, choices=TARGET_CHOICES, default='manual_review')
+    target_id = models.IntegerField()
+    report_type = models.CharField(max_length=64, default='violation')
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    admin_resolution = models.TextField(blank=True, default='')
+    handled_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reports_handled'
+    )
+    handled_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.localtime)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['status', 'created_at'], name='ur_status_created_idx'),
+        ]
+
+
+class DetectionModelConfig(models.Model):
+    """平台检测模型与模式配置（管理端维护，用户端只读展示）。"""
+    key = models.CharField(max_length=64, unique=True)
+    value = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.key
 
 
 class Log(models.Model):

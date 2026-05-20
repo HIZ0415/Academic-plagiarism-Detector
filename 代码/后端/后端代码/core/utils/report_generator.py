@@ -20,8 +20,12 @@ _FONT_DIR = Path(__file__).resolve().parent.parent.parent  # 指向 后端代码
 _SIMSUN_PATH = str(_FONT_DIR / 'SimSun.ttf')
 _SIMSUN_BOLD_PATH = str(_FONT_DIR / 'SimSun-Bold.ttf')
 try:
-    pdfmetrics.registerFont(TTFont('SimSun', _SIMSUN_PATH))
-    pdfmetrics.registerFont(TTFont('SimSun-Bold', _SIMSUN_BOLD_PATH))
+    if os.path.isfile(_SIMSUN_PATH):
+        pdfmetrics.registerFont(TTFont('SimSun', _SIMSUN_PATH))
+    if os.path.isfile(_SIMSUN_BOLD_PATH):
+        pdfmetrics.registerFont(TTFont('SimSun-Bold', _SIMSUN_BOLD_PATH))
+    elif os.path.isfile(_SIMSUN_PATH):
+        pdfmetrics.registerFont(TTFont('SimSun-Bold', _SIMSUN_PATH))
 except Exception as e:
     import logging
     logging.getLogger(__name__).warning(f"字体注册失败，PDF报告将使用默认字体: {e}")
@@ -71,17 +75,18 @@ def generate_detection_task_report(task: DetectionTask) -> str:
     c = canvas.Canvas(abs_path, pagesize=A4)
     W, H = A4
     MARGIN = 40
+    fn, fb = _font(), _font(bold=True)
 
     # ────────────────────────── 封面页 ──────────────────────────
     c.bookmarkPage("cover")
     c.addOutlineEntry("任务概览", "cover", level=0)
 
     y = H - 120
-    c.setFont("SimSun-Bold", 40)
+    c.setFont(fb, 40)
     c.drawCentredString(W / 2, y, '“听泉鉴图”图像造假检测报告')
     y -= 80
 
-    c.setFont("SimSun", 24)
+    c.setFont(fn, 24)
     c.drawString(MARGIN, y, f"任务编号：{task.id}")
     y -= 40
     c.drawString(MARGIN, y, f"任务名称：{task.task_name}")
@@ -99,10 +104,10 @@ def generate_detection_task_report(task: DetectionTask) -> str:
 
     # 参数
     y -= 10
-    c.setFont("SimSun-Bold", 24)
+    c.setFont(fb, 24)
     c.drawString(MARGIN, y, "检测参数")
     y -= 36
-    c.setFont("SimSun", 22)
+    c.setFont(fn, 22)
     c.drawString(MARGIN, y, f"cmd_block_size：{task.cmd_block_size}")
     y -= 36
     c.drawString(MARGIN, y, f"urn_k：{task.urn_k}")
@@ -121,7 +126,7 @@ def generate_detection_task_report(task: DetectionTask) -> str:
         c.addOutlineEntry(page_label, f"img_{dr.image_upload.id}", level=1)
 
         y = H - MARGIN
-        c.setFont("SimSun-Bold", 14)
+        c.setFont(fb, 14)
         c.drawString(MARGIN, y, page_label)
         y -= 25
 
@@ -136,7 +141,7 @@ def generate_detection_task_report(task: DetectionTask) -> str:
             # 更新 y 坐标，确保图像与后续内容的间距
             y -= 100  # 图片高度 + 适当的间距
         # 总体结论
-        c.setFont("SimSun", 11)
+        c.setFont(fn, 11)
         c.drawString(MARGIN, y - 20, f"判定：{'造假' if dr.is_fake else '真实'}")
         c.drawString(MARGIN, y - 45, f"造假概率：{dr.confidence_score:.2f}")
         y -= 70
@@ -144,7 +149,7 @@ def generate_detection_task_report(task: DetectionTask) -> str:
         # LLM 结果
         if task.if_use_llm:
             y -= 10
-            c.setFont("SimSun-Bold", 11)
+            c.setFont(fb, 11)
             c.drawString(MARGIN, y, "大语言模型分析：")
             y -= 18
             y = _draw_multiline(c, MARGIN + 15, y, dr.llm_judgment or "无", max_chars=50)
@@ -165,12 +170,12 @@ def generate_detection_task_report(task: DetectionTask) -> str:
         y -= 130
 
         # 子方法
-        c.setFont("SimSun-Bold", 11)
+        c.setFont(fb, 11)
         c.drawString(MARGIN, y, "深度学习检测方法：")
         y -= 20
         for sub in dr.sub_results.all():
             y = _check_and_create_new_page(c, y, H, MARGIN)  # 调用检查函数
-            c.setFont("SimSun", 10)
+            c.setFont(fn, 10)
             c.drawString(MARGIN + 10, y, f"{sub.method}  造假概率：{sub.probability:.2f}")
             if sub.mask_image and os.path.exists(sub.mask_image.path):
                 c.drawImage(ImageReader(sub.mask_image.path), MARGIN + 220, y - 40, width=60, height=60,
@@ -423,6 +428,21 @@ def generate_paper_aigc_report(task: DetectionTask) -> str:
         y -= 30
 
         # 段落详情
+        factual = result.get("factual_conclusions") or result.get("factual_issues") or []
+        if factual:
+            c.setFont(_font(bold=True), 14)
+            c.drawString(MARGIN, y, "Factual Check Conclusions")
+            y -= 24
+            for fc in factual[:6]:
+                y = _check_and_create_new_page(c, y, H, MARGIN)
+                c.setFont(_font(bold=True), 11)
+                c.drawString(MARGIN, y, str(fc.get("title", ""))[:60])
+                y -= 16
+                for reason in (fc.get("reasons") or [])[:3]:
+                    y = _draw_multiline(c, MARGIN + 12, y, f"- {reason}", max_chars=70, font=_font(), size=9)
+                    y -= 4
+            y -= 12
+
         paragraphs = result.get("paragraphs", [])
         if paragraphs:
             c.setFont(_font(bold=True), 14)
@@ -573,6 +593,90 @@ def generate_review_detection_report(task: DetectionTask) -> str:
     c.save()
     task.report_file = rel_path
     task.save(update_fields=["report_file"])
+    return rel_path
+
+
+def generate_comprehensive_forgery_pdf(task: DetectionTask) -> str:
+    """综合鉴伪 PDF（FR-YHZS-0005 下载维度），与在线 comprehensive-report 结构对齐。"""
+    rel_path = f"reports/task_{task.id}_comprehensive_report.pdf"
+    abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+    c = canvas.Canvas(abs_path, pagesize=A4)
+    W, H = A4
+    MARGIN = 40
+    fn, fb = _font(), _font(bold=True)
+
+    y = H - 80
+    c.setFont(fb, 22)
+    c.drawCentredString(W / 2, y, "Comprehensive Forgery Report")
+    y -= 40
+    c.setFont(fn, 12)
+    for line in [
+        f"Task ID: {task.id}",
+        f"Name: {task.task_name}",
+        f"Type: {task.task_type or 'image_detection'}",
+        f"Mode: {task.detection_mode or ('precise' if task.if_use_llm else 'fast')}",
+    ]:
+        c.drawString(MARGIN, y, line)
+        y -= 20
+
+    ttype = task.task_type or "image_detection"
+    if ttype == "image_detection":
+        results = task.detection_results.select_related("image_upload").all()
+        fake_n = results.filter(is_fake=True).count()
+        total = results.count()
+        ratio = round(fake_n / total, 3) if total else 0
+        y -= 10
+        c.setFont(fb, 14)
+        c.drawString(MARGIN, y, "Image Summary")
+        y -= 22
+        c.setFont(fn, 11)
+        c.drawString(MARGIN, y, f"Suspicious images: {fake_n} / {total}")
+        y -= 18
+        c.drawString(MARGIN, y, f"AI contribution (equiv.): {round(ratio * 100, 1)}%")
+        y -= 18
+        c.drawString(MARGIN, y, f"Risk: {_risk_label('high' if ratio > 0.5 else ('medium' if ratio > 0.2 else 'low'))}")
+    else:
+        raw = _load_result_json(task)
+        if raw:
+            y -= 10
+            c.setFont(fb, 14)
+            c.drawString(MARGIN, y, "Text Detection Summary")
+            y -= 22
+            c.setFont(fn, 11)
+            summary = raw.get("summary", "")
+            if summary:
+                y = _draw_multiline(c, MARGIN, y, summary, max_chars=72, font=fn, size=10)
+            ratio = raw.get("ai_contribution_ratio")
+            if ratio is not None:
+                y -= 8
+                c.drawString(MARGIN, y, f"AI ratio: {round(float(ratio) * 100, 1)}%")
+                y -= 18
+            for fc in (raw.get("factual_conclusions") or raw.get("factual_issues") or [])[:5]:
+                y = _check_and_create_new_page(c, y, H, MARGIN)
+                c.setFont(fb, 11)
+                c.drawString(MARGIN, y, str(fc.get("title", ""))[:55])
+                y -= 14
+                for r in (fc.get("reasons") or [])[:2]:
+                    y = _draw_multiline(c, MARGIN + 10, y, str(r), max_chars=68, font=fn, size=9)
+
+    y -= 24
+    c.setFont(fb, 12)
+    c.drawString(MARGIN, y, "Usage Advice")
+    y -= 18
+    c.setFont(fn, 10)
+    tips = [
+        "Combine automated scores with source documents and lab records.",
+        "Apply for manual review if conclusions affect publication decisions.",
+    ]
+    if ttype == "image_detection":
+        tips.insert(0, "Verify suspicious regions on original figures.")
+    for tip in tips:
+        y = _draw_multiline(c, MARGIN, y, f"- {tip}", max_chars=70, font=fn, size=10)
+
+    c.showPage()
+    c.save()
     return rel_path
 
 

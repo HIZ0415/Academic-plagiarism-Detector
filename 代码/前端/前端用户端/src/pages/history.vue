@@ -7,7 +7,7 @@
           <div class="text-body-2 text-medium-emphasis">任务编号：{{ formatTaskId(detailTask.task_id) }}</div>
         </div>
         <v-spacer></v-spacer>
-        <v-chip :color="getStatusColor(detailTask.status)" size="small">{{ getStatus(detailTask.status) }}</v-chip>
+        <v-chip :color="getStatusColor(effectiveDetailStatus)" size="small">{{ getStatus(effectiveDetailStatus) }}</v-chip>
       </v-card-title>
 
       <v-card-text class="pa-0 mt-4">
@@ -17,7 +17,7 @@
               <div class="text-subtitle-1 font-weight-bold mb-3">任务概览</div>
               <v-row>
                 <v-col cols="12" md="3" class="text-body-2">类型：{{ getTaskTypeLabel(detailTask.task_type) }}</v-col>
-                <v-col cols="12" md="3" class="text-body-2">状态：{{ getStatus(detailTask.status) }}</v-col>
+                <v-col cols="12" md="3" class="text-body-2">状态：{{ getStatus(effectiveDetailStatus) }}</v-col>
                 <v-col cols="12" md="3" class="text-body-2">进度：{{ detailTask.progress || 0 }}%</v-col>
                 <v-col cols="12" md="3" class="text-body-2">时间：{{ formatDateTime(detailTask.upload_time) || '暂无' }}</v-col>
                 <v-col v-if="detailTask.batch_session_id" cols="12" class="text-body-2 mt-2">
@@ -34,31 +34,80 @@
               </v-alert>
             </v-card>
 
-            <v-card variant="outlined" class="pa-4 mb-4">
-              <div class="text-subtitle-1 font-weight-bold mb-3">图片检测结果</div>
+            <v-progress-linear v-if="detailReportLoading" indeterminate color="primary" class="mb-4" />
+            <v-alert v-if="detailReportError" type="warning" variant="tonal" density="compact" class="mb-4">
+              {{ detailReportError }}
+            </v-alert>
+            <v-alert
+              v-if="!isBackendTaskId(detailTask.task_id)"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+            >
+              当前为<strong>本地记录</strong>（任务 ID 非后端数字），无法下载 PDF。请在列表中选择服务器返回的已完成任务，或重新在「统一学术检测」提交。
+            </v-alert>
+
+            <v-card v-if="detailSections?.image" variant="outlined" class="pa-4 mb-4">
+              <div class="text-subtitle-1 font-weight-bold mb-3">图像检测结果</div>
+              <p class="text-body-2 mb-2">{{ detailSections.image.summary || '—' }}</p>
               <v-row>
-                <v-col cols="12" md="4"><div class="text-body-2">总图片数：{{ unifiedResult.image.total }}</div></v-col>
-                <v-col cols="12" md="4"><div class="text-body-2">疑似造假：{{ unifiedResult.image.suspicious }}</div></v-col>
-                <v-col cols="12" md="4"><div class="text-body-2">正常图片：{{ unifiedResult.image.normal }}</div></v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">综合风险：{{ riskLabelCn(detailSections.image.risk_level || detailSections.conclusion?.risk_level) }}</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">可疑区域：{{ detailSections.image.suspicious_regions?.length ?? 0 }} 处</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">
+                    AI 占比：{{ formatRatioPercent(detailSections.image.ai_contribution_ratio ?? detailSections.conclusion?.ai_contribution_ratio) }}
+                  </div>
+                </v-col>
               </v-row>
             </v-card>
 
-            <v-card variant="outlined" class="pa-4 mb-4">
+            <v-card v-if="detailSections?.paper" variant="outlined" class="pa-4 mb-4">
               <div class="text-subtitle-1 font-weight-bold mb-3">论文检测结果</div>
+              <p class="text-body-2 mb-2">{{ detailSections.paper.summary || detailSections.conclusion?.headline || '—' }}</p>
               <v-row>
-                <v-col cols="12" md="4"><div class="text-body-2">AIGC 风险：{{ unifiedResult.paper.riskLevel }}</div></v-col>
-                <v-col cols="12" md="4"><div class="text-body-2">AI 占比：{{ unifiedResult.paper.aiRatio }}%</div></v-col>
-                <v-col cols="12" md="4"><div class="text-body-2">高风险段落：{{ unifiedResult.paper.highRiskParagraphs }}</div></v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">AIGC 风险：{{ riskLabelCn(detailSections.paper.risk_level || detailSections.conclusion?.risk_level) }}</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">
+                    AI 占比：{{ formatRatioPercent(detailSections.paper.ai_contribution_ratio ?? detailSections.conclusion?.ai_contribution_ratio) }}
+                  </div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">
+                    高风险段落：{{ highRiskParagraphCount(detailSections.paper.paragraphs) }}
+                  </div>
+                </v-col>
               </v-row>
             </v-card>
 
-            <v-card variant="outlined" class="pa-4 mb-4">
+            <v-card v-if="detailSections?.review" variant="outlined" class="pa-4 mb-4">
               <div class="text-subtitle-1 font-weight-bold mb-3">Review 检测结果</div>
+              <p class="text-body-2 mb-2">{{ detailSections.review.summary || detailSections.conclusion?.headline || '—' }}</p>
               <v-row>
-                <v-col cols="12" md="4"><div class="text-body-2">模板化风险：{{ unifiedResult.review.templateRisk }}</div></v-col>
-                <v-col cols="12" md="4"><div class="text-body-2">文本异常片段：{{ unifiedResult.review.anomalySegments }}</div></v-col>
-                <v-col cols="12" md="4"><div class="text-body-2">综合建议：{{ unifiedResult.review.suggestion }}</div></v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">综合风险：{{ riskLabelCn(detailSections.review.risk_level || detailSections.conclusion?.risk_level) }}</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">模板化信号：{{ detailSections.review.template_signals?.length ?? 0 }} 条</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-body-2">问题条目：{{ detailSections.review.issues?.length ?? 0 }}</div>
+                </v-col>
               </v-row>
+            </v-card>
+
+            <v-card
+              v-if="effectiveDetailStatus === 'completed' && isBackendTaskId(detailTask.task_id) && !detailSections && !detailReportLoading"
+              variant="tonal"
+              class="pa-4 mb-4"
+            >
+              <div class="text-body-2 text-medium-emphasis">暂无结构化结果，仍可尝试下载 PDF 报告。</div>
             </v-card>
 
             <v-card variant="outlined" class="pa-4 mb-4">
@@ -94,10 +143,29 @@
                   prepend-icon="mdi-file-download-outline"
                   class="text-none"
                   :loading="downloadingDetectionReport"
-                  :disabled="detailTask.status !== 'completed'"
+                  :disabled="!canDownloadDetectionReport"
                   @click="handleDownloadDetectionReport"
                 >
                   下载 AI 检测报告
+                </v-btn>
+                <v-btn
+                  color="primary"
+                  variant="outlined"
+                  prepend-icon="mdi-file-download"
+                  class="text-none"
+                  :loading="downloadingComprehensiveReport"
+                  :disabled="!canDownloadDetectionReport"
+                  @click="handleDownloadComprehensivePdf"
+                >
+                  下载综合鉴伪 PDF
+                </v-btn>
+                <v-btn
+                  variant="text"
+                  class="text-none"
+                  :disabled="!canDownloadDetectionReport"
+                  @click="goComprehensiveReport(detailTask)"
+                >
+                  在线综合报告
                 </v-btn>
                 <v-btn
                   color="secondary"
@@ -114,12 +182,12 @@
                   color="primary"
                   prepend-icon="mdi-gavel"
                   class="text-none"
-                  :disabled="detailTask.status !== 'completed'"
+                  :disabled="effectiveDetailStatus !== 'completed'"
                   @click="goManualReviewRequest"
                 >
                   人工审核申请
                 </v-btn>
-                <v-btn color="primary" variant="tonal" class="text-none" :disabled="detailTask.status !== 'completed'" @click="goSpecialDetail(detailTask)">
+                <v-btn color="primary" variant="tonal" class="text-none" :disabled="effectiveDetailStatus !== 'completed'" @click="goSpecialDetail(detailTask)">
                   高级检测
                 </v-btn>
                 <v-btn color="secondary" variant="outlined" class="text-none" @click="goRepeatDetection(detailTask)">
@@ -146,9 +214,19 @@
       <task-detail v-if="showDetail" :task="currentTask" @close="showDetail = false" />
     </v-dialog>
 
-    <v-card-title class="d-flex align-center pa-0">
+    <v-card-title class="d-flex align-center flex-wrap ga-2 pa-0">
       <h1 class="text-h4 font-weight-bold">检测历史</h1>
       <v-spacer></v-spacer>
+      <v-text-field
+        v-model="keyword"
+        density="compact"
+        hide-details
+        prepend-inner-icon="mdi-magnify"
+        label="搜索任务名或 ID"
+        style="max-width: 240px"
+        clearable
+        @keyup.enter="applyKeywordSearch"
+      />
       <v-btn variant="outlined" class="mr-2" @click="showFilter = true"
         :color="hasActiveFilters ? 'primary' : undefined">
         <v-icon class="mr-2">mdi-filter</v-icon>
@@ -158,6 +236,14 @@
         统一检测
       </v-btn>
     </v-card-title>
+
+    <v-tabs v-model="typeTab" color="primary" class="mt-3 mb-2" density="comfortable">
+      <v-tab value="all">全部</v-tab>
+      <v-tab value="image_detection">图像</v-tab>
+      <v-tab value="paper_aigc">论文</v-tab>
+      <v-tab value="review_detection">Review</v-tab>
+      <v-tab value="resource_check">资源规范</v-tab>
+    </v-tabs>
 
     <v-alert v-if="batchSessionFilter" type="info" variant="tonal" density="compact" class="mt-3 mb-2">
       当前按<strong>统一检测批次</strong>筛选：<code>{{ batchSessionFilter }}</code>。列表仅显示该批次在本地记录的子任务；清除地址栏中的
@@ -172,6 +258,14 @@
         <v-card-text>
           <div class="d-flex flex-column gap-4">
             <v-select v-model="filters.status" :items="statusOptions" label="任务状态" clearable hide-details></v-select>
+
+            <v-select
+              v-model="filters.taskType"
+              :items="taskTypeFilterOptions"
+              label="内容类型"
+              clearable
+              hide-details
+            ></v-select>
 
             <v-select v-model="filters.timeRange" :items="timeRangeOptions" label="快速选择时间范围" clearable hide-details
               @update:model-value="handleTimeRangeChange"></v-select>
@@ -224,6 +318,15 @@
               :disabled="!canEnterDetail(item)">
               查看报告
             </v-btn>
+            <v-btn
+              size="small"
+              color="teal"
+              variant="text"
+              :disabled="item.status !== 'completed'"
+              @click="goComprehensiveReport(item)"
+            >
+              综合鉴伪
+            </v-btn>
             <v-btn size="small" color="secondary" variant="text" @click="goRepeatDetection(item)">
               再次检测
             </v-btn>
@@ -268,6 +371,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import publisher from '@/api/publisher'
+import platform from '@/api/platform'
 import { getManualReviewApplicationByDetectionTask } from '@/api/manualReviewWorkflow'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 import { savePdfFromAxiosResponse } from '@/utils/downloadPdf'
@@ -300,6 +404,7 @@ interface Task {
   completion_time: string
   status: 'pending' | 'in_progress' | 'completed' | 'failed'
   task_type?: string
+  task_name?: string
   progress?: number
   source?: 'server' | 'local'
   error_message?: string
@@ -312,17 +417,29 @@ const tasks = ref<Task[]>([])
 
 // 筛选相关
 const showFilter = ref(false)
+const typeTab = ref('all')
+const keyword = ref('')
+
 const filters = ref<{
   status: string | null
+  taskType: string | null
   timeRange: string | null
   startDate: string | null
   endDate: string | null
 }>({
   status: null,
+  taskType: null,
   timeRange: null,
   startDate: null,
   endDate: null
 })
+
+const taskTypeFilterOptions = [
+  { title: '图像检测', value: 'image_detection' },
+  { title: '论文 AIGC', value: 'paper_aigc' },
+  { title: 'Review', value: 'review_detection' },
+  { title: '资源规范', value: 'resource_check' },
+]
 
 // 时间验证相关
 const timeError = ref('')
@@ -338,7 +455,8 @@ const timeRangeOptions = [
   { title: '最近一周', value: '7d' },
   { title: '最近一月', value: '30d' },
   { title: '最近三月', value: '90d' },
-  { title: '最近一年', value: '365d' }
+  { title: '最近半年', value: '180d' },
+  { title: '最近一年', value: '365d' },
 ]
 
 // 处理快速选择时间范围变化
@@ -391,6 +509,12 @@ const fetchTasks = async (page: number, pageSize: number) => {
     if (filters.value.status) {
       params.status = filters.value.status
     }
+    if (filters.value.taskType) {
+      params.task_type = filters.value.taskType
+    }
+    if (keyword.value.trim()) {
+      params.keyword = keyword.value.trim()
+    }
 
     // 添加时间范围筛选
     if (filters.value.timeRange) {
@@ -400,7 +524,8 @@ const fetchTasks = async (page: number, pageSize: number) => {
         '7d': 7 * 24 * 60 * 60 * 1000,
         '30d': 30 * 24 * 60 * 60 * 1000,
         '90d': 90 * 24 * 60 * 60 * 1000,
-        '365d': 365 * 24 * 60 * 60 * 1000
+        '180d': 180 * 24 * 60 * 60 * 1000,
+        '365d': 365 * 24 * 60 * 60 * 1000,
       }
       const rangeMs = ranges[filters.value.timeRange as keyof typeof ranges]
       params.startTime = formatDateFilter(now - rangeMs)
@@ -422,6 +547,8 @@ const fetchTasks = async (page: number, pageSize: number) => {
       progress: task.status === 'completed' ? 100 : task.status === 'in_progress' ? 60 : 20,
       source: 'server',
       error_message: task.error_message || '',
+      batch_session_id: task.batch_session_id || '',
+      task_name: task.task_name || '',
     }))
 
     const localTasksRaw = JSON.parse(localStorage.getItem('local_detection_tasks') || '[]') as any[]
@@ -557,12 +684,25 @@ function clearBatchFilter() {
   router.replace({ path: '/history', query: q })
 }
 
-// 筛选后的任务列表（含统一检测入口的批次筛选）
+// 筛选后的任务列表（批次 / 类型 Tab / 关键字）
 const filteredTasks = computed(() => {
   const b = batchSessionFilter.value
-  if (!b) return tasks.value
-  return tasks.value.filter((t) => (t.batch_session_id || '') === b)
+  let list = b ? tasks.value.filter((t) => (t.batch_session_id || '') === b) : tasks.value
+  if (typeTab.value !== 'all') {
+    list = list.filter((t) => (t.task_type || '') === typeTab.value)
+  }
+  const kw = keyword.value.trim().toLowerCase()
+  if (!kw) return list
+  return list.filter((t) => {
+    const id = String(t.task_id).toLowerCase()
+    const name = String(t.task_name || '').toLowerCase()
+    return id.includes(kw) || name.includes(kw)
+  })
 })
+
+function applyKeywordSearch() {
+  fetchTasks(currentPage.value, pageSize.value)
+}
 
 const listRecordCount = computed(() => (batchSessionFilter.value ? filteredTasks.value.length : totalTasks.value))
 
@@ -587,30 +727,58 @@ const detailTask = computed<Task>(() => {
   return fallback
 })
 
-const unifiedResult = computed(() => {
-  const seed = Number(String(detailTask.value.task_id).replace(/\D/g, '').slice(-2) || '7')
-  const imageTotal = Math.max(3, (seed % 8) + 3)
-  const imageSuspicious = Math.min(imageTotal, Math.max(1, seed % 4))
-  const riskLevels = ['低', '中', '高'] as const
-  const templateRiskLevels = ['低', '中', '高'] as const
-  return {
-    image: {
-      total: imageTotal,
-      suspicious: imageSuspicious,
-      normal: imageTotal - imageSuspicious,
-    },
-    paper: {
-      riskLevel: riskLevels[seed % 3],
-      aiRatio: Math.min(95, 25 + (seed % 60)),
-      highRiskParagraphs: (seed % 5) + 1,
-    },
-    review: {
-      templateRisk: templateRiskLevels[(seed + 1) % 3],
-      anomalySegments: (seed % 4) + 1,
-      suggestion: seed % 2 === 0 ? '建议人工复核' : '可直接通过',
-    },
-  }
+function isBackendTaskId(id: string | number | undefined) {
+  return /^\d+$/.test(String(id ?? '').trim())
+}
+
+function riskLabelCn(level?: string) {
+  const m: Record<string, string> = { low: '低', medium: '中', high: '高' }
+  return m[String(level || '').toLowerCase()] || level || '—'
+}
+
+function formatRatioPercent(ratio: unknown) {
+  if (ratio == null || ratio === '') return '—'
+  const n = Number(ratio)
+  if (Number.isNaN(n)) return '—'
+  return n <= 1 ? `${(n * 100).toFixed(1)}%` : `${n.toFixed(1)}%`
+}
+
+function highRiskParagraphCount(paragraphs: unknown) {
+  if (!Array.isArray(paragraphs)) return 0
+  return paragraphs.filter((p) => (p as { risk_level?: string }).risk_level === 'high').length
+}
+
+const detailSections = ref<Record<string, unknown> | null>(null)
+const detailReportLoading = ref(false)
+const detailReportError = ref('')
+
+const effectiveDetailStatus = computed(() => {
+  const found = tasks.value.find((t) => String(t.task_id) === detailId.value)
+  return (found?.status || detailTask.value.status) as Task['status']
 })
+
+async function loadDetailReport() {
+  detailSections.value = null
+  detailReportError.value = ''
+  const tid = detailId.value
+  if (!tid || !isBackendTaskId(tid)) return
+  if (effectiveDetailStatus.value !== 'completed') return
+
+  detailReportLoading.value = true
+  try {
+    const res = await platform.getComprehensiveReport(tid)
+    if (res.data.ready && res.data.sections) {
+      detailSections.value = res.data.sections as Record<string, unknown>
+    } else {
+      detailReportError.value = res.data.message || '检测尚未完成，报告生成中'
+    }
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { detail?: string } } }
+    detailReportError.value = err.response?.data?.detail || '加载检测结果失败'
+  } finally {
+    detailReportLoading.value = false
+  }
+}
 
 const resetFilters = () => {
   filters.value = {
@@ -636,6 +804,10 @@ const applyFilters = () => {
 }
 
 // 操作按钮处理函数
+function goComprehensiveReport(item: Task) {
+  router.push({ path: '/comprehensive-report', query: { task_id: String(item.task_id) } })
+}
+
 const handleNext = (item: Task) => {
   router.push({
     path: '/history',
@@ -712,7 +884,7 @@ const manualReviewWorkflowPayload = ref<{
 
 async function loadManualReviewWorkflow() {
   manualReviewWorkflowPayload.value = null
-  if (!detailId.value || detailTask.value.status !== 'completed') return
+  if (!detailId.value || effectiveDetailStatus.value !== 'completed') return
   try {
     const res = await getManualReviewApplicationByDetectionTask(detailId.value)
     manualReviewWorkflowPayload.value = res.data as typeof manualReviewWorkflowPayload.value
@@ -722,15 +894,16 @@ async function loadManualReviewWorkflow() {
 }
 
 watch(
-  () => [detailId.value, detailTask.value.status] as const,
+  () => [detailId.value, effectiveDetailStatus.value] as const,
   () => {
     loadManualReviewWorkflow()
+    loadDetailReport()
   },
   { immediate: true },
 )
 
 const manualReviewStep = computed(() => {
-  if (detailTask.value.status !== 'completed') return 1
+  if (effectiveDetailStatus.value !== 'completed') return 1
   const w = manualReviewWorkflowPayload.value
   if (!w || !w.found) return 1
   if (w.admin_state === 'refused') return 2
@@ -740,7 +913,7 @@ const manualReviewStep = computed(() => {
 })
 
 const manualReviewStageText = computed(() => {
-  if (detailTask.value.status !== 'completed') return '自动检测未完成，暂不可发起人工审核'
+  if (effectiveDetailStatus.value !== 'completed') return '自动检测未完成，暂不可发起人工审核'
   const w = manualReviewWorkflowPayload.value
   if (!w || !w.found) return '尚未发起人工审核申请，请点击「人工审核申请」填写表单提交'
   if (w.admin_state === 'refused') return `管理端已拒绝：${w.admin_reject_reason || '—'}`
@@ -766,7 +939,7 @@ const manualReviewExpertLabel = computed(() => {
 })
 
 const canViewManualReviewResult = computed(() => {
-  if (detailTask.value.status !== 'completed') return false
+  if (effectiveDetailStatus.value !== 'completed') return false
   const w = manualReviewWorkflowPayload.value
   if (!w?.found || !w.review_request_id) return false
   if (w.admin_state === 'refused') return false
@@ -774,7 +947,7 @@ const canViewManualReviewResult = computed(() => {
 })
 
 const canDownloadManualReviewReport = computed(() => {
-  if (detailTask.value.status !== 'completed') return false
+  if (effectiveDetailStatus.value !== 'completed') return false
   const w = manualReviewWorkflowPayload.value
   if (!w?.found || !w.review_request_id) return false
   if (w.admin_state === 'refused') return false
@@ -782,20 +955,60 @@ const canDownloadManualReviewReport = computed(() => {
 })
 
 const downloadingDetectionReport = ref(false)
+const downloadingComprehensiveReport = ref(false)
 const downloadingManualReport = ref(false)
+
+const canDownloadDetectionReport = computed(
+  () => effectiveDetailStatus.value === 'completed' && isBackendTaskId(detailTask.value.task_id),
+)
+
+async function parseAxiosBlobError(e: unknown): Promise<string> {
+  const err = e as { response?: { data?: Blob } }
+  const data = err.response?.data
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text()
+      const json = JSON.parse(text) as { detail?: string }
+      return json.detail || text.slice(0, 160)
+    } catch {
+      return '服务器返回错误（非 PDF）'
+    }
+  }
+  return ''
+}
 
 async function handleDownloadDetectionReport() {
   const tid = detailTask.value.task_id
-  if (!tid || detailTask.value.status !== 'completed') return
+  if (!canDownloadDetectionReport.value) return
   downloadingDetectionReport.value = true
   try {
     const res = await publisher.downloadReport(tid)
     savePdfFromAxiosResponse(res, `task_${tid}_report.pdf`)
     snackbar.showMessage('AI 检测报告已下载', 'success')
-  } catch {
-    snackbar.showMessage('AI 检测报告下载失败，请确认任务已完成且后端已生成报告', 'error')
+  } catch (e: unknown) {
+    const detail = await parseAxiosBlobError(e)
+    snackbar.showMessage(
+      detail || 'AI 检测报告下载失败，请确认任务已完成且后端已生成报告',
+      'error',
+    )
   } finally {
     downloadingDetectionReport.value = false
+  }
+}
+
+async function handleDownloadComprehensivePdf() {
+  const tid = detailTask.value.task_id
+  if (!canDownloadDetectionReport.value) return
+  downloadingComprehensiveReport.value = true
+  try {
+    const res = await platform.downloadComprehensiveReport(tid)
+    savePdfFromAxiosResponse(res, `comprehensive_task_${tid}.pdf`)
+    snackbar.showMessage('综合鉴伪 PDF 已下载', 'success')
+  } catch (e: unknown) {
+    const detail = await parseAxiosBlobError(e)
+    snackbar.showMessage(detail || '综合鉴伪 PDF 下载失败', 'error')
+  } finally {
+    downloadingComprehensiveReport.value = false
   }
 }
 

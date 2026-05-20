@@ -66,9 +66,13 @@ export function submitReviewDetection(params: {
   task_name: string
   text?: string
   file?: File
+  batch_session_id?: string
+  detection_mode?: string
 }) {
   const fd = new FormData()
   fd.append('task_name', params.task_name.trim())
+  if (params.batch_session_id) fd.append('batch_session_id', params.batch_session_id)
+  if (params.detection_mode) fd.append('detection_mode', params.detection_mode)
   if (params.file) {
     fd.append('file', params.file)
   } else if (params.text != null) {

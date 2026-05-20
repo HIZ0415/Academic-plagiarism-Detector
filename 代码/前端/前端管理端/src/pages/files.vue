@@ -177,6 +177,22 @@
               clearable
               hide-details
             ></v-select>
+
+            <v-select
+              v-model="filters.resourceType"
+              :items="resourceTypeOptions"
+              label="资源类型"
+              clearable
+              hide-details
+            ></v-select>
+
+            <v-select
+              v-model="filters.fakeDegree"
+              :items="fakeDegreeOptions"
+              label="造假程度（图像）"
+              clearable
+              hide-details
+            ></v-select>
             
             <v-select
               v-model="filters.timeRange"
@@ -459,15 +475,31 @@ const searchQuery = ref('')
 const showFilterDialog = ref(false)
 const filters = ref<{
   subject: string | null
+  resourceType: string | null
+  fakeDegree: string | null
   timeRange: string | null
   startDate: string | null
   endDate: string | null
 }>({
   subject: null,
+  resourceType: null,
+  fakeDegree: null,
   timeRange: null,
   startDate: null,
   endDate: null
 })
+
+const resourceTypeOptions = [
+  { title: '图像', value: 'image' },
+  { title: '论文 PDF', value: 'paper' },
+  { title: 'Review 文本', value: 'review' },
+]
+
+const fakeDegreeOptions = [
+  { title: '高风险（疑似造假）', value: 'high' },
+  { title: '低风险（未见异常）', value: 'low' },
+  { title: '未检测', value: 'unknown' },
+]
 
 const subjectOptions = [
   { title: '生物', value: 'Biology' },
@@ -850,6 +882,8 @@ const fetchFiles = async (page: number, pageSize: number) => {
       query: searchSelectedUser.value?.username || '',
       organization: searchSelectedOrg.value || '',
       categories: filters.value.subject || '',
+      resource_type: filters.value.resourceType || '',
+      fake_degree: filters.value.fakeDegree || '',
       startTime: startTimeFilter,
       endTime: endTimeFilter
     }

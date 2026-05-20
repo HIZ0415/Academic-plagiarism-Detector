@@ -156,7 +156,11 @@ export default {
     return http.get<ResourceCheckResult>(`/paper/resource-check/${taskId}/result/`)
   },
 
-  async uploadAndSubmitAigcTask(file: File, taskName: string) {
+  async uploadAndSubmitAigcTask(
+    file: File,
+    taskName: string,
+    opts?: { batch_session_id?: string; detection_mode?: string },
+  ) {
     const formData = new FormData()
     formData.append('file', file)
     const uploadRes = await this.uploadPaper(formData)
@@ -164,10 +168,16 @@ export default {
     return this.submitAigcTask({
       paper_file_id: paperFileId,
       task_name: taskName,
+      batch_session_id: opts?.batch_session_id,
+      detection_mode: opts?.detection_mode,
     })
   },
 
-  async uploadAndSubmitResourceTask(file: File, taskName: string) {
+  async uploadAndSubmitResourceTask(
+    file: File,
+    taskName: string,
+    opts?: { batch_session_id?: string; detection_mode?: string },
+  ) {
     const formData = new FormData()
     formData.append('file', file)
     const uploadRes = await this.uploadPaper(formData)
@@ -175,6 +185,8 @@ export default {
     return this.submitResourceCheck({
       paper_file_id: paperFileId,
       task_name: taskName,
+      batch_session_id: opts?.batch_session_id,
+      detection_mode: opts?.detection_mode,
     })
   },
 }
