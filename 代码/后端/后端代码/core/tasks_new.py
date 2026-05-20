@@ -247,7 +247,13 @@ def finalize_task(_chord_results: list | None, task_pk: int, image_num: int, _=N
         task.status = "completed"
         task.completion_time = timezone.now()
         task.save(update_fields=["status", "completion_time"])
-        generate_detection_task_report(task)
+        try:
+            generate_detection_task_report(task)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "图像检测报告生成失败 (task %s): %s", task_pk, exc,
+            )
 
     send_task_completion_notification(task.user, task_pk)
 

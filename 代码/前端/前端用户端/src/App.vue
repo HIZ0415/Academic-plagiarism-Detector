@@ -20,10 +20,18 @@
         <v-list-item prepend-icon="mdi-home" title="主页" value="home" @click="goToHome"></v-list-item>
         <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-image" title="统一学术检测" value="upload"
           @click="goToUpload"></v-list-item>
+        <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-file-document" title="论文 AIGC 检测" value="paper"
+          @click="goToPaperDetect"></v-list-item>
+        <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-text-box-search" title="Review 检测" value="rev-detect"
+          @click="goToReviewDetect"></v-list-item>
         <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-history" title="检测历史" value="history"
           @click="goToHistory"></v-list-item>
+        <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-chart-timeline-variant" title="多模态联合分析"
+          value="fusion" @click="goToFusion"></v-list-item>
         <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-gavel" title="人工审核申请" value="annual"
           @click="gotoAnnual"></v-list-item>
+        <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-message-text-outline" title="社区反馈"
+          value="community" @click="goToCommunity"></v-list-item>
         <v-list-item v-if="effectiveRole === 'reviewer'" prepend-icon="mdi-clipboard-check-multiple" title="人工审核"
           value="review" @click="goToReview"></v-list-item>
         <v-list-item prepend-icon="mdi-account" title="个人主页" value="profile" @click="goToProfile"></v-list-item>
@@ -320,6 +328,22 @@ const goToHome = () => {
 
 const goToUpload = () => {
   router.push('/upload')
+}
+
+const goToPaperDetect = () => {
+  router.push('/detect/paper')
+}
+
+const goToReviewDetect = () => {
+  router.push('/detect/review')
+}
+
+const goToFusion = () => {
+  router.push('/multimodal-fusion')
+}
+
+const goToCommunity = () => {
+  router.push('/community-feedback')
 }
 
 const goToHistory = () => {

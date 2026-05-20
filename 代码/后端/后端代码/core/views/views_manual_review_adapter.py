@@ -145,7 +145,10 @@ def get_manual_review_by_detection_task(request):
         return Response({"found": False, "detection_task_id": tid})
 
     admin_state = rr.status2
-    manual_review_status = _aggregate_manual_review_status(rr)
+    if (rr.check_reason or "").strip() == "publisher_cancelled":
+        manual_review_status = "cancelled"
+    else:
+        manual_review_status = _aggregate_manual_review_status(rr)
     mr = rr.manual_reviews.order_by("id").first()
     payload = {
         "found": True,
@@ -200,7 +203,10 @@ def get_publisher_manual_review_summary(request, review_request_id: int):
 
     task = rr.detection_result.detection_task
     admin_state = rr.status2
-    manual_review_status = _aggregate_manual_review_status(rr)
+    if (rr.check_reason or "").strip() == "publisher_cancelled":
+        manual_review_status = "cancelled"
+    else:
+        manual_review_status = _aggregate_manual_review_status(rr)
     first_mr = rr.manual_reviews.order_by("id").first()
 
     completed_mrs = [m for m in rr.manual_reviews.all() if m.status == "completed"]

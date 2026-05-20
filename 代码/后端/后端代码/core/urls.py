@@ -21,6 +21,22 @@ from .views.views_manual_review_adapter import (
     get_manual_review_by_detection_task,
     get_publisher_manual_review_summary,
 )
+from .views.views_platform_extensions import (
+    submit_feedback,
+    list_feedback,
+    submit_user_report,
+    admin_list_user_reports,
+    admin_handle_user_report,
+    cancel_manual_review_request,
+    community_feedback_feed,
+    comprehensive_forgery_report,
+    download_comprehensive_forgery_report,
+    multimodal_batch_fusion,
+    detection_models_catalog,
+    update_detection_preferences,
+    admin_detection_models,
+    admin_detection_logs,
+)
 from .views import views_admin
 from .views import views_notify
 from django.urls import path
@@ -208,4 +224,26 @@ urlpatterns = [
         get_publisher_manual_review_summary,
         name='manual_review_publisher_summary',
     ),
+    path(
+        'manual-review-requests/<int:review_request_id>/cancel/',
+        cancel_manual_review_request,
+        name='manual_review_request_cancel',
+    ),
+    path('feedback/', submit_feedback, name='submit_feedback'),
+    path('feedback/<int:manual_review_id>/', list_feedback, name='list_feedback'),
+    path('reports/submit/', submit_user_report, name='submit_user_report'),
+    path('reports/admin/', admin_list_user_reports, name='admin_list_user_reports'),
+    path('reports/admin/<int:report_id>/handle/', admin_handle_user_report, name='admin_handle_user_report'),
+    path('community-feedback/', community_feedback_feed, name='community_feedback_feed'),
+    path('tasks/<int:task_id>/comprehensive-report/', comprehensive_forgery_report, name='comprehensive_forgery_report'),
+    path(
+        'tasks/<int:task_id>/comprehensive-report/download/',
+        download_comprehensive_forgery_report,
+        name='download_comprehensive_forgery_report',
+    ),
+    path('batch-fusion/', multimodal_batch_fusion, name='multimodal_batch_fusion'),
+    path('detection-models/', detection_models_catalog, name='detection_models_catalog'),
+    path('detection-preferences/', update_detection_preferences, name='update_detection_preferences'),
+    path('admin/detection-models/', admin_detection_models, name='admin_detection_models'),
+    path('admin/detection-logs/', admin_detection_logs, name='admin_detection_logs'),
 ]

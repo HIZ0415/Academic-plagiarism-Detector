@@ -34,7 +34,7 @@
         </v-expansion-panel-title>
         <v-expansion-panel-text class="text-body-2">
           申请时间 {{ reviewRequestMeta.request_time }}。
-          <span v-if="manualReviewStatus !== 'completed'" class="text-medium-emphasis d-block mt-2">鉴定口径见右侧「评分维度」说明；评论点赞与举报待接口接入。</span>
+          <span v-if="manualReviewStatus !== 'completed'" class="text-medium-emphasis d-block mt-2">鉴定口径见右侧「评分维度」说明；可在下方参与评论、点赞或举报。</span>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>
@@ -327,6 +327,44 @@
       </div>
     </div>
 
+    <v-card v-if="manual_review_id" variant="outlined" class="pa-4 mt-6 mx-2">
+      <div class="d-flex align-center flex-wrap ga-2 mb-3">
+        <div class="text-subtitle-1 font-weight-bold">评论与互动</div>
+        <v-chip size="small" color="primary" variant="tonal">{{ feedbackLikeCount }} 赞</v-chip>
+        <v-spacer />
+        <v-btn size="small" variant="tonal" color="error" class="text-none" prepend-icon="mdi-flag" @click="showReportDialog = true">
+          举报
+        </v-btn>
+      </div>
+      <v-list v-if="feedbacks.length" density="compact" class="mb-3">
+        <v-list-item v-for="fb in feedbacks" :key="fb.feedback_id">
+          <v-list-item-title>{{ fb.username }}</v-list-item-title>
+          <v-list-item-subtitle>
+            <span v-if="fb.is_like">👍 </span>{{ fb.comment || '（仅点赞）' }}
+          </v-list-item-subtitle>
+        </v-list-item>
+      </v-list>
+      <v-textarea v-model="feedbackComment" label="发表评论" rows="2" variant="outlined" hide-details class="mb-2" />
+      <div class="d-flex ga-2">
+        <v-btn color="primary" variant="tonal" class="text-none" @click="submitComment">发表评论</v-btn>
+        <v-btn color="secondary" variant="outlined" class="text-none" prepend-icon="mdi-thumb-up" @click="submitLike">点赞</v-btn>
+      </div>
+    </v-card>
+
+    <v-dialog v-model="showReportDialog" max-width="480">
+      <v-card>
+        <v-card-title>举报本审核任务</v-card-title>
+        <v-card-text>
+          <v-textarea v-model="reportReason" label="举报说明" rows="3" variant="outlined" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showReportDialog = false">取消</v-btn>
+          <v-btn color="error" @click="submitReport">提交</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- 添加提示对话框 -->
     <v-dialog v-model="showAlert" max-width="400">
       <v-card>
@@ -381,10 +419,75 @@ import type { RouteParams } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import DrawingDialog from '@/components/DrawingDialog.vue'
 import publisher from '@/api/publisher'
+import platform from '@/api/platform'
 import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 const router = useRouter()
 const snackbar = useSnackbarStore()
 const route = useRoute()
+
+const feedbacks = ref<Array<{ feedback_id: number; username: string; is_like: boolean; comment: string }>>([])
+const feedbackLikeCount = ref(0)
+const feedbackComment = ref('')
+const showReportDialog = ref(false)
+const reportReason = ref('')
+
+async function loadFeedbacks() {
+  const id = manual_review_id.value
+  if (!id) return
+  try {
+    const res = await platform.listFeedback(id)
+    feedbacks.value = res.data.feedbacks || []
+    feedbackLikeCount.value = res.data.like_count ?? 0
+  } catch {
+    feedbacks.value = []
+  }
+}
+
+async function submitComment() {
+  const text = feedbackComment.value.trim()
+  if (!text) {
+    snackbar.showMessage('请填写评论', 'warning')
+    return
+  }
+  try {
+    await platform.submitFeedback({ manual_review_id: manual_review_id.value, comment: text })
+    feedbackComment.value = ''
+    await loadFeedbacks()
+    snackbar.showMessage('评论已发布', 'success')
+  } catch {
+    snackbar.showMessage('评论失败', 'error')
+  }
+}
+
+async function submitLike() {
+  try {
+    await platform.submitFeedback({ manual_review_id: manual_review_id.value, is_like: true })
+    await loadFeedbacks()
+    snackbar.showMessage('已点赞', 'success')
+  } catch {
+    snackbar.showMessage('点赞失败', 'error')
+  }
+}
+
+async function submitReport() {
+  const reason = reportReason.value.trim()
+  if (reason.length < 5) {
+    snackbar.showMessage('请至少填写 5 字说明', 'warning')
+    return
+  }
+  try {
+    await platform.submitReport({
+      target_type: 'manual_review',
+      target_id: manual_review_id.value,
+      reason,
+    })
+    showReportDialog.value = false
+    reportReason.value = ''
+    snackbar.showMessage('举报已提交', 'success')
+  } catch {
+    snackbar.showMessage('举报失败', 'error')
+  }
+}
 
 interface Image {
   id: number,
@@ -830,6 +933,7 @@ async function loadReviewDetail() {
     snackbar.showMessage(pageError.value, 'error')
   } finally {
     pageLoading.value = false
+    void loadFeedbacks()
   }
 }
 
@@ -839,6 +943,7 @@ function reloadDetail() {
 
 onMounted(() => {
   loadReviewDetail()
+  void loadFeedbacks()
 })
 
 const currentImage = computed(() => {

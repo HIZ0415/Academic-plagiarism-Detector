@@ -19,10 +19,24 @@
     </v-alert>
 
     <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      <strong>格式说明：</strong>论文检测仅 <strong>.pdf</strong>；Review 为下方文本框或 <strong>.txt</strong>；图像与压缩包与既有流程一致。ZIP/RAR 内若含多种类型，请解压后分别加入本批（当前队列按单文件类型识别）。
+      <strong>格式说明：</strong>论文检测仅 <strong>.pdf</strong>（不支持 DOCX）；Review 为下方文本框或 <strong>.txt</strong>；<strong>ZIP/RAR</strong> 将自动解压并抽取图像送检。
     </v-alert>
 
     <v-card class="pa-4" variant="outlined">
+      <v-row class="mb-2">
+        <v-col cols="12">
+          <div class="text-subtitle-2 font-weight-medium mb-2">本批检测模式</div>
+          <v-btn-toggle v-model="detectionMode" mandatory divided color="primary" density="comfortable" :disabled="running">
+            <v-btn value="fast" class="text-none">标准模式</v-btn>
+            <v-btn value="precise" class="text-none">精准模式</v-btn>
+          </v-btn-toggle>
+          <p class="text-caption text-medium-emphasis mt-2 mb-0">
+            <strong>标准模式</strong>：常规检测，速度更快、配额占用较低；
+            <strong>精准模式</strong>：启用更强推理（含 LLM 辅助，图像检测尤甚）。个人主页可设置默认模式。
+          </p>
+        </v-col>
+      </v-row>
+
       <v-row>
         <v-col cols="12">
           <v-file-input
@@ -76,6 +90,15 @@
             :to="{ path: '/history', query: { batch_session_id: batchSessionId } }"
           >
             在检测历史中查看本批次
+          </v-btn>
+          <v-btn
+            v-if="batchSessionId && rows.length"
+            color="secondary"
+            variant="tonal"
+            prepend-icon="mdi-chart-timeline-variant"
+            :to="{ path: '/multimodal-fusion', query: { batch_session_id: batchSessionId } }"
+          >
+            多模态联合分析
           </v-btn>
         </v-col>
       </v-row>
@@ -158,8 +181,9 @@ import publisherApi from '@/api/publisher'
 import uploadApi from '@/api/upload'
 import { submitReviewDetection } from '@/api/reviewDetection'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
+import { useDetectionMode } from '@/composables/useDetectionMode'
 
-type ResourceType = 'image' | 'paper' | 'review' | 'unknown'
+type ResourceType = 'image' | 'paper' | 'review' | 'archive' | 'docx' | 'unknown'
 type RowStatus = 'pending' | 'running' | 'completed' | 'failed'
 
 type QueueRow = {
@@ -189,6 +213,8 @@ type LocalTaskRecord = {
 }
 
 const USE_MOCK = mockAigcFeaturesEnabled()
+const { mode: detectionMode, modePayload: detectionModePayload, imageSubmitMode } = useDetectionMode()
+
 const route = useRoute()
 const router = useRouter()
 const snackbar = useSnackbarStore()
@@ -250,7 +276,8 @@ function detectType(file: File): ResourceType {
   if (file.type.startsWith('image/')) return 'image'
   if (name.endsWith('.txt')) return 'review'
   if (name.endsWith('.pdf')) return 'paper'
-  if (name.endsWith('.zip') || name.endsWith('.rar')) return 'unknown'
+  if (name.endsWith('.docx')) return 'docx'
+  if (name.endsWith('.zip') || name.endsWith('.rar')) return 'archive'
   return 'unknown'
 }
 
@@ -262,6 +289,10 @@ function typeLabel(t: ResourceType) {
       return '论文 PDF'
     case 'review':
       return 'Review'
+    case 'archive':
+      return '压缩包（抽图）'
+    case 'docx':
+      return 'DOCX（需转 PDF）'
     default:
       return '未知'
   }
@@ -275,6 +306,10 @@ function typeColor(t: ResourceType) {
       return 'teal'
     case 'review':
       return 'deep-purple'
+    case 'archive':
+      return 'orange'
+    case 'docx':
+      return 'amber'
     default:
       return 'grey'
   }
@@ -316,7 +351,7 @@ function reset() {
 
 function toTaskType(t: ResourceType) {
   if (t === 'paper') return 'paper_aigc'
-  if (t === 'image') return 'image_detection'
+  if (t === 'image' || t === 'archive') return 'image_detection'
   if (t === 'review') return 'review_detection'
   return 'unknown'
 }
@@ -376,7 +411,12 @@ async function backendRun(row: QueueRow) {
   row.status = 'running'
   row.progress = 10
 
-  if (row.type === 'image') {
+  if (row.type === 'docx') {
+    row.error = '论文检测仅支持 PDF，请将 DOCX 转为 PDF 后上传。'
+    throw new Error(row.error)
+  }
+
+  if (row.type === 'image' || row.type === 'archive') {
     if (!row.file.type.startsWith('image/')) {
       row.error = '图像检测仅支持图片文件。'
       throw new Error(row.error)
@@ -409,9 +449,13 @@ async function backendRun(row: QueueRow) {
 
     row.progress = 70
     const taskName = `${row.batchSessionId.slice(0, 24)}-${row.name}`
+    const mode = detectionModePayload()
     const submitRes = await publisherApi.submitDetection({
       image_ids: images,
       task_name: taskName,
+      batch_session_id: row.batchSessionId,
+      detection_mode: mode,
+      mode: imageSubmitMode(),
     })
     row.taskId = String((submitRes.data as { task_id?: string | number }).task_id ?? '')
     row.progress = 100
@@ -425,7 +469,10 @@ async function backendRun(row: QueueRow) {
       throw new Error(row.error)
     }
     const taskName = `${row.batchSessionId.slice(0, 24)}-${row.name}`
-    const submitRes = await paperApi.uploadAndSubmitAigcTask(row.file, taskName)
+    const submitRes = await paperApi.uploadAndSubmitAigcTask(row.file, taskName, {
+      batch_session_id: row.batchSessionId,
+      detection_mode: detectionModePayload(),
+    })
     const payload = submitRes.data as { task_id?: string | number; status?: string; error_message?: string }
     row.taskId = String(payload.task_id ?? '')
     if (payload.status === 'failed') {
@@ -446,6 +493,8 @@ async function backendRun(row: QueueRow) {
       const submitRes = await submitReviewDetection({
         task_name: taskName,
         text: row.pastedReviewText,
+        batch_session_id: row.batchSessionId,
+        detection_mode: detectionModePayload(),
       })
       row.taskId = String((submitRes.data as { task_id?: string | number }).task_id ?? '')
       row.progress = 100
@@ -459,6 +508,8 @@ async function backendRun(row: QueueRow) {
     const submitRes = await submitReviewDetection({
       task_name: taskName,
       file: row.file,
+      batch_session_id: row.batchSessionId,
+      detection_mode: detectionModePayload(),
     })
     row.taskId = String((submitRes.data as { task_id?: string | number }).task_id ?? '')
     row.progress = 100
@@ -533,6 +584,9 @@ async function start() {
   const hint = firstFail?.error ? `（首条：${firstFail.error.slice(0, 100)}${firstFail.error.length > 100 ? '…' : ''}）` : ''
   snackbar.showMessage(`本批检测结束：成功 ${okCount}，失败 ${failCount} ${hint}`, failCount ? 'warning' : 'success')
   saveLocalTasks(rows.value)
+  if (okCount > 0 && batchSessionId.value) {
+    router.push({ path: '/history', query: { batch_session_id: batchSessionId.value } })
+  }
 }
 
 function openResult(row: QueueRow) {

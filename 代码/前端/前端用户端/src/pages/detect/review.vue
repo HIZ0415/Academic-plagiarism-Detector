@@ -106,6 +106,12 @@
           <v-card variant="outlined" class="pa-4">
             <div class="text-h6 mb-3">输入 Review 文本</div>
 
+            <div class="text-subtitle-2 font-weight-medium mb-2">检测模式</div>
+            <v-btn-toggle v-model="detectionMode" mandatory divided color="primary" density="comfortable" class="mb-3" :disabled="submitting">
+              <v-btn value="fast" class="text-none">标准模式</v-btn>
+              <v-btn value="precise" class="text-none">精准模式</v-btn>
+            </v-btn-toggle>
+
             <v-textarea
               v-model="reviewText"
               label="在线粘贴评审意见 / Review 全文"
@@ -186,11 +192,13 @@ import {
 } from '@/api/reviewDetection'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
+import { useDetectionMode } from '@/composables/useDetectionMode'
 
 const route = useRoute()
 const router = useRouter()
 const snackbar = useSnackbarStore()
 const useMock = mockAigcFeaturesEnabled()
+const { mode: detectionMode, modePayload: detectionModePayload } = useDetectionMode()
 
 const linkedTaskId = computed(() => {
   const q = route.query.task_id
@@ -371,6 +379,7 @@ async function submit() {
       task_name: name,
       file: file || undefined,
       text: file ? undefined : text,
+      detection_mode: detectionModePayload(),
     })
     lastResponse.value = res.data as Record<string, unknown>
     snackbar.showMessage('Review 检测任务已提交', 'success')

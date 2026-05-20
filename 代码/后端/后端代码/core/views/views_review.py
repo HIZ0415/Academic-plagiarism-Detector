@@ -551,7 +551,9 @@ def get_publisher_review_tasks(request):
     elif status_filter == 'completed':
         review_requests = review_requests.filter(status2='accepted', status1='completed')
     elif status_filter == 'failed':
-        review_requests = review_requests.filter(status2='refused')
+        review_requests = review_requests.filter(status2='refused').exclude(check_reason='publisher_cancelled')
+    elif status_filter == 'cancelled':
+        review_requests = review_requests.filter(check_reason='publisher_cancelled')
     if start_time:
         review_requests = review_requests.filter(request_time__gte=start_time)
     if end_time:
@@ -573,7 +575,9 @@ def get_publisher_review_tasks(request):
         completed_reviews_count = review_request.manual_reviews.filter(status='completed').count()
         progress = f"{completed_reviews_count}/{denominator}"
 
-        if review_request.status2 == 'refused':
+        if (review_request.check_reason or '').strip() == 'publisher_cancelled':
+            ui_status = 'cancelled'
+        elif review_request.status2 == 'refused':
             ui_status = 'failed'
         elif review_request.status2 == 'pending':
             ui_status = 'pending'

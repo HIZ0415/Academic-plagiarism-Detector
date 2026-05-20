@@ -28,6 +28,7 @@ from ..models import DetectionTask, FileManagement, Log, User
 from ..utils.ai_gateway import AIGatewayError, run_text_detection_payload
 from ..utils.paper_preprocessing import preprocess_pdf_paper
 from ..utils.review_preprocessing import preprocess_review_bytes, preprocess_review_text
+from ..utils.factual_check import build_factual_conclusions
 
 ALPHA_ALLOWED_PAPER_EXT = {".pdf"}
 ALPHA_ALLOWED_REVIEW_FILE_EXT = {".txt"}
@@ -222,12 +223,15 @@ def _build_aigc_result(task, paper_text, paragraphs_data=None):
     high_count = sum(1 for p in paragraphs if p["risk_level"] == "high")
     summary = f"检测完成：AI 贡献占比约 {round(ratio * 100, 1)}%，高风险段落 {high_count} 段。"
 
+    factual = build_factual_conclusions(paragraphs, paper_text)
     return {
         "task_id": task.id,
         "overall_risk_level": _risk_level(ratio),
         "ai_contribution_ratio": ratio,
         "summary": summary,
         "paragraphs": paragraphs,
+        "factual_conclusions": factual,
+        "factual_issues": factual,
     }
 
 
@@ -254,24 +258,30 @@ def _build_aigc_result_from_ai(task, ai_result):
             paper_summary.get("overall_risk_score", item.get("overall_confidence", 0.0)),
         )
     )
+    para_list = [
+        {
+            "index": paragraph.get("index"),
+            "risk_score": float(paragraph.get("risk_score", paragraph.get("ai_generated_probability", 0.0))),
+            "risk_level": paragraph.get("risk_level", "low"),
+            "excerpt": paragraph.get("excerpt", ""),
+            "char_start": paragraph.get("char_start"),
+            "char_end": paragraph.get("char_end"),
+            "basic_explanation": paragraph.get("basic_explanation", ""),
+        }
+        for paragraph in paragraph_risks
+        if isinstance(paragraph, dict)
+    ]
+    factual = details.get("factual_conclusions")
+    if not isinstance(factual, list) or not factual:
+        factual = build_factual_conclusions(para_list)
     return {
         "task_id": task.id,
         "overall_risk_level": paper_summary.get("risk_level") or _risk_level(ratio),
         "ai_contribution_ratio": ratio,
         "summary": paper_summary.get("summary_text") or item.get("summary") or "论文 AIGC 检测完成。",
-        "paragraphs": [
-            {
-                "index": paragraph.get("index"),
-                "risk_score": float(paragraph.get("risk_score", paragraph.get("ai_generated_probability", 0.0))),
-                "risk_level": paragraph.get("risk_level", "low"),
-                "excerpt": paragraph.get("excerpt", ""),
-                "char_start": paragraph.get("char_start"),
-                "char_end": paragraph.get("char_end"),
-                "basic_explanation": paragraph.get("basic_explanation", ""),
-            }
-            for paragraph in paragraph_risks
-            if isinstance(paragraph, dict)
-        ],
+        "paragraphs": para_list,
+        "factual_conclusions": factual,
+        "factual_issues": factual,
         "paper_summary": paper_summary,
         "basic_explanation": details.get("basic_explanation", []),
         "raw_ai_result": ai_result,
@@ -518,6 +528,17 @@ def upload_paper(request):
 #  论文检测提交 — 派发 Celery 异步任务
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _detection_mode_fields(request, default_llm: bool):
+    mode = (request.data.get("detection_mode") or "").strip().lower()
+    use_llm = default_llm or mode == "precise"
+    batch_session_id = (request.data.get("batch_session_id") or "")[:64]
+    return {
+        "if_use_llm": use_llm,
+        "detection_mode": "precise" if use_llm else "fast",
+        "batch_session_id": batch_session_id,
+    }
+
+
 def _submit_paper_task(request, expected_type):
     """通用提交逻辑：paper_aigc / resource_check"""
     user = User.objects.get(id=request.user.id)
@@ -526,6 +547,7 @@ def _submit_paper_task(request, expected_type):
 
     paper_file_id = request.data.get("paper_file_id")
     task_name = (request.data.get("task_name") or "paper-task").strip()
+    mode_fields = _detection_mode_fields(request, default_llm=(expected_type == "paper_aigc"))
     if not paper_file_id:
         return Response({"detail": "paper_file_id 不能为空。"}, status=400)
     try:
@@ -550,7 +572,7 @@ def _submit_paper_task(request, expected_type):
         task_name=task_name,
         status="pending",
         error_message="",
-        if_use_llm=(expected_type == "paper_aigc"),
+        **mode_fields,
     )
 
     Log.objects.create(
@@ -788,6 +810,7 @@ def submit_review_detection_task(request):
         },
     )
 
+    mode_fields = _detection_mode_fields(request, default_llm=False)
     task = DetectionTask.objects.create(
         organization=user.organization,
         user=request.user,
@@ -796,7 +819,7 @@ def submit_review_detection_task(request):
         task_name=task_name,
         status="pending",
         error_message="",
-        if_use_llm=False,
+        **mode_fields,
     )
     Log.objects.create(
         user=request.user,

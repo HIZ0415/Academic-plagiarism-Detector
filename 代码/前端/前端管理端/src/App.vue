@@ -53,6 +53,38 @@
           @click="goToLogs"
         />
 
+        <v-list-item
+          v-if="isLoggedIn"
+          prepend-icon="mdi-file-document-outline"
+          title="论文检测日志"
+          value="paper-logs"
+          @click="navigate('/paper-logs')"
+        />
+
+        <v-list-item
+          v-if="isLoggedIn"
+          prepend-icon="mdi-text-box-search-outline"
+          title="Review 检测日志"
+          value="review-logs"
+          @click="navigate('/review-logs')"
+        />
+
+        <v-list-item
+          v-if="isLoggedIn"
+          prepend-icon="mdi-cog-outline"
+          title="模型配置"
+          value="model-config"
+          @click="navigate('/model-config')"
+        />
+
+        <v-list-item
+          v-if="isLoggedIn"
+          prepend-icon="mdi-flag-outline"
+          title="举报处理"
+          value="reports"
+          @click="navigate('/reports')"
+        />
+
         <v-divider class="my-2"></v-divider>
         <v-list-item v-if="isLoggedIn" prepend-icon="mdi-logout" title="退出登录" value="logout" @click="handleLogout" />
         <v-list-item v-else prepend-icon="mdi-login" title="登录" value="login" @click="goToLogin" />

@@ -34,6 +34,11 @@
           <v-card variant="outlined" class="pa-4 h-100">
             <div class="text-h6 mb-1">{{ panelA.title }}</div>
             <p class="text-body-2 text-medium-emphasis mb-4">{{ panelA.hint }}</p>
+            <div class="text-subtitle-2 font-weight-medium mb-2">检测模式</div>
+            <v-btn-toggle v-model="detectionMode" mandatory divided color="primary" density="comfortable" class="mb-3" :disabled="isSubmitting">
+              <v-btn value="fast" class="text-none">标准模式</v-btn>
+              <v-btn value="precise" class="text-none">精准模式</v-btn>
+            </v-btn-toggle>
             <v-file-input
               v-model="selectedFiles"
               :accept="panelA.accept"
@@ -149,9 +154,22 @@
         <div class="text-body-1 mt-4">{{ latestResult.summary }}</div>
       </v-card>
 
+      <v-card v-if="factualRows.length && activeTab === 'aigc'" variant="outlined" class="mt-5 pa-4">
+        <div class="text-h6 mb-2">事实性鉴伪子结论</div>
+        <v-expansion-panels variant="accordion">
+          <v-expansion-panel v-for="fc in factualRows" :key="fc.id || fc.title" :title="fc.title">
+            <v-expansion-panel-text>
+              <ul class="pl-4 mb-0">
+                <li v-for="(r, i) in fc.reasons" :key="i" class="text-body-2">{{ r }}</li>
+              </ul>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+      </v-card>
+
       <v-card v-if="paragraphRows.length && activeTab === 'aigc'" variant="outlined" class="mt-5 pa-4">
         <div class="text-h6 mb-2">段落级 AIGC 风险（仅 AIGC 检测）</div>
-        <p class="text-caption text-medium-emphasis mb-3">段落序号、风险分数与摘录来自 <code>getAigcResult</code>；学术资源检测不会产生本表。</p>
+        <p class="text-caption text-medium-emphasis mb-3">点击行可高亮当前段落；数据来自 <code>getAigcResult</code>。</p>
         <v-table density="compact">
           <thead>
             <tr>
@@ -162,7 +180,13 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in paragraphRows" :key="item.index">
+            <tr
+              v-for="item in paragraphRows"
+              :key="item.index"
+              :class="{ 'bg-amber-lighten-4': selectedParagraphIndex === item.index }"
+              class="cursor-pointer"
+              @click="selectedParagraphIndex = item.index"
+            >
               <td>{{ item.index }}</td>
               <td>{{ item.score }}</td>
               <td>{{ item.level }}</td>
@@ -170,6 +194,9 @@
             </tr>
           </tbody>
         </v-table>
+        <v-alert v-if="highlightedExcerpt" type="info" variant="tonal" density="compact" class="mt-3 text-body-2">
+          <strong>当前段落 P{{ selectedParagraphIndex }}：</strong>{{ highlightedExcerpt }}
+        </v-alert>
       </v-card>
 
       <v-card v-if="resourceIssueRows.length && activeTab === 'resource'" variant="outlined" class="mt-5 pa-4">
@@ -215,6 +242,7 @@ import { useRoute, useRouter } from 'vue-router'
 import paperApi from '@/api/paper'
 import type { ResourceIssue, TaskStatus } from '@/types/core'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
+import { useDetectionMode } from '@/composables/useDetectionMode'
 
 type ParagraphResult = {
   index: number
@@ -252,8 +280,16 @@ const error = ref('')
 const tasks = ref<BatchTaskRow[]>([])
 const latestResult = ref<LatestResult | null>(null)
 const paragraphRows = ref<ParagraphResult[]>([])
+const factualRows = ref<{ id?: string; title: string; reasons: string[] }[]>([])
+const selectedParagraphIndex = ref<number | null>(null)
 const resourceIssueRows = ref<ResourceIssue[]>([])
+
+const highlightedExcerpt = computed(() => {
+  if (selectedParagraphIndex.value == null) return ''
+  return paragraphRows.value.find((p) => p.index === selectedParagraphIndex.value)?.excerpt || ''
+})
 const useMockAigc = mockAigcFeaturesEnabled()
+const { mode: detectionMode, modePayload: detectionModePayload } = useDetectionMode()
 
 const panelA = computed(() => {
   if (activeTab.value === 'aigc') {
@@ -333,6 +369,8 @@ function clearWorkspace() {
   tasks.value = []
   latestResult.value = null
   paragraphRows.value = []
+  factualRows.value = []
+  selectedParagraphIndex.value = null
   resourceIssueRows.value = []
   error.value = ''
   selectedFiles.value = []
@@ -387,10 +425,11 @@ const submitBatchTasks = async () => {
         row.progress = 100
       } else {
         const taskName = createTaskName(i)
+        const modeOpts = { detection_mode: detectionModePayload() }
         const submitRes =
           tab === 'aigc'
-            ? await paperApi.uploadAndSubmitAigcTask(file, taskName)
-            : await paperApi.uploadAndSubmitResourceTask(file, taskName)
+            ? await paperApi.uploadAndSubmitAigcTask(file, taskName, modeOpts)
+            : await paperApi.uploadAndSubmitResourceTask(file, taskName, modeOpts)
         row.taskId = String(submitRes.data.task_id)
         row.progress = 30
       }
@@ -446,6 +485,14 @@ const syncSingleTask = async (row: BatchTaskRow) => {
       level: item.risk_level as ParagraphResult['level'],
       excerpt: item.excerpt as string,
     }))
+    factualRows.value = (data.factual_conclusions || data.factual_issues || []).map(
+      (fc: Record<string, unknown>) => ({
+        id: String(fc.id || fc.title || ''),
+        title: String(fc.title || '子结论'),
+        reasons: Array.isArray(fc.reasons) ? fc.reasons.map(String) : [],
+      }),
+    )
+    selectedParagraphIndex.value = paragraphRows.value[0]?.index ?? null
     resourceIssueRows.value = []
   } else {
     const resultRes = await paperApi.getResourceResult(row.taskId)

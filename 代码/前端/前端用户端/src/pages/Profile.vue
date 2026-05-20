@@ -39,6 +39,13 @@
                 <v-list-item-title>个人简介</v-list-item-title>
                 <v-list-item-subtitle>{{ userStore.profile || '未设置' }}</v-list-item-subtitle>
               </v-list-item>
+              <v-list-item v-if="effectiveRole === 'publisher'">
+                <template v-slot:prepend>
+                  <v-icon>mdi-star-circle</v-icon>
+                </template>
+                <v-list-item-title>用户等级</v-list-item-title>
+                <v-list-item-subtitle>{{ publisherLevelLabel }}</v-list-item-subtitle>
+              </v-list-item>
             </v-list>
           </v-card-text>
           <v-card-actions class="justify-center">
@@ -76,6 +83,33 @@
       </v-col>
 
       <v-col cols="12" md="8">
+        <v-card v-if="effectiveRole === 'publisher'" id="detection-prefs" class="mb-4" variant="outlined">
+          <v-card-title class="text-subtitle-1 font-weight-bold">检测偏好</v-card-title>
+          <v-card-subtitle class="text-wrap">
+            查看平台模型信息，并设置<strong>默认</strong>检测模式；在「统一学术检测」等页面提交时仍可临时切换标准 / 精准。
+          </v-card-subtitle>
+          <v-card-text>
+            <v-list v-if="modelEntries.length" density="compact" class="mb-4">
+              <v-list-item v-for="item in modelEntries" :key="item.key">
+                <v-list-item-title>{{ item.label }}</v-list-item-title>
+                <v-list-item-subtitle>
+                  {{ item.name }} · v{{ item.version }}
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+            <v-alert v-else type="info" variant="tonal" density="compact" class="mb-4">模型目录加载中或暂不可用</v-alert>
+
+            <div class="text-subtitle-2 font-weight-medium mb-2">默认检测模式</div>
+            <v-btn-toggle v-model="defaultDetectionMode" mandatory divided color="primary" density="comfortable" class="mb-3">
+              <v-btn value="fast" class="text-none">标准模式</v-btn>
+              <v-btn value="precise" class="text-none">精准模式</v-btn>
+            </v-btn-toggle>
+            <v-btn color="primary" variant="tonal" class="text-none" :loading="savingDetectionPrefs" @click="saveDetectionPrefs">
+              保存为默认
+            </v-btn>
+          </v-card-text>
+        </v-card>
+
         <!-- 最近活动 -->
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -188,6 +222,70 @@ import VerificationCodeInput from '@/components/VerificationCodeInput.vue'
 import publisher from '@/api/publisher'
 import reviewer from '@/api/reviewer'
 import { useEffectiveRole } from '@/composables/useEffectiveRole'
+import platform from '@/api/platform'
+import { useDetectionMode, type DetectionMode } from '@/composables/useDetectionMode'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+const { setMode: setGlobalDetectionMode } = useDetectionMode()
+
+const defaultDetectionMode = ref<DetectionMode>('fast')
+const savingDetectionPrefs = ref(false)
+
+const modelEntries = ref<{ key: string; label: string; name: string; version: string }[]>([])
+
+const MODEL_CATALOG_KEYS = [
+  { key: 'text_model', label: '文本' },
+  { key: 'image_model', label: '图像' },
+  { key: 'review_model', label: 'Review' },
+] as const
+
+async function loadDetectionPrefs() {
+  try {
+    const res = await platform.getDetectionModels()
+    const data = res.data as {
+      catalog?: Record<string, { name?: string; version?: string }>
+      user_preferences?: { mode?: DetectionMode }
+    }
+    const catalog = data.catalog || {}
+    modelEntries.value = MODEL_CATALOG_KEYS.map(({ key, label }) => {
+      const m = catalog[key]
+      return {
+        key,
+        label,
+        name: m?.name || '—',
+        version: m?.version || '—',
+      }
+    })
+    const mode = data.user_preferences?.mode
+    if (mode === 'fast' || mode === 'precise') {
+      defaultDetectionMode.value = mode
+      setGlobalDetectionMode(mode)
+    }
+  } catch {
+    modelEntries.value = []
+  }
+}
+
+async function saveDetectionPrefs() {
+  savingDetectionPrefs.value = true
+  try {
+    await platform.updateDetectionPreferences({ mode: defaultDetectionMode.value })
+    setGlobalDetectionMode(defaultDetectionMode.value)
+    snackbar.showMessage('默认检测模式已保存', 'success')
+  } catch {
+    snackbar.showMessage('保存失败，请稍后重试', 'error')
+  } finally {
+    savingDetectionPrefs.value = false
+  }
+}
+
+function scrollToDetectionPrefs() {
+  if (route.query.tab !== 'detection-prefs') return
+  requestAnimationFrame(() => {
+    document.getElementById('detection-prefs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
 
 const snackbar = useSnackbarStore()
 const userStore = useUserStore()
@@ -409,6 +507,8 @@ onMounted(async () => {
       stats.value.completedTasks = response.completed_task_count
       stats.value.uploadedTasks = response.total_task_count
       recentActivities.value = normalizeActivities(response.recent_tasks || [], 'publisher')
+      await loadDetectionPrefs()
+      scrollToDetectionPrefs()
     } else {
       const res = (await reviewer.getTaskCount()).data
       stats.value.completedTasks = res.total_completed_tasks
@@ -510,6 +610,14 @@ const getStatusColor = (status: string) => {
       return 'grey'
   }
 }
+
+const publisherLevelLabel = computed(() => {
+  const n = stats.value.completedTasks || 0
+  if (n >= 50) return '资深用户 Lv.4'
+  if (n >= 20) return '活跃用户 Lv.3'
+  if (n >= 5) return '进阶用户 Lv.2'
+  return '入门用户 Lv.1'
+})
 
 const isEditFormValid = computed(() => {
   return (!editForm.value.username || editForm.value.username.length <= 10) &&

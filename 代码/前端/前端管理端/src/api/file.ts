@@ -9,6 +9,8 @@ export default {
     page_size: number;
     query?: string;
     categories?: string;
+    resource_type?: string;
+    fake_degree?: string;
     startTime?: string;
     endTime?: string;
   }) {

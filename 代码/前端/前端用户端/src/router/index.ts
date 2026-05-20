@@ -16,7 +16,18 @@ import { routes } from 'vue-router/auto-routes'
 import { isLoggedIn } from '@/api/user'
 import { getEffectiveRoleAtGuard } from '@/utils/effectiveRole'
 
-const PUBLISHER_PATHS = ['/upload', '/history', '/annual', '/detect', '/manual-review-result', '/step']
+const PUBLISHER_PATHS = [
+  '/upload',
+  '/history',
+  '/annual',
+  '/detect',
+  '/manual-review-result',
+  '/step',
+  '/community-feedback',
+  '/comprehensive-report',
+  '/multimodal-fusion',
+  '/detection-settings',
+]
 const REVIEWER_PATHS = ['/review', '/task']
 
 function isUnder(path: string, roots: string[]) {
@@ -78,13 +89,6 @@ router.beforeEach(
     }
 
     if (to.path === '/detect/image') {
-      next({ path: '/upload', replace: true })
-      return
-    }
-    if (
-      (to.path === '/detect/paper' || to.path === '/detect/review') &&
-      !String(to.query.task_id || '').trim()
-    ) {
       next({ path: '/upload', replace: true })
       return
     }

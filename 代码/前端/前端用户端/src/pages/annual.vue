@@ -105,6 +105,16 @@
             >
               下载报告
             </v-btn>
+            <v-btn
+              size="small"
+              variant="text"
+              color="error"
+              class="text-none"
+              :disabled="!canTerminate(item)"
+              @click="terminateReview(item)"
+            >
+              终止审核
+            </v-btn>
           </div>
         </template>
       </v-data-table>
@@ -250,6 +260,7 @@ import {
   createManualReviewRequest,
   listPublisherManualReviewApplications,
 } from '@/api/manualReviewWorkflow'
+import platform from '@/api/platform'
 import publisher from '@/api/publisher'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
@@ -396,6 +407,8 @@ const getStatusColor = (status: string) => {
       return 'success'
     case 'failed':
       return 'error'
+    case 'cancelled':
+      return 'grey'
     default:
       return 'grey'
   }
@@ -411,8 +424,25 @@ const getStatusName = (status: string) => {
       return '已完成'
     case 'failed':
       return '管理端已拒绝'
+    case 'cancelled':
+      return '已终止'
     default:
       return status
+  }
+}
+
+function canTerminate(item: Task) {
+  return item.status === 'pending' || item.status === 'in_progress'
+}
+
+async function terminateReview(item: Task) {
+  if (!confirm('确定终止该人工审核？终止后专家将无法继续提交。')) return
+  try {
+    await platform.cancelManualReview(item.review_request_id)
+    snackbar.showMessage('已终止', 'success')
+    await fetchTasks(currentPage.value, pageSize.value)
+  } catch {
+    snackbar.showMessage('终止失败', 'error')
   }
 }
 
