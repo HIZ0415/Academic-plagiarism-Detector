@@ -5,7 +5,7 @@
         <h1 class="text-h4 font-weight-bold">人工审核申请</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
           发布者（编辑）侧：发起人工审核申请 → 组织管理员审批 → 专家鉴定 → <strong>本页查看进度与最终结果</strong>。
-          专家提交后请点击「查看结果」进入汇总页（<code>/manual-review-result</code>）。
+          专家提交后请点击「查看结果」进入人工审核汇总页。
         </p>
       </v-col>
     </v-row>
@@ -19,7 +19,7 @@
       closable
       @click:close="clearFromTaskHint"
     >
-      您从检测任务 <code>{{ fromTaskId }}</code> 跳转而来；可直接点击「发起人工审核申请」预填该任务 ID，或在下列列表中跟踪进度。
+      您从检测任务（编号 {{ fromTaskId }}）跳转而来；可直接点击「发起人工审核申请」预填该任务，或在下列列表中跟踪进度。
     </v-alert>
 
     <v-row class="mb-4">
@@ -79,7 +79,7 @@
         </template>
 
         <template v-slot:item.detection_task_id="{ item }">
-          <code class="text-body-2">{{ item.detection_task_id || '—' }}</code>
+          <span class="text-body-2">{{ item.detection_task_id || '—' }}</span>
         </template>
 
         <template v-slot:item.actions="{ item }">
@@ -150,7 +150,7 @@
         <v-card-text>
           <v-text-field
             v-model="createForm.detection_task_id"
-            label="关联自动检测任务 ID *"
+            label="关联检测任务编号 *"
             variant="outlined"
             density="comfortable"
             hide-details="auto"
@@ -184,7 +184,7 @@
           />
           <v-text-field
             v-model="createForm.batch_session_id"
-            label="统一检测批次 ID（可选）"
+            label="统一检测批次编号（可选）"
             variant="outlined"
             density="comfortable"
             hide-details="auto"
@@ -305,7 +305,7 @@ async function submitCreate() {
   const tid = createForm.value.detection_task_id.trim()
   const reason = createForm.value.reason.trim()
   if (!tid) {
-    snackbar.showMessage('请填写关联检测任务 ID', 'warning')
+    snackbar.showMessage('请填写关联检测任务编号', 'warning')
     return
   }
   if (reason.length < 10) {
@@ -325,7 +325,7 @@ async function submitCreate() {
     showCreateDialog.value = false
     await fetchTasks(currentPage.value, pageSize.value)
   } catch {
-    snackbar.showMessage('提交失败，请确认 Django 已启动且 POST /manual-review-requests/ 可用', 'error')
+    snackbar.showMessage('提交失败，请确认后端服务已启动后重试', 'error')
   } finally {
     createSubmitting.value = false
   }
@@ -353,7 +353,7 @@ interface Task {
 
 const headers = [
   { title: '申请单号', key: 'review_request_id', align: 'start' as const },
-  { title: '检测任务 ID', key: 'detection_task_id', align: 'center' as const },
+  { title: '检测任务', key: 'detection_task_id', align: 'center' as const },
   { title: '提交时间', key: 'request_time', align: 'center' as const },
   { title: '状态', key: 'status', align: 'center' as const },
   { title: '专家进度', key: 'progress', align: 'center' as const },
@@ -479,7 +479,7 @@ function formatReportDownloadError(e: unknown): string {
     return d.detail
   }
   if (d instanceof Blob) {
-    return '报告生成失败（请重启 Django 后重试）'
+    return '报告生成失败，请稍后重试或联系管理员'
   }
   if (ax.response?.status === 202) {
     return '报告正在生成，请稍后重试'
@@ -521,7 +521,7 @@ function formatLoadListError(e: unknown): string {
   }
   if (typeof d?.error === 'string') return d.error
   if (typeof d?.message === 'string') return d.message
-  return '获取任务列表失败，请确认已用编辑账号登录且 Django 已启动'
+  return '获取申请列表失败，请确认已登录且网络正常'
 }
 
 // 时间验证相关

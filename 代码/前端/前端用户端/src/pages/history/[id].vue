@@ -189,18 +189,30 @@ function goRepeatDetection() {
 
 function goSpecialDetail() {
   if (task.value.task_type === 'paper_aigc') {
-    router.push({ path: '/detect/paper', query: { tab: 'aigc', task_id: taskId.value } })
+    router.push({ path: '/upload', query: { section: 'paper', paper_tab: 'aigc', task_id: taskId.value } })
     return
   }
   if (task.value.task_type === 'resource_check') {
-    router.push({ path: '/detect/paper', query: { tab: 'resource', task_id: taskId.value } })
+    router.push({ path: '/upload', query: { section: 'paper', paper_tab: 'resource', task_id: taskId.value } })
     return
   }
   if (task.value.task_type === 'review_detection') {
-    router.push({ path: '/detect/review', query: { task_id: taskId.value } })
+    router.push({ path: '/upload', query: { section: 'review', task_id: taskId.value } })
     return
   }
-  router.push(`/step/${taskId.value}`)
+  router.push({
+    path: '/history',
+    query: {
+      detail_id: taskId.value,
+      task_type: task.value.task_type || 'image_detection',
+      status: task.value.status,
+      progress: String(task.value.progress || 0),
+      upload_time: task.value.upload_time || '',
+      completion_time: task.value.completion_time || '',
+      error_message: task.value.error_message || '',
+      source: 'history',
+    },
+  })
 }
 
 onMounted(async () => {

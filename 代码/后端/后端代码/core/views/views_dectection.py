@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from django.utils import timezone
 from ..models import DetectionResult, ImageUpload, Log, User
 from django.db.models import Q
+from django.db.models.functions import Coalesce
 from datetime import datetime
 from django.core.paginator import Paginator
 from ..utils.image_preprocessing import DetectionBatchImage, build_detection_batch_artifacts
@@ -694,7 +695,11 @@ def get_user_tasks(request):
     end_time = request.query_params.get('endTime', None)
 
     # 获取当前用户的所有检测任务并应用筛选条件
-    tasks = DetectionTask.objects.filter(user=request.user).order_by('-upload_time')
+    tasks = (
+        DetectionTask.objects.filter(user=request.user)
+        .annotate(sort_time=Coalesce('completion_time', 'upload_time'))
+        .order_by('-sort_time')
+    )
 
     if task_type:
         tasks = tasks.filter(task_type=task_type)

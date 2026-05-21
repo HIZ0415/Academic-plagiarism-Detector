@@ -5,14 +5,14 @@
         <h1 class="text-h4 font-weight-bold mb-2">人工审核任务池</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
           本页供<strong>专家（审稿人）</strong>使用：组织管理员在管理端<strong>通过</strong>申请后，任务会出现在此列表。
-          点击<strong>进入审核</strong>打开详情页，查看 AI 参考结论并提交人工鉴定（图像 / 论文 / Review 由 <code>task_kind</code> 区分）。
+          点击<strong>进入审核</strong>打开详情页，查看 AI 参考结论并提交人工鉴定（按图像、论文或 Review 等材料类型区分）。
         </p>
       </v-col>
     </v-row>
 
     <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      <strong>流程：</strong>发布者「人工审核申请」→ 组织管理员审批（<code>accepted</code>）→ 本页待办 →
-      <code>/task/detail/{manual_review_id}</code> 提交结论 → 发布者在申请/历史中查看汇总。
+      <strong>流程：</strong>发布者提交「人工审核申请」→ 组织管理员审批通过 → 本页待办 →
+      进入审核页填写结论 → 发布者在「人工审核申请」或「检测历史」中查看汇总结果。
     </v-alert>
 
     <v-row class="mb-4">
@@ -133,7 +133,7 @@
             <v-icon size="48" class="mb-2">mdi-clipboard-text-off-outline</v-icon>
             <div class="text-body-1">暂无人工审核任务</div>
             <div class="text-body-2 mt-2">
-              请确认：① 已用<strong>专家</strong>账号登录；② 组织管理员已<strong>通过</strong>申请；③ Django 服务已启动。
+              请确认：① 已用<strong>专家</strong>账号登录；② 组织管理员已<strong>通过</strong>申请；③ 后端服务已正常启动。
             </div>
           </div>
         </template>
@@ -340,7 +340,7 @@ function formatLoadError(e: unknown): string {
   if (status === 401) return serverMsg || '登录已过期，请重新登录'
   if (status === 400) return serverMsg || '请求参数无效'
   if (serverMsg) return serverMsg
-  return ax.message || '无法连接后端，请确认 Django 已启动（http://127.0.0.1:8000）'
+  return ax.message || '无法连接服务器，请确认网络与后端服务正常'
 }
 
 function mapRow(raw: Record<string, unknown>): ReviewerTaskRow {
@@ -446,7 +446,7 @@ function applyFilters() {
 }
 
 function goDetail(item: ReviewerTaskRow) {
-  router.push(`/task/detail/${item.manual_review_id}`)
+  router.push(`/manual-review/${item.manual_review_id}`)
 }
 
 onMounted(() => {

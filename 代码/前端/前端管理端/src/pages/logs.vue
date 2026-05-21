@@ -1,14 +1,31 @@
 <template>
   <v-container>
-  <!-- 标题 -->
-  <v-row class="mb-6">
+  <v-row class="mb-4">
     <v-col>
-      <h1 class="text-h4 font-weight-bold">操作与审计日志</h1>
+      <h1 class="text-h4 font-weight-bold">系统日志</h1>
       <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
-        按用户、时间与类型检索关键操作记录，支撑审计与故障排查。
+        <strong>用户操作留痕</strong>记录谁在何时做了何事（上传、自动检测、人工审核申请与专家提交等）；
+        <strong>检测任务记录</strong>按论文 / Review / 图像查看各检测任务的状态与失败原因。人工审核审批仍在侧栏「人工审核审批」处理，相关动作会出现在操作留痕中。
       </p>
     </v-col>
   </v-row>
+
+  <v-tabs v-model="mainTab" color="primary" class="mb-2">
+    <v-tab value="operations">用户操作留痕</v-tab>
+    <v-tab value="detection">检测任务记录</v-tab>
+  </v-tabs>
+
+  <v-window v-model="mainTab">
+  <v-window-item value="operations" class="pt-4">
+
+  <v-chip-group v-model="operationQuickFilter" class="mb-2" mandatory filter>
+    <v-chip value="all" variant="outlined" class="text-none">全部</v-chip>
+    <v-chip value="detection" variant="outlined" class="text-none">检测与上传</v-chip>
+    <v-chip value="manual_review" variant="outlined" class="text-none">人工审核</v-chip>
+  </v-chip-group>
+  <p v-if="operationQuickFilter !== 'all'" class="text-caption text-medium-emphasis mb-4">
+    快捷分类在当前页结果上筛选；精确检索请在「筛选」中指定业务动作。
+  </p>
 
   <!-- 搜索和筛选区域 -->
   <v-row class="mb-4 align-center">
@@ -202,18 +219,39 @@
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  </v-window-item>
+
+  <v-window-item value="detection" class="pt-4">
+    <DetectionLogsPage embedded :initial-scope="detectionScope" />
+  </v-window-item>
+  </v-window>
 </v-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
+import DetectionLogsPage from '@/components/admin/DetectionLogsPage.vue'
 import logApi from '@/api/log'
 import userApi from '@/api/user'
 import axios from 'axios'
 import type { UserListItem } from '@/types/core'
 
 const snackbar = useSnackbarStore()
+const route = useRoute()
+const router = useRouter()
+
+const mainTab = ref<'operations' | 'detection'>(
+  route.query.tab === 'detection' ? 'detection' : 'operations',
+)
+const detectionScope = ref<'paper' | 'review' | 'image'>(
+  route.query.scope === 'review' || route.query.scope === 'image'
+    ? (route.query.scope as 'review' | 'image')
+    : 'paper',
+)
+const operationQuickFilter = ref<'all' | 'detection' | 'manual_review'>('all')
 
 interface Log {
   id: number
@@ -228,8 +266,8 @@ interface Log {
 const headers = computed(() => {
   const baseHeaders = [
     { title: '操作用户', key: 'user', align: 'start' },
-    { title: '操作类型', key: 'operation_type', align: 'center' },
-    { title: '相关模型', key: 'related_model', align: 'center' },
+    { title: '业务动作', key: 'operation_type', align: 'center' },
+    { title: '关联对象', key: 'related_model', align: 'center' },
     { title: '相关ID', key: 'related_id', align: 'center' },
     { title: '操作时间', key: 'operation_time', align: 'center' },
   ]
@@ -272,9 +310,9 @@ const filters = ref<{
 
 const operationTypeOptions = [
   { title: '上传图像', value: 'upload' },
-  { title: 'AI检测', value: 'detection' },
-  { title: '发布审核', value: 'review_request' },
-  { title: '提交审核', value: 'manual_review' }
+  { title: 'AI 自动检测', value: 'detection' },
+  { title: '发起人工审核申请', value: 'review_request' },
+  { title: '专家提交审核结论', value: 'manual_review' },
 ]
 
 const getImageUrl = (url?: string) => {
@@ -386,7 +424,7 @@ const fetchLogs = async (page: number, pageSize: number) => {
     const { data } = response
 
     if (data && data.logs) {
-      logs.value = data.logs.map((log: any) => ({
+      let rows = data.logs.map((log: any) => ({
         id: log.id,
         user: log.user,
         organization: log.organization || '未知组织',
@@ -395,6 +433,24 @@ const fetchLogs = async (page: number, pageSize: number) => {
         related_id: log.related_id,
         operation_time: log.operation_time
       }))
+      if (operationQuickFilter.value === 'detection') {
+        rows = rows.filter(
+          (log) =>
+            log.operation_type === 'upload' ||
+            log.operation_type === 'detection' ||
+            log.related_model === 'DetectionTask' ||
+            log.related_model === 'FileManagement',
+        )
+      } else if (operationQuickFilter.value === 'manual_review') {
+        rows = rows.filter(
+          (log) =>
+            log.operation_type === 'review_request' ||
+            log.operation_type === 'manual_review' ||
+            log.related_model === 'ReviewRequest' ||
+            log.related_model === 'ManualReview',
+        )
+      }
+      logs.value = rows
 
       currentPage.value = data.current_page
       totalPages.value = data.total_pages
@@ -446,9 +502,9 @@ const getOperationType = (type: string) => {
     case 'detection':
       return 'AI检测'
     case 'review_request':
-      return '发布审核'
+      return '发起人工审核申请'
     case 'manual_review':
-      return '提交审核'
+      return '专家提交审核结论'
     default:
       return '未知'
   }
@@ -461,9 +517,9 @@ const getRelatedModel = (model: string) => {
     case 'FileManagement':
       return "文件管理"
     case 'ReviewRequest':
-      return "人工审核请求"
+      return '人工审核申请单'
     case 'ManualReview':
-      return "人工审核提交"
+      return '专家审核记录'
     default:
       return '未知'
   }
@@ -506,7 +562,17 @@ const currentUser = ref<{
   admin_type?: string;
 } | null>(null)
 
+watch(mainTab, (tab) => {
+  const query: Record<string, string> = { ...route.query as Record<string, string>, tab }
+  if (tab !== 'detection') delete query.scope
+  router.replace({ query })
+})
 
+watch(operationQuickFilter, () => {
+  filters.value.operationType = null
+  currentPage.value = 1
+  fetchLogs(1, pageSize.value)
+})
 
 // 初始化
 onMounted(async () => {

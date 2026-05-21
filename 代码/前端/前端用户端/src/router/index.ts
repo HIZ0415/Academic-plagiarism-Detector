@@ -22,13 +22,12 @@ const PUBLISHER_PATHS = [
   '/annual',
   '/detect',
   '/manual-review-result',
-  '/step',
+  '/image-review',
   '/community-feedback',
   '/comprehensive-report',
-  '/multimodal-fusion',
   '/detection-settings',
 ]
-const REVIEWER_PATHS = ['/review', '/task']
+const REVIEWER_PATHS = ['/review', '/manual-review']
 
 function isUnder(path: string, roots: string[]) {
   return roots.some((r) => path === r || path.startsWith(`${r}/`))
@@ -90,6 +89,65 @@ router.beforeEach(
 
     if (to.path === '/detect/image') {
       next({ path: '/upload', replace: true })
+      return
+    }
+
+    if (to.path === '/detect/paper') {
+      const { tab, ...rest } = to.query
+      const paperTab = tab === 'resource' ? 'resource' : 'aigc'
+      next({
+        path: '/upload',
+        query: { ...rest, section: 'paper', paper_tab: paperTab },
+        replace: true,
+      })
+      return
+    }
+
+    if (to.path === '/detect/review') {
+      next({
+        path: '/upload',
+        query: { ...to.query, section: 'review' },
+        replace: true,
+      })
+      return
+    }
+
+    if (to.path === '/multimodal-fusion') {
+      next({
+        path: '/comprehensive-report',
+        query: { ...to.query },
+        replace: true,
+      })
+      return
+    }
+
+    const legacyManualDetail = to.path.match(/^\/task\/detail\/(\d+)$/)
+    if (legacyManualDetail) {
+      next({
+        path: `/manual-review/${legacyManualDetail[1]}`,
+        query: to.query,
+        replace: true,
+      })
+      return
+    }
+
+    const legacyImageReview = to.path.match(/^\/task\/(\d+)$/)
+    if (legacyImageReview) {
+      next({
+        path: `/image-review/${legacyImageReview[1]}`,
+        query: to.query,
+        replace: true,
+      })
+      return
+    }
+
+    const legacyStep = to.path.match(/^\/step\/(\d+)$/)
+    if (legacyStep) {
+      next({
+        path: '/history',
+        query: { ...to.query, detail_id: legacyStep[1] },
+        replace: true,
+      })
       return
     }
 

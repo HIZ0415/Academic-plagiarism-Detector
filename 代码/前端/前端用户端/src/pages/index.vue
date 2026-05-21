@@ -17,7 +17,7 @@
           <v-card class="h-100">
             <v-card-title class="text-h6">专家 · 人工审核任务池</v-card-title>
             <v-card-text class="text-body-2">
-              本卡片进入的是<strong>人工审核</strong>任务池（路由 <code>/review</code>），与发布者侧的<strong>Review 文本自动检测</strong>（统一入口 <code>/upload</code>）不是同一功能。任务类型可含图像、论文、Review 等材料单元。
+              本卡片进入<strong>人工审核任务池</strong>，供专家对已通过审批的申请进行复核；与发布者侧的「Review 文本自动检测」不是同一功能。任务可含图像、论文、Review 等材料。
             </v-card-text>
             <v-card-actions>
               <v-btn color="primary" to="/review" prepend-icon="mdi-clipboard-check-multiple">进入人工审核</v-btn>
@@ -41,12 +41,12 @@
     <v-row v-else>
       <v-col cols="12" md="7">
         <v-card class="h-100">
-          <v-card-title class="text-h6">统一学术检测（唯一入口）</v-card-title>
+          <v-card-title class="text-h6">学术检测</v-card-title>
           <v-card-text class="text-body-2">
-            <code>/upload</code>：同一批次可同时送检<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及压缩包等；系统为每批生成 <strong>batch_session_id</strong>，各子任务结果在检测历史中可筛选对照。论文与 Review 不再设独立提交页；带任务 ID 的历史深链仍可打开专项结果视图。
+            「学术检测」页包含：<strong>批量提交</strong>（图像 / 论文 PDF / Review 等同批）、<strong>论文检测</strong>（AIGC 与资源规范性）、<strong>Review 检测</strong>。历史记录中的报告会打开对应内容。
           </v-card-text>
           <v-card-actions>
-            <v-btn color="primary" to="/upload" prepend-icon="mdi-upload">进入统一检测</v-btn>
+            <v-btn color="primary" to="/upload" prepend-icon="mdi-flask-outline">进入学术检测</v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
@@ -54,7 +54,7 @@
         <v-card class="h-100">
           <v-card-title class="text-h6">检测历史与审核协作</v-card-title>
           <v-card-text class="text-body-2">
-            查看各子任务状态与结果摘要；可按批次 ID 筛选同一批送检记录。若对自动结果有疑义，请在<strong>检测历史详情</strong>中发起人工审核申请（与专家在 <code>/review</code> 执行的审核不同）。
+            查看各子任务状态与结果摘要；可按批次筛选同一批送检记录。若对自动结果有疑义，请在<strong>检测历史</strong>详情中发起人工审核申请（与专家人工复核流程不同）。
           </v-card-text>
           <v-card-actions>
             <v-btn variant="outlined" to="/history" prepend-icon="mdi-history">检测历史</v-btn>

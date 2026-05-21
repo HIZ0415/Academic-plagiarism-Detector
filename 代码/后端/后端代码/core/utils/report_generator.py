@@ -355,26 +355,58 @@ def generate_manual_review_report(review: ManualReview) -> str:
 #  任务 019 – 统一报告生成（论文 / Review）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _load_result_json(task, result_type=None):
-    """读取 Celery 落盘的检测结果 JSON。"""
-    media = Path(settings.MEDIA_ROOT)
-    if task.task_type in ('paper_aigc', 'resource_check'):
-        fname = f"{task.paper_file_id}_{result_type or task.task_type.split('_', 1)[-1]}_result.json"
-        if task.task_type == 'paper_aigc':
-            fname = f"{task.paper_file_id}_aigc_result.json"
-        else:
-            fname = f"{task.paper_file_id}_resource_result.json"
-        p = media / "paper_uploads" / fname
-    elif task.task_type == 'review_detection':
-        p = media / "review_uploads" / f"{task.paper_file_id}_detection_result.json"
-    else:
-        return None
-    if not p.exists():
+def _read_json_file(path: Path):
+    if not path.is_file():
         return None
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _load_result_json(task, result_type=None):
+    """读取论文/Review 检测结果（兼容 Celery 扁平 JSON 与 meta.ai_result_path 落盘）。"""
+    file_id = getattr(task, "paper_file_id", None)
+    if not file_id:
+        return None
+
+    media = Path(settings.MEDIA_ROOT)
+    ttype = task.task_type or ""
+
+    if ttype in ("paper_aigc", "resource_check"):
+        fname = (
+            f"{file_id}_aigc_result.json"
+            if ttype == "paper_aigc"
+            else f"{file_id}_resource_result.json"
+        )
+        legacy = _read_json_file(media / "paper_uploads" / fname)
+        if legacy is not None:
+            return legacy
+
+        from core.views import views_paper
+
+        meta = views_paper._load_paper_meta(file_id)
+        ai_raw = views_paper._read_media_json((meta or {}).get("ai_result_path", ""))
+        if ai_raw is None:
+            return None
+        if ttype == "paper_aigc":
+            return views_paper._build_aigc_result_from_ai(task, ai_raw)
+        return ai_raw
+
+    if ttype == "review_detection":
+        legacy = _read_json_file(media / "review_uploads" / f"{file_id}_detection_result.json")
+        if legacy is not None:
+            return legacy
+
+        from core.views import views_paper
+
+        meta = views_paper._load_review_meta(file_id)
+        ai_raw = views_paper._read_media_json((meta or {}).get("ai_result_path", ""))
+        if ai_raw is None:
+            return None
+        return views_paper._build_review_result_from_ai(task, ai_raw)
+
+    return None
 
 
 def _risk_label(level):

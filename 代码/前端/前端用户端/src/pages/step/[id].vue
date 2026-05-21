@@ -1,38 +1,22 @@
 <template>
-  <v-card flat border="0">
-    <v-card-text class="pa-0 mt-4">
-      <DetectionReviewStep :task_id="taskId"/>
-    </v-card-text>
-  </v-card>
+  <v-container class="py-8 text-center">
+    <v-progress-circular indeterminate color="primary" />
+    <p class="text-body-2 text-medium-emphasis mt-4">正在打开检测详情…</p>
+  </v-container>
 </template>
 
 <script setup lang="ts">
-//注意鉴权！！！
-import { computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import type { RouteParams } from 'vue-router'
-import DetectionReviewStep from '@/components/steps/DetectionReviewStep.vue'
-import { useSnackbarStore } from '@/stores/snackbar';
-import publisher from '@/api/publisher'
-const snackbar = useSnackbarStore();
+import { onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
-const router = useRouter()
 const route = useRoute()
+const router = useRouter()
 
-// 获取任务ID
-const taskId = computed(() => (route.params as RouteParams & { id: string }).id)
-
-// 组件挂载时获取任务数据
-onMounted(async () => {
-  const response = (await publisher.ifHasPermission({task_id: taskId.value})).data.access
-  if(response !== true){
-    router.push('/404')
-  }
+onMounted(() => {
+  const id = (route.params as { id: string }).id
+  router.replace({
+    path: '/history',
+    query: { ...route.query, detail_id: id },
+  })
 })
 </script>
-
-<style scoped>
-.v-card {
-  box-shadow: none;
-}
-</style>

@@ -1,10 +1,10 @@
 <template>
-  <v-container class="py-4">
+  <v-container class="py-4 detection-hub">
     <v-row class="mb-2" align="center">
       <v-col cols="12" md="8">
-        <div class="text-h4 font-weight-bold mb-1">统一学术检测</div>
+        <div class="text-h4 font-weight-bold mb-1">学术检测</div>
         <div class="text-body-2 text-medium-emphasis">
-          本页为<strong>唯一检测提交入口</strong>：同一批次可同时提交<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及 ZIP/RAR 等；各子任务并行执行，共享<strong>批次 ID</strong>，便于在历史中筛选与后续人工审核关联。
+          图像、论文 PDF、Review 文本等检测均在本页完成：通过下方标签切换<strong>批量提交</strong>、<strong>论文工作台</strong>与 <strong>Review 结果</strong>。
         </div>
       </v-col>
       <v-col cols="12" md="4" class="d-flex justify-end">
@@ -14,8 +14,16 @@
       </v-col>
     </v-row>
 
+    <v-tabs v-model="section" color="primary" class="mb-4" density="comfortable">
+      <v-tab value="submit" class="text-none">批量提交</v-tab>
+      <v-tab value="paper" class="text-none">论文检测</v-tab>
+      <v-tab value="review" class="text-none">Review 检测</v-tab>
+    </v-tabs>
+
+    <v-window v-model="section" class="detection-hub-window">
+      <v-window-item value="submit">
     <v-alert v-if="route.query.task_id" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      正在基于历史任务 <code>{{ route.query.task_id }}</code> 发起再次检测。旧任务结果请回到检测历史点击「查看报告」；本页只用于重新选择文件或粘贴 Review 后创建新检测。
+      正在基于历史任务（编号 {{ route.query.task_id }}）发起再次检测。旧任务结果请回到检测历史点击「查看报告」；本页只用于重新选择文件或粘贴 Review 后创建新检测。
     </v-alert>
 
     <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
@@ -95,10 +103,10 @@
             v-if="batchSessionId && rows.length"
             color="secondary"
             variant="tonal"
-            prepend-icon="mdi-chart-timeline-variant"
-            :to="{ path: '/multimodal-fusion', query: { batch_session_id: batchSessionId } }"
+            prepend-icon="mdi-clipboard-text-outline"
+            :to="{ path: '/comprehensive-report', query: { batch_session_id: batchSessionId } }"
           >
-            多模态联合分析
+            查看鉴伪报告
           </v-btn>
         </v-col>
       </v-row>
@@ -108,7 +116,7 @@
       <v-card-title class="text-subtitle-1 font-weight-bold">本批次综合摘要</v-card-title>
       <v-card-text class="text-body-2">
         <div class="mb-2">
-          <strong>批次 ID：</strong><code>{{ batchSummary.id }}</code>
+          <strong>批次编号：</strong>{{ batchSummary.id }}
         </div>
         <div class="mb-2">
           本批共 <strong>{{ batchSummary.total }}</strong> 个子任务：图像 {{ batchSummary.counts.image }}，
@@ -116,7 +124,7 @@
           其他 {{ batchSummary.counts.unknown }}。
         </div>
         <div class="text-medium-emphasis">
-          同一 <code>batch_session_id</code> 会写入本地检测历史（与后端任务 ID 并列），用于将图像 / 论文 / Review 的自动结果在流程上视为一次「综合送检」，便于对照解读与发起人工审核时引用整批上下文。
+          同一批次编号会关联本批各子任务，便于在检测历史、鉴伪报告中按批查看，以及发起人工审核时引用整批上下文。
         </div>
       </v-card-text>
     </v-card>
@@ -157,7 +165,7 @@
 
           <template #item.actions="{ item }">
             <v-btn
-              v-if="item.taskId && item.type !== 'image'"
+              v-if="item.taskId"
               size="small"
               variant="text"
               color="primary"
@@ -169,11 +177,23 @@
         </v-data-table>
       </v-card-text>
     </v-card>
+      </v-window-item>
+
+      <v-window-item value="paper">
+        <PaperDetectWorkbench v-if="section === 'paper'" embedded />
+      </v-window-item>
+
+      <v-window-item value="review">
+        <ReviewDetectWorkbench v-if="section === 'review'" embedded />
+      </v-window-item>
+    </v-window>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import PaperDetectWorkbench from '@/pages/detect/paper.vue'
+import ReviewDetectWorkbench from '@/pages/detect/review.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import paperApi from '@/api/paper'
@@ -215,8 +235,39 @@ type LocalTaskRecord = {
 const USE_MOCK = mockAigcFeaturesEnabled()
 const { mode: detectionMode, modePayload: detectionModePayload, imageSubmitMode } = useDetectionMode()
 
+type HubSection = 'submit' | 'paper' | 'review'
+
 const route = useRoute()
 const router = useRouter()
+
+const section = ref<HubSection>('submit')
+
+function parseSection(raw: unknown): HubSection {
+  const s = (Array.isArray(raw) ? raw[0] : raw)?.toString()
+  if (s === 'paper' || s === 'review' || s === 'submit') return s
+  return 'submit'
+}
+
+watch(
+  () => route.query.section,
+  (s) => {
+    section.value = parseSection(s)
+  },
+  { immediate: true },
+)
+
+watch(section, (s) => {
+  if (parseSection(route.query.section) === s) return
+  const query: Record<string, string | string[] | undefined> = { ...route.query }
+  if (s === 'submit') {
+    delete query.section
+    delete query.paper_tab
+  } else {
+    query.section = s
+    if (s !== 'paper') delete query.paper_tab
+  }
+  router.replace({ path: '/upload', query })
+})
 const snackbar = useSnackbarStore()
 
 const files = ref<File[]>([])
@@ -249,7 +300,7 @@ function axiosDetail(err: unknown): string {
     if (typeof message === 'string') return message
   }
   if (ax.response?.status === 403) {
-    return '无权限（403）：发布者需归属组织且具备上传/提交权限；若 Django 里用户无 organization，也会 403。'
+    return '无提交权限：请确认账号已加入组织且具备检测提交权限。'
   }
   return typeof ax.message === 'string' ? ax.message : '请求失败，请打开 F12 → Network 查看接口返回'
 }
@@ -478,7 +529,7 @@ async function backendRun(row: QueueRow) {
     if (payload.status === 'failed') {
       row.error =
         payload.error_message ||
-        '论文 AIGC 检测失败（常见：本机 AI 服务未启动、Django 未配置 AI_SERVICE_URL，或 PDF 预处理异常）'
+        '论文 AIGC 检测失败（常见原因：AI 服务未启动、PDF 无法解析或网络异常）'
       throw new Error(row.error)
     }
     row.progress = 100
@@ -593,6 +644,14 @@ function openResult(row: QueueRow) {
   if (!row.taskId) {
     row.taskId = `local-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
   }
+  if (row.type === 'paper') {
+    router.push({ path: '/upload', query: { section: 'paper', paper_tab: 'aigc', task_id: row.taskId } })
+    return
+  }
+  if (row.type === 'review') {
+    router.push({ path: '/upload', query: { section: 'review', task_id: row.taskId } })
+    return
+  }
   const taskType = toTaskType(row.type)
   router.push({
     path: '/history',
@@ -617,5 +676,10 @@ function openResult(row: QueueRow) {
 
 .font-mono {
   font-family: ui-monospace, monospace;
+}
+
+.detection-hub :deep(.paper-workbench),
+.detection-hub :deep(.review-detect-page) {
+  box-shadow: none;
 }
 </style>

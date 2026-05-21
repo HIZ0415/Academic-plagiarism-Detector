@@ -48,25 +48,9 @@
         <v-list-item
           v-if="isLoggedIn"
           prepend-icon="mdi-clipboard-text-clock"
-          title="操作与审计日志"
+          title="系统日志"
           value="logs"
           @click="goToLogs"
-        />
-
-        <v-list-item
-          v-if="isLoggedIn"
-          prepend-icon="mdi-file-document-outline"
-          title="论文检测日志"
-          value="paper-logs"
-          @click="navigate('/paper-logs')"
-        />
-
-        <v-list-item
-          v-if="isLoggedIn"
-          prepend-icon="mdi-text-box-search-outline"
-          title="Review 检测日志"
-          value="review-logs"
-          @click="navigate('/review-logs')"
         />
 
         <v-list-item
@@ -150,7 +134,7 @@
             :title="canApproveManualReview ? '人工审核审批' : '人工审核（只读）'"
             @click="navigate('/reviews')"
           />
-          <v-list-item v-if="isLoggedIn" prepend-icon="mdi-clipboard-text-clock" title="操作与审计日志" @click="navigate('/logs')" />
+          <v-list-item v-if="isLoggedIn" prepend-icon="mdi-clipboard-text-clock" title="系统日志" @click="navigate('/logs')" />
           <v-divider class="my-1" />
           <v-list-item v-if="isLoggedIn" prepend-icon="mdi-logout" title="退出登录" @click="mobileLogout" />
         </v-list>
