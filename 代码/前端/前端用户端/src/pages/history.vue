@@ -860,15 +860,15 @@ const goRepeatDetection = (task: Task) => {
 
 const goSpecialDetail = (task: Task) => {
   if (task.task_type === 'paper_aigc') {
-    router.push({ path: '/detect/paper', query: { tab: 'aigc', task_id: task.task_id } })
+    router.push({ path: '/upload', query: { section: 'paper', paper_tab: 'aigc', task_id: task.task_id } })
     return
   }
   if (task.task_type === 'resource_check') {
-    router.push({ path: '/detect/paper', query: { tab: 'resource', task_id: task.task_id } })
+    router.push({ path: '/upload', query: { section: 'paper', paper_tab: 'resource', task_id: task.task_id } })
     return
   }
   if (task.task_type === 'review_detection') {
-    router.push({ path: '/detect/review', query: { task_id: task.task_id } })
+    router.push({ path: '/upload', query: { section: 'review', task_id: task.task_id } })
     return
   }
   router.push(`/step/${task.task_id}`)

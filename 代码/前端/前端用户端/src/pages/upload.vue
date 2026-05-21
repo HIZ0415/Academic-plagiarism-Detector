@@ -1,10 +1,10 @@
 <template>
-  <v-container class="py-4">
+  <v-container class="py-4 detection-hub">
     <v-row class="mb-2" align="center">
       <v-col cols="12" md="8">
-        <div class="text-h4 font-weight-bold mb-1">统一学术检测</div>
+        <div class="text-h4 font-weight-bold mb-1">学术检测</div>
         <div class="text-body-2 text-medium-emphasis">
-          本页为<strong>唯一检测提交入口</strong>：同一批次可同时提交<strong>图像</strong>、<strong>论文 PDF</strong>、<strong>Review</strong>（在线文本或 .txt）及 ZIP/RAR 等；各子任务并行执行，共享<strong>批次 ID</strong>，便于在历史中筛选与后续人工审核关联。
+          图像、论文 PDF、Review 文本等检测均在本页完成：通过下方标签切换<strong>批量提交</strong>、<strong>论文工作台</strong>与 <strong>Review 结果</strong>。
         </div>
       </v-col>
       <v-col cols="12" md="4" class="d-flex justify-end">
@@ -14,6 +14,14 @@
       </v-col>
     </v-row>
 
+    <v-tabs v-model="section" color="primary" class="mb-4" density="comfortable">
+      <v-tab value="submit" class="text-none">批量提交</v-tab>
+      <v-tab value="paper" class="text-none">论文检测</v-tab>
+      <v-tab value="review" class="text-none">Review 检测</v-tab>
+    </v-tabs>
+
+    <v-window v-model="section">
+      <v-window-item value="submit">
     <v-alert v-if="route.query.task_id" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
       正在基于历史任务 <code>{{ route.query.task_id }}</code> 发起再次检测。旧任务结果请回到检测历史点击「查看报告」；本页只用于重新选择文件或粘贴 Review 后创建新检测。
     </v-alert>
@@ -157,7 +165,7 @@
 
           <template #item.actions="{ item }">
             <v-btn
-              v-if="item.taskId && item.type !== 'image'"
+              v-if="item.taskId"
               size="small"
               variant="text"
               color="primary"
@@ -169,11 +177,23 @@
         </v-data-table>
       </v-card-text>
     </v-card>
+      </v-window-item>
+
+      <v-window-item value="paper">
+        <PaperDetectWorkbench embedded />
+      </v-window-item>
+
+      <v-window-item value="review">
+        <ReviewDetectWorkbench embedded />
+      </v-window-item>
+    </v-window>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import PaperDetectWorkbench from '@/pages/detect/paper.vue'
+import ReviewDetectWorkbench from '@/pages/detect/review.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import paperApi from '@/api/paper'
@@ -215,8 +235,35 @@ type LocalTaskRecord = {
 const USE_MOCK = mockAigcFeaturesEnabled()
 const { mode: detectionMode, modePayload: detectionModePayload, imageSubmitMode } = useDetectionMode()
 
+type HubSection = 'submit' | 'paper' | 'review'
+
 const route = useRoute()
 const router = useRouter()
+
+const section = ref<HubSection>('submit')
+
+function parseSection(raw: unknown): HubSection {
+  const s = (Array.isArray(raw) ? raw[0] : raw)?.toString()
+  if (s === 'paper' || s === 'review' || s === 'submit') return s
+  return 'submit'
+}
+
+watch(
+  () => route.query.section,
+  (s) => {
+    section.value = parseSection(s)
+  },
+  { immediate: true },
+)
+
+watch(section, (s) => {
+  if (parseSection(route.query.section) === s) return
+  const query: Record<string, string | string[] | undefined> = { ...route.query, section: s }
+  if (s !== 'paper') {
+    delete query.paper_tab
+  }
+  router.replace({ path: '/upload', query })
+})
 const snackbar = useSnackbarStore()
 
 const files = ref<File[]>([])
@@ -593,6 +640,14 @@ function openResult(row: QueueRow) {
   if (!row.taskId) {
     row.taskId = `local-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
   }
+  if (row.type === 'paper') {
+    router.push({ path: '/upload', query: { section: 'paper', paper_tab: 'aigc', task_id: row.taskId } })
+    return
+  }
+  if (row.type === 'review') {
+    router.push({ path: '/upload', query: { section: 'review', task_id: row.taskId } })
+    return
+  }
   const taskType = toTaskType(row.type)
   router.push({
     path: '/history',
@@ -617,5 +672,10 @@ function openResult(row: QueueRow) {
 
 .font-mono {
   font-family: ui-monospace, monospace;
+}
+
+.detection-hub :deep(.paper-workbench),
+.detection-hub :deep(.review-detect-page) {
+  box-shadow: none;
 }
 </style>

@@ -189,15 +189,15 @@ function goRepeatDetection() {
 
 function goSpecialDetail() {
   if (task.value.task_type === 'paper_aigc') {
-    router.push({ path: '/detect/paper', query: { tab: 'aigc', task_id: taskId.value } })
+    router.push({ path: '/upload', query: { section: 'paper', paper_tab: 'aigc', task_id: taskId.value } })
     return
   }
   if (task.value.task_type === 'resource_check') {
-    router.push({ path: '/detect/paper', query: { tab: 'resource', task_id: taskId.value } })
+    router.push({ path: '/upload', query: { section: 'paper', paper_tab: 'resource', task_id: taskId.value } })
     return
   }
   if (task.value.task_type === 'review_detection') {
-    router.push({ path: '/detect/review', query: { task_id: taskId.value } })
+    router.push({ path: '/upload', query: { section: 'review', task_id: taskId.value } })
     return
   }
   router.push(`/step/${taskId.value}`)

@@ -1,14 +1,13 @@
 <template>
   <v-card flat class="review-detect-page">
-    <v-card-item>
+    <v-card-item v-if="!embedded">
       <v-card-title class="text-h5 font-weight-bold">同行评审 Review 检测</v-card-title>
       <v-card-subtitle class="text-body-2 text-wrap mt-1">
-        需求：对同行评审（Review）文本做自动化检测；输入为<strong>在线文本</strong>或<strong>TXT 文件</strong>，需求写明「本阶段不新增 Review PDF、DOCX 等格式」。接口
-        <code>POST /api/review/submit/</code>（字段 <code>text</code> 或 <code>file</code>）与《current-project-api》§16.2 一致。
+        对同行评审（Review）<strong>意见文本</strong>做自动检测；输入为在线文本或 <strong>.txt</strong>（非论文 PDF）。
       </v-card-subtitle>
       <div class="d-flex flex-wrap align-center ga-2 mt-3">
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-upload" class="text-none" to="/upload">
-          新检测（统一入口）
+        <v-btn color="primary" variant="tonal" prepend-icon="mdi-upload" class="text-none" :to="{ path: '/upload', query: { section: 'submit' } }">
+          新检测（批量提交）
         </v-btn>
         <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
           人工审核申请
@@ -16,10 +15,21 @@
         <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
       </div>
     </v-card-item>
+    <v-card-item v-else class="pb-0">
+      <v-card-subtitle class="text-body-2 text-wrap">
+        Review 文本自动检测：可在此提交或查看历史任务结果；同批送检也可在「批量提交」标签粘贴 Review。
+      </v-card-subtitle>
+      <div class="d-flex flex-wrap align-center ga-2 mt-2">
+        <v-btn variant="tonal" color="primary" size="small" class="text-none" :to="{ path: '/upload', query: { section: 'submit' } }">
+          去批量提交
+        </v-btn>
+        <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
+      </div>
+    </v-card-item>
 
     <v-card-text>
-      <v-alert type="warning" variant="tonal" density="comfortable" class="mb-4 text-body-2">
-        请勿将 PDF/DOCX 当作 Review 上传；论文类请在<strong>统一检测入口</strong>（<code>/upload</code>）上传 PDF。
+      <v-alert v-if="!embedded" type="warning" variant="tonal" density="comfortable" class="mb-4 text-body-2">
+        请勿将 PDF/DOCX 当作 Review 上传；论文 PDF 请在「批量提交」或「论文检测」标签处理。
       </v-alert>
 
       <v-alert v-if="linkedTaskId" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
@@ -183,6 +193,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 import {
   getReviewDetectionResult,
   getReviewDetectionStatus,

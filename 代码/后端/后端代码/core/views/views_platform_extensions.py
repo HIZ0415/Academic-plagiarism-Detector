@@ -399,7 +399,7 @@ def comprehensive_forgery_report(request, task_id: int):
         sections["image"] = img_sec
         sections["conclusion"] = {
             "headline": img_sec["summary"],
-            "risk_level": img_sec["risk_level"],
+            "risk_level": _risk_label(img_sec["risk_level"]),
             "ai_contribution_ratio": img_sec["ai_contribution_ratio"],
         }
         sections["usage_advice"] = [
@@ -446,11 +446,12 @@ def comprehensive_forgery_report(request, task_id: int):
         }
 
     catalog = _ensure_model_catalog()
+    effective_mode = task.detection_mode or ("precise" if task.if_use_llm else "fast")
     sections["models_used"] = {
         "text": catalog.get("text_model"),
         "image": catalog.get("image_model"),
         "review": catalog.get("review_model"),
-        "mode": task.detection_mode or catalog.get("default_mode", "fast"),
+        "mode": effective_mode or catalog.get("default_mode", "fast"),
     }
 
     return Response({"ready": True, "sections": sections})

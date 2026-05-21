@@ -93,6 +93,26 @@ router.beforeEach(
       return
     }
 
+    if (to.path === '/detect/paper') {
+      const { tab, ...rest } = to.query
+      const paperTab = tab === 'resource' ? 'resource' : 'aigc'
+      next({
+        path: '/upload',
+        query: { ...rest, section: 'paper', paper_tab: paperTab },
+        replace: true,
+      })
+      return
+    }
+
+    if (to.path === '/detect/review') {
+      next({
+        path: '/upload',
+        query: { ...to.query, section: 'review' },
+        replace: true,
+      })
+      return
+    }
+
     next()
   },
 )

@@ -5,7 +5,9 @@
       <div>
         <h1 class="text-h4 font-weight-bold mb-0">综合鉴伪报告</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
-          任务 <code>{{ taskId }}</code> · AI 占比、可疑位置、分模态结论与使用建议
+          任务 <code>{{ taskId }}</code>
+          <span v-if="sections?.overview?.task_type"> · {{ taskTypeLabel }}</span>
+          · AI 占比、可疑位置、分模态结论与使用建议
         </p>
       </div>
       <v-spacer />
@@ -42,7 +44,7 @@
         <v-col cols="12" md="4">
           <v-card variant="outlined" class="pa-4">
             <div class="text-caption text-medium-emphasis">综合风险</div>
-            <div class="text-h5 font-weight-bold">{{ conclusion.risk_level || '—' }}</div>
+            <div class="text-h5 font-weight-bold">{{ riskLevelLabel(conclusion.risk_level) }}</div>
           </v-card>
         </v-col>
         <v-col cols="12" md="4">
@@ -70,6 +72,14 @@
           </v-list-item>
         </v-list>
       </v-card>
+
+      <v-alert
+        v-if="sectionsEmpty"
+        type="info"
+        variant="tonal"
+        class="mb-4"
+        text="该任务暂无分模态检测数据。图像任务请确认检测已完成；论文/Review 任务请从对应检测页查看详细结果。"
+      />
 
       <v-expansion-panels v-if="sections.image" variant="accordion" class="mb-4">
         <v-expansion-panel title="图像 · 可疑区域">
@@ -167,12 +177,42 @@ const notReadyMessage = ref('')
 const sections = ref<any>(null)
 
 const conclusion = computed(() => sections.value?.conclusion || {})
+const taskTypeLabel = computed(() => {
+  const t = sections.value?.overview?.task_type || ''
+  const map: Record<string, string> = {
+    image_detection: '图像检测',
+    paper_aigc: '论文 AIGC',
+    resource_check: '资源规范性',
+    review_detection: 'Review 检测',
+  }
+  return map[t] || t || '未知类型'
+})
+const sectionsEmpty = computed(() => {
+  if (!sections.value) return false
+  const c = conclusion.value
+  const hasConclusion = !!(c.headline || c.risk_level || c.ai_contribution_ratio != null)
+  const hasModality = !!(sections.value.image || sections.value.paper || sections.value.review)
+  return !hasConclusion && !hasModality
+})
 const aiRatioPercent = computed(() => {
   const r = conclusion.value.ai_contribution_ratio
   if (r == null) return '—'
   const n = Number(r)
   return n <= 1 ? `${(n * 100).toFixed(1)}%` : `${n}%`
 })
+
+function riskLevelLabel(level: string | undefined) {
+  if (!level) return '—'
+  const map: Record<string, string> = {
+    high: '高风险',
+    medium: '中风险',
+    low: '低风险',
+    高风险: '高风险',
+    中风险: '中风险',
+    低风险: '低风险',
+  }
+  return map[level] || level
+}
 
 function mediaUrl(path: string) {
   if (!path) return ''

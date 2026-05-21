@@ -1,12 +1,23 @@
 <template>
   <v-card flat class="paper-workbench">
-    <v-card-item>
+    <v-card-item v-if="!embedded">
       <v-card-title class="text-h5 font-weight-bold">论文与学术资源检测工作台</v-card-title>
       <v-card-subtitle class="text-body-2 text-wrap mt-1">
-        需求与接口约定：论文检测<strong>仅支持上传 PDF</strong>（后端 PyMuPDF 提取文本）。同一工作台另含「学术资源规范性」检测，与 AIGC 目标不同，共用 PDF 上传入口；结果分别走
-        <code>/paper/aigc/</code> 与 <code>/paper/resource-check/</code>。概要设计线框中曾写 DOCX/TXT，以<strong>需求与 API 文档为准</strong>。
+        论文检测<strong>仅支持 PDF</strong>。含「全篇 AIGC」与「学术资源规范性」两类子检测，结果分别走
+        <code>/paper/aigc/</code> 与 <code>/paper/resource-check/</code>。
       </v-card-subtitle>
       <div class="d-flex flex-wrap align-center ga-2 mt-3">
+        <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
+          人工审核申请
+        </v-btn>
+        <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
+      </div>
+    </v-card-item>
+    <v-card-item v-else class="pb-0">
+      <v-card-subtitle class="text-body-2 text-wrap">
+        论文 PDF 专项：AIGC 段落分析 / 参考文献规范性（与「批量提交」中的论文任务互补；批量提交侧重同批图像+论文+Review）。
+      </v-card-subtitle>
+      <div class="d-flex flex-wrap align-center ga-2 mt-2">
         <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
           人工审核申请
         </v-btn>
@@ -229,8 +240,8 @@
         density="compact"
         class="mt-5 text-body-2"
       >
-        <strong>整体界面逻辑：</strong>新检测请从<strong>统一入口</strong><router-link to="/upload" class="text-primary"><code>/upload</code></router-link>提交（图像 / 论文 PDF / Review 同批）；本页为<strong>论文 PDF 专项结果工作台</strong>（需带 <code>task_id</code> 深链）。Review 文本检测亦在 <code>/upload</code>。历史中的
-        <code>paper_aigc</code> / <code>resource_check</code> 会跳回本页对应标签。
+        <strong>提示：</strong>同批送检请用「批量提交」标签；本标签用于论文 PDF 的 AIGC / 资源规范性专项提交与结果查看。历史中的
+        <code>paper_aigc</code> / <code>resource_check</code> 会跳转到本标签对应子页。
       </v-alert>
     </v-card-text>
   </v-card>
@@ -243,6 +254,8 @@ import paperApi from '@/api/paper'
 import type { ResourceIssue, TaskStatus } from '@/types/core'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 import { useDetectionMode } from '@/composables/useDetectionMode'
+
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 type ParagraphResult = {
   index: number
@@ -272,6 +285,13 @@ type LatestResult = {
 const activeTab = ref<'aigc' | 'resource'>('aigc')
 const route = useRoute()
 const router = useRouter()
+
+function innerTabFromRoute(): 'aigc' | 'resource' {
+  const key = props.embedded ? 'paper_tab' : 'tab'
+  const raw = route.query[key]
+  const tab = (Array.isArray(raw) ? raw[0] : raw)?.toString()
+  return tab === 'resource' ? 'resource' : 'aigc'
+}
 const selectedFiles = ref<File[]>([])
 const taskNamePrefix = ref('aigc-paper')
 const batchLimit = ref(5)
@@ -317,9 +337,9 @@ const panelB = computed(() => ({
 }))
 
 watch(
-  () => route.query.tab,
-  (tab) => {
-    const next = tab === 'resource' ? 'resource' : 'aigc'
+  () => (props.embedded ? route.query.paper_tab : route.query.tab),
+  () => {
+    const next = innerTabFromRoute()
     if (activeTab.value !== next) {
       activeTab.value = next
     }
@@ -335,8 +355,18 @@ function applyDefaultsForTab() {
 
 function syncQueryWithTab() {
   const t = activeTab.value
-  if (route.query.tab === t) return
-  router.replace({ path: route.path, query: { ...route.query, tab: t } })
+  const tabKey = props.embedded ? 'paper_tab' : 'tab'
+  if (route.query[tabKey] === t) return
+  const path = props.embedded ? '/upload' : route.path
+  const query: Record<string, string | string[] | undefined> = {
+    ...route.query,
+    [tabKey]: t,
+  }
+  if (props.embedded) {
+    query.section = 'paper'
+    delete query.tab
+  }
+  router.replace({ path, query })
 }
 
 watch(activeTab, (tab, prev) => {
