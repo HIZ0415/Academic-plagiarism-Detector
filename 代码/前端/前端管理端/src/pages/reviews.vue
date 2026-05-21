@@ -19,6 +19,15 @@
           审批对象为<strong>本组织发布者</strong>针对某次<strong>自动检测任务</strong>发起的复核申请（非个人账号级审批）。
           通过后系统向本组织<strong>专家（审稿人）</strong>分配任务；拒绝须填写理由。
         </p>
+        <v-btn
+          class="text-none mt-3"
+          variant="text"
+          color="primary"
+          prepend-icon="mdi-clipboard-text-clock"
+          :to="{ path: '/logs', query: { tab: 'operations' } }"
+        >
+          查看人工审核相关留痕
+        </v-btn>
       </v-col>
     </v-row>
 

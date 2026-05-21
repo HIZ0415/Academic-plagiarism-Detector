@@ -44,9 +44,17 @@ router.beforeEach((to, from, next) => {
   } else {
     if (to.path === '/login') {
       next('/')
-    } else {
-      next()
+      return
     }
+    if (to.path === '/paper-logs') {
+      next({ path: '/logs', query: { ...to.query, tab: 'detection', scope: 'paper' }, replace: true })
+      return
+    }
+    if (to.path === '/review-logs') {
+      next({ path: '/logs', query: { ...to.query, tab: 'detection', scope: 'review' }, replace: true })
+      return
+    }
+    next()
   }
 })
 export default router

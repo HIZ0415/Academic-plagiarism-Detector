@@ -200,7 +200,19 @@ function goSpecialDetail() {
     router.push({ path: '/upload', query: { section: 'review', task_id: taskId.value } })
     return
   }
-  router.push(`/step/${taskId.value}`)
+  router.push({
+    path: '/history',
+    query: {
+      detail_id: taskId.value,
+      task_type: task.value.task_type || 'image_detection',
+      status: task.value.status,
+      progress: String(task.value.progress || 0),
+      upload_time: task.value.upload_time || '',
+      completion_time: task.value.completion_time || '',
+      error_message: task.value.error_message || '',
+      source: 'history',
+    },
+  })
 }
 
 onMounted(async () => {

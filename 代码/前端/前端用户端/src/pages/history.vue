@@ -16,15 +16,15 @@
             <v-card variant="outlined" class="pa-4 mb-4">
               <div class="text-subtitle-1 font-weight-bold mb-3">任务概览</div>
               <v-row>
-                <v-col cols="12" md="3" class="text-body-2">类型：{{ getTaskTypeLabel(detailTask.task_type) }}</v-col>
+                <v-col cols="12" md="3" class="text-body-2">类型：{{ getTaskTypeLabelFull(detailTask.task_type) }}</v-col>
                 <v-col cols="12" md="3" class="text-body-2">状态：{{ getStatus(effectiveDetailStatus) }}</v-col>
                 <v-col cols="12" md="3" class="text-body-2">进度：{{ detailTask.progress || 0 }}%</v-col>
                 <v-col cols="12" md="3" class="text-body-2">时间：{{ formatDateTime(detailTask.upload_time) || '暂无' }}</v-col>
                 <v-col v-if="detailTask.batch_session_id" cols="12" class="text-body-2 mt-2">
-                  统一检测批次：<code>{{ detailTask.batch_session_id }}</code>（与同批其他子任务逻辑关联）
+                  统一检测批次：{{ detailTask.batch_session_id }}（与同批其他子任务关联）
                 </v-col>
                 <v-col v-if="manualReviewWorkflowPayload?.found" cols="12" class="text-body-2 mt-2">
-                  人工审核申请单：<code>{{ manualReviewWorkflowPayload.review_request_id }}</code>；
+                  人工审核申请单：{{ manualReviewWorkflowPayload.review_request_id }}；
                   管理端：<span class="font-weight-medium">{{ manualReviewAdminLabel }}</span>；
                   专家进度：<span class="font-weight-medium">{{ manualReviewExpertLabel }}</span>
                 </v-col>
@@ -240,14 +240,13 @@
     <v-tabs v-model="typeTab" color="primary" class="mt-3 mb-2" density="comfortable">
       <v-tab value="all">全部</v-tab>
       <v-tab value="image_detection">图像</v-tab>
-      <v-tab value="paper_aigc">论文</v-tab>
+      <v-tab value="paper">论文</v-tab>
       <v-tab value="review_detection">Review</v-tab>
-      <v-tab value="resource_check">资源规范</v-tab>
     </v-tabs>
 
     <v-alert v-if="batchSessionFilter" type="info" variant="tonal" density="compact" class="mt-3 mb-2">
-      当前按<strong>统一检测批次</strong>筛选：<code>{{ batchSessionFilter }}</code>。列表仅显示该批次在本地记录的子任务；清除地址栏中的
-      <code>batch_session_id</code> 查询参数可恢复完整列表。
+      当前按<strong>统一检测批次</strong>筛选：{{ batchSessionFilter }}。列表仅显示该批次的子任务。
+      点击「清除批次筛选」可恢复完整列表。
       <v-btn size="small" variant="text" class="ms-2" @click="clearBatchFilter">清除批次筛选</v-btn>
     </v-alert>
 
@@ -295,6 +294,16 @@
           <span :title="`原始 ID：${item.task_id}`">{{ formatTaskId(item.task_id) }}</span>
         </template>
 
+        <template v-slot:item.task_type="{ item }">
+          <v-chip
+            size="x-small"
+            variant="tonal"
+            :color="item.task_type === 'paper_aigc' || item.task_type === 'resource_check' ? 'teal' : 'default'"
+          >
+            {{ getTaskTypeLabelFull(item.task_type) }}
+          </v-chip>
+        </template>
+
         <template v-slot:item.upload_time="{ item }">
           <span>{{ formatDateTime(item.upload_time) }}</span>
         </template>
@@ -325,7 +334,7 @@
               :disabled="item.status !== 'completed'"
               @click="goComprehensiveReport(item)"
             >
-              综合鉴伪
+              鉴伪报告
             </v-btn>
             <v-btn size="small" color="secondary" variant="text" @click="goRepeatDetection(item)">
               再次检测
@@ -389,8 +398,11 @@ const totalPages = ref(1)
 const loading = ref(false)
 
 // 表格列定义
+const PAPER_TASK_TYPES = ['paper_aigc', 'resource_check'] as const
+
 const headers = [
-  { title: '任务编号', key: 'task_id', align: 'center' as const, width: '130px' },
+  { title: '任务编号', key: 'task_id', align: 'center' as const, width: '120px' },
+  { title: '论文子类', key: 'task_type', align: 'center' as const, width: '120px' },
   { title: '批次', key: 'batch_session_id', align: 'center' as const, width: '130px' },
   { title: '上传时间', key: 'upload_time', align: 'center' as const, width: '180px' },
   { title: '完成时间', key: 'completion_time', align: 'center' as const, width: '180px' },
@@ -436,10 +448,38 @@ const filters = ref<{
 
 const taskTypeFilterOptions = [
   { title: '图像检测', value: 'image_detection' },
-  { title: '论文 AIGC', value: 'paper_aigc' },
+  { title: '论文（全部）', value: 'paper' },
+  { title: '论文 · AIGC', value: 'paper_aigc' },
+  { title: '论文 · 资源规范性', value: 'resource_check' },
   { title: 'Review', value: 'review_detection' },
-  { title: '资源规范', value: 'resource_check' },
 ]
+
+function taskMatchesTypeTab(task: Task, tab: string): boolean {
+  const tt = task.task_type || ''
+  if (tab === 'all') return true
+  if (tab === 'paper') return PAPER_TASK_TYPES.includes(tt as (typeof PAPER_TASK_TYPES)[number])
+  return tt === tab
+}
+
+function taskMatchesFilterType(task: Task, filterType: string): boolean {
+  const tt = task.task_type || ''
+  if (filterType === 'paper') {
+    return PAPER_TASK_TYPES.includes(tt as (typeof PAPER_TASK_TYPES)[number])
+  }
+  return tt === filterType
+}
+
+/** 完成时间优先，无完成时间则用上传时间；新 → 旧 */
+function taskSortTimestamp(task: Task): number {
+  const raw = task.completion_time || task.upload_time || ''
+  if (!raw) return 0
+  const ms = new Date(raw.replace(' ', 'T')).getTime()
+  return Number.isNaN(ms) ? 0 : ms
+}
+
+function sortTasksNewestFirst(list: Task[]): Task[] {
+  return [...list].sort((a, b) => taskSortTimestamp(b) - taskSortTimestamp(a))
+}
 
 // 时间验证相关
 const timeError = ref('')
@@ -509,7 +549,7 @@ const fetchTasks = async (page: number, pageSize: number) => {
     if (filters.value.status) {
       params.status = filters.value.status
     }
-    if (filters.value.taskType) {
+    if (filters.value.taskType && filters.value.taskType !== 'paper') {
       params.task_type = filters.value.taskType
     }
     if (keyword.value.trim()) {
@@ -570,7 +610,7 @@ const fetchTasks = async (page: number, pageSize: number) => {
       if (!remoteIds.has(String(local.task_id))) merged.unshift(local)
     }
 
-    tasks.value = merged
+    tasks.value = sortTasksNewestFirst(merged)
 
     currentPage.value = current_page
     totalPages.value = total_pages
@@ -689,15 +729,20 @@ const filteredTasks = computed(() => {
   const b = batchSessionFilter.value
   let list = b ? tasks.value.filter((t) => (t.batch_session_id || '') === b) : tasks.value
   if (typeTab.value !== 'all') {
-    list = list.filter((t) => (t.task_type || '') === typeTab.value)
+    list = list.filter((t) => taskMatchesTypeTab(t, typeTab.value))
+  }
+  if (filters.value.taskType) {
+    list = list.filter((t) => taskMatchesFilterType(t, filters.value.taskType!))
   }
   const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return list
-  return list.filter((t) => {
-    const id = String(t.task_id).toLowerCase()
-    const name = String(t.task_name || '').toLowerCase()
-    return id.includes(kw) || name.includes(kw)
-  })
+  if (kw) {
+    list = list.filter((t) => {
+      const id = String(t.task_id).toLowerCase()
+      const name = String(t.task_name || '').toLowerCase()
+      return id.includes(kw) || name.includes(kw)
+    })
+  }
+  return sortTasksNewestFirst(list)
 })
 
 function applyKeywordSearch() {
@@ -805,7 +850,11 @@ const applyFilters = () => {
 
 // 操作按钮处理函数
 function goComprehensiveReport(item: Task) {
-  router.push({ path: '/comprehensive-report', query: { task_id: String(item.task_id) } })
+  const query: Record<string, string> = { task_id: String(item.task_id) }
+  if (item.batch_session_id) {
+    query.batch_session_id = item.batch_session_id
+  }
+  router.push({ path: '/comprehensive-report', query })
 }
 
 const handleNext = (item: Task) => {
@@ -831,8 +880,16 @@ const canEnterDetail = (item: Task) => {
 }
 
 const getTaskTypeLabel = (taskType?: string) => {
-  if (taskType === 'paper_aigc') return '论文 AIGC'
-  if (taskType === 'resource_check') return '学术资源检测'
+  if (taskType === 'paper_aigc') return 'AIGC'
+  if (taskType === 'resource_check') return '资源规范性'
+  if (taskType === 'image_detection') return '图像'
+  if (taskType === 'review_detection') return 'Review'
+  return '—'
+}
+
+const getTaskTypeLabelFull = (taskType?: string) => {
+  if (taskType === 'paper_aigc') return '论文 · AIGC'
+  if (taskType === 'resource_check') return '论文 · 资源规范性'
   if (taskType === 'image_detection') return '图像检测'
   if (taskType === 'review_detection') return 'Review 检测'
   return '未知类型'
@@ -847,15 +904,22 @@ const goUpload = () => {
 }
 
 const goRepeatDetection = (task: Task) => {
-  router.push({
-    path: '/upload',
-    query: {
-      task_id: task.task_id,
-      task_type: task.task_type || 'unknown',
-      source: 'history-repeat',
-      ...(task.batch_session_id ? { batch_session_id: task.batch_session_id } : {}),
-    },
-  })
+  const query: Record<string, string> = {
+    task_id: task.task_id,
+    task_type: task.task_type || 'unknown',
+    source: 'history-repeat',
+  }
+  if (task.batch_session_id) query.batch_session_id = task.batch_session_id
+  if (task.task_type === 'paper_aigc') {
+    query.section = 'paper'
+    query.paper_tab = 'aigc'
+  } else if (task.task_type === 'resource_check') {
+    query.section = 'paper'
+    query.paper_tab = 'resource'
+  } else if (task.task_type === 'review_detection') {
+    query.section = 'review'
+  }
+  router.push({ path: '/upload', query })
 }
 
 const goSpecialDetail = (task: Task) => {
@@ -871,7 +935,7 @@ const goSpecialDetail = (task: Task) => {
     router.push({ path: '/upload', query: { section: 'review', task_id: task.task_id } })
     return
   }
-  router.push(`/step/${task.task_id}`)
+  handleNext(task)
 }
 
 const manualReviewWorkflowPayload = ref<{
@@ -1043,7 +1107,7 @@ const goManualReview = () => {
   })
 }
 
-/** 发布者侧发起/跟踪人工审核（文档 `/annual`，与侧栏「人工审核申请」一致） */
+/** 发布者侧发起/跟踪人工审核（侧栏「人工审核申请」） */
 const goManualReviewRequest = () => {
   router.push({
     path: '/annual',

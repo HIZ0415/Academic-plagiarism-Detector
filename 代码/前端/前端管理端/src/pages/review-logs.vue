@@ -1,7 +1,21 @@
 <template>
-  <DetectionLogsPage log-scope="review" title="Review 检测日志" subtitle="追踪 review_detection 类任务的操作记录与异常。" />
+  <v-container class="py-8 text-center">
+    <v-progress-circular indeterminate color="primary" />
+    <p class="text-body-2 text-medium-emphasis mt-4">正在跳转到系统日志…</p>
+  </v-container>
 </template>
 
 <script setup lang="ts">
-import DetectionLogsPage from '@/components/admin/DetectionLogsPage.vue'
+import { onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+const route = useRoute()
+const router = useRouter()
+
+onMounted(() => {
+  router.replace({
+    path: '/logs',
+    query: { ...route.query, tab: 'detection', scope: 'review' },
+  })
+})
 </script>

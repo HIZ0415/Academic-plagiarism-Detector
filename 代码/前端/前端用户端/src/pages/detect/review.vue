@@ -33,7 +33,7 @@
       </v-alert>
 
       <v-alert v-if="linkedTaskId" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-        已从检测历史关联任务 <code>{{ linkedTaskId }}</code> 跳转；可在下方重新提交或前往历史查看原任务状态。
+        已从检测历史关联任务（编号 {{ linkedTaskId }}）跳转；可在下方重新提交或前往历史查看原任务状态。
       </v-alert>
 
       <v-card v-if="linkedTaskId" variant="outlined" class="pa-4 mb-5">
@@ -381,7 +381,7 @@ async function submit() {
         task_id: `mock-${Date.now()}`,
         status: 'pending',
         cleaned_text_length: file ? file.size : text.length,
-        message: 'Mock：未调用 /review/submit/',
+        message: 'Mock：演示模式，未实际提交',
       }
       snackbar.showMessage('Mock 模式：已模拟提交', 'success')
       return

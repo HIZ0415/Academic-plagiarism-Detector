@@ -4,8 +4,8 @@
       <div>
         <div class="text-h5 font-weight-bold">人工审核结果</div>
         <div class="text-body-2 text-medium-emphasis">
-          检测任务：<code>{{ taskId }}</code>
-          <template v-if="reviewRequestId"> · 申请单：<code>{{ reviewRequestId }}</code></template>
+          检测任务：{{ taskId || '—' }}
+          <template v-if="reviewRequestId"> · 申请单：{{ reviewRequestId }}</template>
         </div>
       </div>
       <v-spacer />

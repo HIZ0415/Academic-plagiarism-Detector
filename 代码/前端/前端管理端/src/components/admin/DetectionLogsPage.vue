@@ -1,12 +1,28 @@
 <template>
-  <v-container>
-    <v-row class="mb-4">
+  <div>
+    <v-row v-if="!embedded" class="mb-4">
       <v-col>
         <h1 class="text-h4 font-weight-bold">{{ title }}</h1>
         <p class="text-body-2 text-medium-emphasis mb-0 mt-2">{{ subtitle }}</p>
       </v-col>
       <v-col cols="auto">
         <v-btn color="primary" prepend-icon="mdi-refresh" class="text-none" :loading="loading" @click="load">刷新</v-btn>
+      </v-col>
+    </v-row>
+
+    <v-row v-else class="mb-3 align-center">
+      <v-col>
+        <v-tabs v-model="scopeTab" density="compact" color="primary" @update:model-value="onScopeChange">
+          <v-tab value="paper">论文</v-tab>
+          <v-tab value="review">Review</v-tab>
+          <v-tab value="image">图像</v-tab>
+        </v-tabs>
+        <p class="text-caption text-medium-emphasis mb-0 mt-1">
+          按检测类型查看任务状态与失败原因（论文含 AIGC / 资源规范性，Review 为评审文本检测，图像为上传鉴伪任务）。
+        </p>
+      </v-col>
+      <v-col cols="auto">
+        <v-btn color="primary" prepend-icon="mdi-refresh" class="text-none" size="small" :loading="loading" @click="load">刷新</v-btn>
       </v-col>
     </v-row>
 
@@ -38,19 +54,41 @@
         <v-pagination v-model="page" :length="totalPages" @update:model-value="load" />
       </div>
     </v-card>
-  </v-container>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import platform from '@/api/platform'
 import { useSnackbarStore } from '@/stores/snackbar'
 
-const props = defineProps<{
-  logScope: 'paper' | 'review' | 'image'
-  title: string
-  subtitle: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    logScope?: 'paper' | 'review' | 'image'
+    title?: string
+    subtitle?: string
+    embedded?: boolean
+    initialScope?: 'paper' | 'review' | 'image'
+  }>(),
+  {
+    logScope: 'paper',
+    title: '检测任务日志',
+    subtitle: '',
+    embedded: false,
+    initialScope: 'paper',
+  },
+)
+
+const scopeTab = ref<'paper' | 'review' | 'image'>(props.embedded ? props.initialScope : props.logScope)
+
+function activeScope(): 'paper' | 'review' | 'image' {
+  return props.embedded ? scopeTab.value : props.logScope
+}
+
+function onScopeChange() {
+  page.value = 1
+  load()
+}
 
 const snackbar = useSnackbarStore()
 const logs = ref<any[]>([])
@@ -87,7 +125,7 @@ async function load() {
   loading.value = true
   try {
     const res = await platform.getDetectionLogs({
-      log_scope: props.logScope,
+      log_scope: activeScope(),
       page: page.value,
       page_size: 15,
       status: filterStatus.value || undefined,
@@ -100,6 +138,17 @@ async function load() {
     loading.value = false
   }
 }
+
+watch(
+  () => props.initialScope,
+  (s) => {
+    if (props.embedded && s) {
+      scopeTab.value = s
+      page.value = 1
+      load()
+    }
+  },
+)
 
 onMounted(load)
 </script>

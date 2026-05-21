@@ -3,8 +3,7 @@
     <v-card-item v-if="!embedded">
       <v-card-title class="text-h5 font-weight-bold">论文与学术资源检测工作台</v-card-title>
       <v-card-subtitle class="text-body-2 text-wrap mt-1">
-        论文检测<strong>仅支持 PDF</strong>。含「全篇 AIGC」与「学术资源规范性」两类子检测，结果分别走
-        <code>/paper/aigc/</code> 与 <code>/paper/resource-check/</code>。
+        论文检测<strong>仅支持 PDF</strong>。含「全篇 AIGC」与「学术资源规范性」两类检测，结果分别展示在对应标签页中。
       </v-card-subtitle>
       <div class="d-flex flex-wrap align-center ga-2 mt-3">
         <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
@@ -180,7 +179,7 @@
 
       <v-card v-if="paragraphRows.length && activeTab === 'aigc'" variant="outlined" class="mt-5 pa-4">
         <div class="text-h6 mb-2">段落级 AIGC 风险（仅 AIGC 检测）</div>
-        <p class="text-caption text-medium-emphasis mb-3">点击行可高亮当前段落；数据来自 <code>getAigcResult</code>。</p>
+        <p class="text-caption text-medium-emphasis mb-3">点击表格行可在下方查看该段摘录。</p>
         <v-table density="compact">
           <thead>
             <tr>
@@ -212,7 +211,7 @@
 
       <v-card v-if="resourceIssueRows.length && activeTab === 'resource'" variant="outlined" class="mt-5 pa-4">
         <div class="text-h6 mb-2">参考文献与规范问题（仅资源检测）</div>
-        <p class="text-caption text-medium-emphasis mb-3">条目来自 <code>getResourceResult</code> 的 issues；与 AIGC 段落表互斥展示。</p>
+        <p class="text-caption text-medium-emphasis mb-3">以下为参考文献与著录相关问题；与 AIGC 段落分析分开展示。</p>
         <v-table density="compact">
           <thead>
             <tr>
@@ -240,8 +239,7 @@
         density="compact"
         class="mt-5 text-body-2"
       >
-        <strong>提示：</strong>同批送检请用「批量提交」标签；本标签用于论文 PDF 的 AIGC / 资源规范性专项提交与结果查看。历史中的
-        <code>paper_aigc</code> / <code>resource_check</code> 会跳转到本标签对应子页。
+        <strong>提示：</strong>同批送检请用「批量提交」标签；本标签用于论文 PDF 的 AIGC / 资源规范性专项提交与结果查看。检测历史中「论文」类任务会跳转到本页对应子标签。
       </v-alert>
     </v-card-text>
   </v-card>
@@ -344,7 +342,9 @@ watch(
       activeTab.value = next
     }
     applyDefaultsForTab()
-    syncQueryWithTab()
+    if (!props.embedded || route.query.section === 'paper') {
+      syncQueryWithTab()
+    }
   },
   { immediate: true }
 )
@@ -354,6 +354,7 @@ function applyDefaultsForTab() {
 }
 
 function syncQueryWithTab() {
+  if (props.embedded && route.query.section !== 'paper') return
   const t = activeTab.value
   const tabKey = props.embedded ? 'paper_tab' : 'tab'
   if (route.query[tabKey] === t) return
@@ -370,7 +371,11 @@ function syncQueryWithTab() {
 }
 
 watch(activeTab, (tab, prev) => {
-  syncQueryWithTab()
+  if (props.embedded && route.query.section === 'paper') {
+    syncQueryWithTab()
+  } else if (!props.embedded) {
+    syncQueryWithTab()
+  }
   if (isSubmitting.value) return
   if (prev !== tab) {
     clearWorkspace()
@@ -422,7 +427,7 @@ const submitBatchTasks = async () => {
 
   const nonPdf = selectedFiles.value.filter((f) => !f.name.toLowerCase().endsWith('.pdf'))
   if (nonPdf.length) {
-    error.value = '仅支持 PDF 上传（需求与接口 POST /paper/upload/ 约定）。请移除非 PDF 文件后重试。'
+    error.value = '仅支持 PDF 上传，请移除非 PDF 文件后重试。'
     return
   }
 

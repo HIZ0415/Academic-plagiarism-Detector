@@ -4,7 +4,7 @@
       <v-col cols="12">
         <div class="text-h4 font-weight-bold">工作台</div>
         <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
-          首页汇总近期任务与活跃度；侧栏按「工作台 → 检测与资源 → 用户与组织 → 协作审核 → 审计」进入各模块。
+          首页汇总近期任务与活跃度；侧栏按「工作台 → 检测与资源 → 用户与组织 → 人工审核审批 → 系统日志」进入各模块。
         </p>
       </v-col>
     </v-row>
@@ -50,9 +50,9 @@
         <v-card border class="h-100" hover to="/logs">
           <v-card-title class="d-flex align-center text-subtitle-1">
             <v-icon class="me-2" color="brown">mdi-clipboard-text-clock</v-icon>
-            操作与审计日志
+            系统日志
           </v-card-title>
-          <v-card-subtitle>关键操作留痕、检索与导出。</v-card-subtitle>
+          <v-card-subtitle>用户操作留痕与检测任务记录（论文 / Review / 图像）。</v-card-subtitle>
           <v-card-actions>
             <v-btn color="primary" variant="tonal" to="/logs" prepend-icon="mdi-arrow-right">进入</v-btn>
           </v-card-actions>

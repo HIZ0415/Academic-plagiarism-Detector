@@ -22,8 +22,6 @@
           @click="goToUpload"></v-list-item>
         <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-history" title="检测历史" value="history"
           @click="goToHistory"></v-list-item>
-        <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-chart-timeline-variant" title="多模态联合分析"
-          value="fusion" @click="goToFusion"></v-list-item>
         <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-gavel" title="人工审核申请" value="annual"
           @click="gotoAnnual"></v-list-item>
         <v-list-item v-if="effectiveRole === 'publisher'" prepend-icon="mdi-message-text-outline" title="社区反馈"
@@ -324,10 +322,6 @@ const goToHome = () => {
 
 const goToUpload = () => {
   router.push('/upload')
-}
-
-const goToFusion = () => {
-  router.push('/multimodal-fusion')
 }
 
 const goToCommunity = () => {
