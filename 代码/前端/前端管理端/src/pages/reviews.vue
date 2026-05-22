@@ -468,16 +468,20 @@ function canHandlePending(request: ReviewRequest | null) {
   )
 }
 
-function startReject(request?: ReviewRequest) {
-  if (request) {
+function isReviewRequest(value: unknown): value is ReviewRequest {
+  return !!value && typeof value === 'object' && typeof (value as ReviewRequest).id === 'number'
+}
+
+function startReject(request?: unknown) {
+  if (isReviewRequest(request)) {
     selectedRequest.value = request
   }
   rejectReason.value = ''
   showRejectDialog.value = true
 }
 
-async function approveRequest(request?: ReviewRequest) {
-  if (request) {
+async function approveRequest(request?: unknown) {
+  if (isReviewRequest(request)) {
     selectedRequest.value = request
   }
   if (!selectedRequest.value) return

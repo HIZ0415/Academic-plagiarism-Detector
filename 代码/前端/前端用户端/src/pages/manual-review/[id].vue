@@ -19,6 +19,9 @@
       <v-btn color="primary" variant="tonal" prepend-icon="mdi-file-chart" @click="showAiReportDialog = true">
         查看 AI 检测报告摘要
       </v-btn>
+      <v-btn color="success" prepend-icon="mdi-check" :disabled="manualReviewStatus === 'completed'" @click="handleSubmit">
+        {{ manualReviewStatus === 'completed' ? 'Submitted' : 'Submit review' }}
+      </v-btn>
     </div>
 
     <v-expansion-panels
@@ -64,11 +67,18 @@
                 <v-card class="pa-2 elevation-1 ai-summary-card" flat rounded="lg">
                   <v-card-title class="pa-2 pb-1 text-subtitle-2 font-weight-bold">AI 检测结果摘要</v-card-title>
                   <v-card-text class="pa-2 pt-1">
-                    <template v-if="isImageTaskKind">
+                    <template v-if="isImageTaskKind && detection_results.length">
                       <div v-for="(dimension, index) in detection_results" :key="index"
                         class="d-flex justify-space-between text-body-2 text-grey">
                         <span class="font-weight-medium">{{ convert(index) }}:</span>
                         <span class="text-primary">{{ dimension.probability.toFixed(2) }}</span>
+                      </div>
+                    </template>
+                    <template v-else-if="isImageTaskKind">
+                      <div v-for="(row, index) in imageAiSummaryRows" :key="index"
+                        class="d-flex justify-space-between text-body-2 text-grey">
+                        <span class="font-weight-medium">{{ row.label }}:</span>
+                        <span class="text-primary">{{ row.value }}</span>
                       </div>
                     </template>
                     <template v-else>
@@ -82,7 +92,7 @@
                 </v-card>
               </div>
 
-              <div class="task-stats d-flex align-center justify-center justify-md-end flex-grow-0">
+              <div v-if="false" class="task-stats d-flex align-center justify-center justify-md-end flex-grow-0">
                 <div class="answer-card elevation-1">
                   <div class="d-flex flex-column flex-sm-row align-sm-center ga-3 mb-3">
                     <div class="text-h6 font-weight-medium">审核进度</div>
@@ -966,6 +976,25 @@ const currentTextualDimensions = computed(() => dimensionsPerTextUnit.value[curr
 
 const textualAiSummaryRows = computed(() => textualAiSummaryList.value)
 
+const imageAiSummaryRows = computed(() => [
+  {
+    label: 'AI',
+    value: aiDetectionSummary.value?.is_fake == null
+      ? '—'
+      : aiDetectionSummary.value.is_fake
+        ? 'Fake'
+        : 'Real',
+  },
+  {
+    label: 'Confidence',
+    value: formatNumber(aiDetectionSummary.value?.confidence_score ?? overall.value?.confidence_score ?? 0),
+  },
+  {
+    label: 'Time',
+    value: aiDetectionSummary.value?.detection_time || '—',
+  },
+])
+
 const getImageUrl = (url: string) => resolveBackendMediaUrl(url)
 
 function patchTextVerdict(v: string | null) {
@@ -1250,7 +1279,7 @@ function normalizeDimensionReasons(dims: Dimension[]): string[] {
   return padded.slice(0, 7)
 }
 
-function normalizeDimensionPoints(dims: Dimension[]): unknown[][] {
+function normalizeDimensionPoints(dims: Dimension[]): Array<Array<{}>> {
   const padded = dims.map((dim) => dim.drawingPaths ?? [])
   while (padded.length < 7) padded.push([])
   return padded.slice(0, 7)

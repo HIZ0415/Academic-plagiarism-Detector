@@ -509,22 +509,18 @@ class ReviewerTasksView(views.APIView):
             return Response({'error': 'Only reviewers can view review details'}, status=403)
 
         # 获取所有分配给当前 reviewer 的任务 ID 列表（不设时间限制）
-        assigned_tasks_ids = ReviewRequest.objects.filter(
-            organization=my_user.organization,
-            reviewers=user
-        ).values_list('detection_result__detection_task_id', flat=True)
+        manual_reviews = ManualReview.objects.filter(
+            reviewer=user,
+            review_request__status2='accepted',
+        )
+        if my_user.organization_id:
+            manual_reviews = manual_reviews.filter(review_request__organization=my_user.organization)
 
         # 所有收到的任务（关联 DetectionTask）
-        received_tasks = DetectionTask.objects.filter(id__in=assigned_tasks_ids)
+        received_tasks = manual_reviews
 
         # 所有已完成的任务（ManualReview 中状态为 completed）
-        completed_tasks_ids = ManualReview.objects.filter(
-            organization=my_user.organization,
-            reviewer=user,
-            status='completed'
-        ).values_list('review_request__detection_result__detection_task_id', flat=True)
-
-        completed_tasks = DetectionTask.objects.filter(id__in=completed_tasks_ids)
+        completed_tasks = manual_reviews.filter(status='completed')
 
         # 统计总数
         total_received_tasks = received_tasks.count()

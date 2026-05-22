@@ -48,4 +48,9 @@ AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://127.0.0.1:8010")
 AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT_SECONDS", os.getenv("AI_SERVICE_TIMEOUT", "120")))
 
 CORS_ALLOW_ALL_ORIGINS = _env_bool("CORS_ALLOW_ALL_ORIGINS", False)
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 

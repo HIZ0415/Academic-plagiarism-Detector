@@ -7,7 +7,7 @@
           图像、论文 PDF、Review 文本等检测均在本页完成：通过下方标签切换<strong>批量提交</strong>、<strong>论文工作台</strong>与 <strong>Review 结果</strong>。
         </div>
       </v-col>
-      <v-col cols="12" md="4" class="d-flex justify-end">
+      <v-col v-if="USE_MOCK" cols="12" md="4" class="d-flex justify-end">
         <v-chip :color="USE_MOCK ? 'warning' : 'success'" variant="tonal">
           {{ USE_MOCK ? 'Mock 模式' : '后端模式' }}
         </v-chip>
@@ -312,7 +312,9 @@ const batchSummary = computed(() => {
   if (!id || !rows.value.length) return null
   const counts = { image: 0, paper: 0, review: 0, unknown: 0 }
   for (const r of rows.value) {
-    counts[r.type]++
+    if (r.type === 'archive') counts.image++
+    else if (r.type === 'docx') counts.unknown++
+    else counts[r.type]++
   }
   return { id, counts, total: rows.value.length }
 })
@@ -468,8 +470,12 @@ async function backendRun(row: QueueRow) {
   }
 
   if (row.type === 'image' || row.type === 'archive') {
-    if (!row.file.type.startsWith('image/')) {
+    if (row.type === 'image' && !row.file.type.startsWith('image/')) {
       row.error = '图像检测仅支持图片文件。'
+      throw new Error(row.error)
+    }
+    if (row.type === 'archive' && !row.file.name.toLowerCase().endsWith('.zip')) {
+      row.error = 'Archive detection supports ZIP files only. Please extract or convert RAR files to ZIP before uploading.'
       throw new Error(row.error)
     }
 

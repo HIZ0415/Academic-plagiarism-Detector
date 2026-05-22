@@ -336,7 +336,7 @@ import DynamicCaptcha from '@/components/DynamicCaptcha.vue'
 import ForgotPassword from '@/components/ForgotPassword.vue'
 import { useSnackbarStore } from '@/stores/snackbar';
 const snackbar = useSnackbarStore();
-import user from '@/api/user'
+import user, { isLoggedIn } from '@/api/user'
 import { useUserStore } from '@/stores/user';
 const userStore = useUserStore();
 import VerificationCodeInput from '@/components/VerificationCodeInput.vue'
@@ -488,6 +488,11 @@ const handleSubmit = async () => {
   }
   // 继续登录/注册流程...
   if (loginType.value === 'login') {
+    localStorage.removeItem('2-token')
+    localStorage.removeItem('2-refresh')
+    localStorage.setItem('2-isLoggedIn', 'false')
+    isLoggedIn.value = false
+    userStore.clearUserInfo()
     const response = await user.login({
       email: email.value.trim().toLowerCase(),
       password: password.value,
@@ -499,11 +504,19 @@ const handleSubmit = async () => {
 
       // 获取用户信息并存储到 user store
       await userStore.fetchUserInfo();
+      if (userStore.role !== selectedRole.value) {
+        throw new Error('Logged in role does not match the selected role')
+      }
 
       snackbar.showMessage('登录成功', 'success')
       router.push('/')
     }).catch((error: unknown) => {
       console.error(error)
+      localStorage.removeItem('2-token')
+      localStorage.removeItem('2-refresh')
+      localStorage.setItem('2-isLoggedIn', 'false')
+      isLoggedIn.value = false
+      userStore.clearUserInfo()
       let errorMessage = '无法连接后端'
       const ax = error as { response?: { status: number; data?: unknown }; code?: string; message?: string }
       if (ax.response) {

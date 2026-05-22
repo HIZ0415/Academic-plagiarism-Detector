@@ -1510,6 +1510,7 @@ def handle_review_request(request, reviewRequest_id):
             manual_review = ManualReview.objects.create(
                 review_request=review_request,
                 reviewer=reviewer,
+                organization=review_request.organization,
                 status='undo'  # 默认状态
             )
 
