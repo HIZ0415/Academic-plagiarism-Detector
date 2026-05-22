@@ -753,10 +753,15 @@ def submit_review_detection_task(request):
     file_name = "review_input.txt"
     file_type = "text/plain"
     raw_bytes = (raw_text or "").encode("utf-8")
-    try:
-        preprocessed = preprocess_review_text(raw_text, source_name=file_name)
-    except ValueError:
-        preprocessed = None
+    preprocessed = None
+    if raw_text:
+        try:
+            preprocessed = preprocess_review_text(raw_text, source_name=file_name)
+        except ValueError as exc:
+            msg = str(exc)
+            if "超过最大长度" in msg:
+                return Response({"detail": msg}, status=400)
+            preprocessed = None
 
     if uploaded_file is not None:
         file_name = uploaded_file.name or "review_input.txt"

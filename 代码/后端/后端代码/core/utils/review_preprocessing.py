@@ -10,6 +10,8 @@ from typing import Any
 BACKEND_AI_REQUEST_SCHEMA_VERSION = "backend-ai-request-v1"
 PREPROCESSING_SCHEMA_VERSION = "review-preprocess-v1"
 TEXT_ENCODINGS = ("utf-8-sig", "utf-8", "gbk", "latin-1")
+# 与测试用例 §6.4-5 对齐：正常 Review 约数百～千余字；超长拒绝（避免 AI/存储压力）
+MAX_REVIEW_TEXT_CHARS = 100_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,7 +22,15 @@ class ReviewPreprocessingResult:
     ai_payload: dict[str, Any]
 
 
+def _ensure_review_text_within_limit(text: str) -> None:
+    if len(text) > MAX_REVIEW_TEXT_CHARS:
+        raise ValueError(
+            f"Review 文本超过最大长度 {MAX_REVIEW_TEXT_CHARS} 字符，请缩短后重试。"
+        )
+
+
 def preprocess_review_text(raw_text: str, *, source_name: str = "review_input.txt") -> ReviewPreprocessingResult:
+    _ensure_review_text_within_limit(raw_text)
     cleaned_text = clean_review_text(raw_text)
     if not cleaned_text:
         raise ValueError("Review text is empty after preprocessing")
@@ -35,6 +45,7 @@ def preprocess_review_text(raw_text: str, *, source_name: str = "review_input.tx
 
 def preprocess_review_bytes(raw_bytes: bytes, *, source_name: str) -> ReviewPreprocessingResult:
     raw_text, encoding = decode_review_bytes(raw_bytes)
+    _ensure_review_text_within_limit(raw_text)
     cleaned_text = clean_review_text(raw_text)
     if not cleaned_text:
         raise ValueError("Review text is empty after preprocessing")
