@@ -1,0 +1,220 @@
+{
+  "task1": {
+    "9": {
+      "result": "通过",
+      "task_id": 18,
+      "note": "API fast image detection"
+    },
+    "10": {
+      "result": "通过",
+      "task_id": 20,
+      "note": "API precise image detection"
+    },
+    "11": {
+      "result": "通过",
+      "msg": "{'task_id': 18, 'task_name': 'auto-1779459741', 'status': 'completed', 'upload_time': '2026-05-22T22:22:21.374209+08:00', 'completion_time': '2026-05-"
+    },
+    "36": {
+      "result": "通过",
+      "report_download": "通过"
+    },
+    "17": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'task_id': 19, 'status': 'completed', 'error_message': '', 'cleaned_text_length': 375}"
+    },
+    "19": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'task_id': 21, 'status': 'completed', 'error_message': '', 'cleaned_text_length': 42}"
+    },
+    "18": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'detail': '请提供 text 或 txt 文件。'}"
+    },
+    "13": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'paper_file_id': 28, 'file_name': 'sample2.pdf', 'upload_time': '2026-05-22 22:22:23', 'paragraph_count': 1}"
+    },
+    "15": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'task_id': 22, 'status': 'completed', 'error_message': '', 'paper_file_id': 28, 'paragraph_count': 1}"
+    },
+    "22": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'task_id': 22, 'overall_risk_level': 'medium', 'ai_contribution_ratio': 0.6733, 'summary': '已分析 1 个段落，整体风险为 medium (0.6"
+    },
+    "14": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'detail': '仅支持 PDF 文件。'}"
+    },
+    "8": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'message': 'Unsupported upload type.'}"
+    },
+    "7": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'message': 'File uploaded successfully', 'file_id': 29, 'file_url': '/media/uploads/c223b284f8be485aa25eb48e0d83e1ad_va",
+      "note": "API 等价于批量提交选图入队"
+    },
+    "37": {
+      "status": 200,
+      "result": "通过"
+    },
+    "38": {
+      "status": 200,
+      "result": "通过"
+    },
+    "39": {
+      "status": 200,
+      "result": "通过"
+    },
+    "40": {
+      "status": 200,
+      "result": "通过"
+    },
+    "26": {
+      "status": 201,
+      "result": "通过",
+      "msg": "{'review_request_id': 7, 'id': 7, 'status': 'pending_admin', 'message': '已提交人工审核申请，等待管理端审批', 'detection_task_id': 18, 't"
+    },
+    "28": {
+      "status": 200,
+      "result": "通过"
+    },
+    "29": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'message': 'ReviewRequest handled successfully'}"
+    },
+    "31": {
+      "status": 200,
+      "result": "通过"
+    }
+  },
+  "task2": {
+    "6.1-1": {
+      "status": 401,
+      "msg": "{'detail': 'Authentication credentials were not provided.'}",
+      "result": "通过"
+    },
+    "6.1-2": {
+      "status": 401,
+      "msg": "{'message': 'Invalid credentials'}",
+      "result": "通过"
+    },
+    "6.1-3": {
+      "status": 403,
+      "msg": "{'error': 'Only publishers can create manual review requests'}",
+      "result": "通过"
+    },
+    "6.1-4": {
+      "status": 403,
+      "msg": "{'error': 'Only reviewers can view tasks'}",
+      "result": "通过"
+    },
+    "6.1-5": {
+      "status": 400,
+      "msg": "{'non_field_errors': ['Invalid role. User is not an admin']}",
+      "result": "通过"
+    },
+    "6.1-6": {
+      "status": 404,
+      "msg": "{'message': 'Detection task not found'}",
+      "result": "通过"
+    },
+    "6.2-1": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'detail': 'No file provided.'}"
+    },
+    "6.2-2": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'message': 'Unsupported upload type.'}"
+    },
+    "6.2-3": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'detail': '仅支持 PDF 文件。'}"
+    },
+    "6.2-4": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'detail': '请提供 text 或 txt 文件。'}"
+    },
+    "6.2-5": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'message': 'No image IDs provided'}"
+    },
+    "6.2-6": {
+      "status": 404,
+      "result": "通过",
+      "msg": "{'message': 'No valid images found'}"
+    },
+    "6.3-1": {
+      "status": 404,
+      "result": "通过",
+      "msg": "{'error': 'task not found'}"
+    },
+    "6.3-3": {
+      "status": 404,
+      "result": "通过",
+      "msg": "{'error': 'ReviewRequest not found'}"
+    },
+    "6.3-5": {
+      "status": 403,
+      "result": "通过",
+      "msg": "{'错误': '该用户没有审核的权限'}"
+    },
+    "6.4-1": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'detail': '请提供 text 或 txt 文件。'}"
+    },
+    "6.4-2": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'detail': '请提供 text 或 txt 文件。'}"
+    },
+    "6.4-4": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'task_id': 19, 'status': 'completed', 'error_message': '', 'cleaned_text_length': 375}"
+    },
+    "6.5-1": {
+      "status": 400,
+      "result": "通过",
+      "msg": "{'detail': \"failed to open PDF 'empty.pdf'\"}"
+    },
+    "6.5-2": {
+      "status": 200,
+      "result": "通过",
+      "msg": "{'paper_file_id': 25, 'file_name': 'sample.pdf', 'upload_time': '2026-05-22 22:22:22', 'paragraph_count': 1}"
+    },
+    "6.5-4": {
+      "status": 404,
+      "result": "通过",
+      "msg": "{'detail': '任务不存在。'}"
+    },
+    "6.5-5": {
+      "status": 200,
+      "note": "incomplete task report",
+      "result": "失败",
+      "msg": "application/pdf"
+    },
+    "6.5-6": {
+      "status": 200,
+      "result": "通过",
+      "msg": "bytes=3979"
+    }
+  }
+}

@@ -53,8 +53,14 @@ def create_manual_review_request(request):
     if not detection_task_id:
         return Response({"error": "detection_task_id is required"}, status=400)
     try:
-        task = DetectionTask.objects.get(id=detection_task_id, user=request.user)
+        task_id = int(detection_task_id)
+    except (TypeError, ValueError):
+        return Response({"error": "detection_task_id must be an integer"}, status=400)
+    try:
+        task = DetectionTask.objects.get(id=task_id, user=request.user)
     except DetectionTask.DoesNotExist:
+        if DetectionTask.objects.filter(id=task_id).exists():
+            return Response({"error": "无权访问该检测任务"}, status=403)
         return Response({"error": "task not found"}, status=404)
     if task.status != "completed":
         return Response({"error": "task not completed"}, status=400)

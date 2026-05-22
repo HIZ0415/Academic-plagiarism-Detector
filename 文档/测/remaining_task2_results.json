@@ -1,0 +1,38 @@
+{
+  "6.3-2": {
+    "status": 403,
+    "msg": "{'error': '无权访问该检测任务'}",
+    "result": "通过",
+    "note": "2026-05-22 修复后复测"
+  },
+  "6.4-5": {
+    "status": 400,
+    "msg": "Review 文本超过最大长度 100000 字符",
+    "result": "通过",
+    "note": "2026-05-22 修复后复测"
+  },
+  "6.4-6": {
+    "status": 200,
+    "msg": "cleaned_text_length=44, result_status=404",
+    "result": "通过"
+  },
+  "6.5-3": {
+    "status": 400,
+    "msg": "{'detail': \"failed to open PDF 'encrypted_fake.pdf'\"}",
+    "result": "通过",
+    "note": "使用损坏 PDF 字节；真·密码加密 PDF 需专用样本文件"
+  },
+  "6.5-3_encrypted": {
+    "status": 400,
+    "msg": "{'detail': 'document closed or encrypted'}",
+    "result": "通过",
+    "note": "PyMuPDF 生成的 AES 加密 PDF"
+  },
+  "6.5-5": {
+    "status": 400,
+    "msg": "Task not completed yet.",
+    "task_status_at_test": "in_progress",
+    "result": "通过",
+    "note": "ORM 将任务置 in_progress 后复测（首轮因检测过快误为 200）"
+  }
+}

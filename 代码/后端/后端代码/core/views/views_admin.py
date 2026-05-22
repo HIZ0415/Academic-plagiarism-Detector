@@ -1464,6 +1464,8 @@ def handle_review_request(request, reviewRequest_id):
         return Response({'error': 'Choice must be 0 (reject) or 1 (accept)'}, status=400)
 
     if choice == 0:
+        if not str(reason).strip():
+            return Response({'error': '拒绝申请时必须填写原因'}, status=400)
         review_request.status2 = 'refused'
     elif choice == 1:
         # 获取所有图片
