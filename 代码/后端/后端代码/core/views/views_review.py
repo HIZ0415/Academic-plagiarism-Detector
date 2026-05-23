@@ -1,3 +1,8 @@
+import json
+import re
+from pathlib import Path
+
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
@@ -13,6 +18,99 @@ from ..models import ReviewRequest, DetectionTask, ImageUpload, User, Log
 from core.util import send_notification
 from core.models import Notification
 from core.utils.serializers_safe import serialize_value
+
+def _format_ratio(value):
+    try:
+        return f'{round(float(value) * 100, 1)}%'
+    except (TypeError, ValueError):
+        return None
+
+
+def _first_factual_hint(result):
+    factual_items = result.get('factual_conclusions') or result.get('factual_issues') or []
+    if not isinstance(factual_items, list) or not factual_items:
+        return None
+
+    first = factual_items[0]
+    if isinstance(first, dict):
+        title = str(first.get('title') or first.get('claim') or '').strip()
+        detail = str(first.get('detail') or first.get('evidence') or first.get('suggestion') or '').strip()
+        if title and detail:
+            return f'{title}: {detail}'
+        return title or detail or None
+    text = str(first).strip()
+    return text or None
+
+
+def _build_text_ai_detection_result(detection_task, detection_result):
+    payload = {
+        'is_fake': detection_result.is_fake,
+        'confidence_score': detection_result.confidence_score,
+        'detection_time': _fmt_dt(detection_result.detection_time),
+        'llm_judgment': detection_result.llm_judgment or '',
+    }
+
+    if not detection_task:
+        return payload
+
+    meta = _load_text_task_meta(detection_task)
+    result = _normalize_text_ai_result(detection_task, _read_media_json(meta.get('ai_result_path')))
+    if not isinstance(result, dict):
+        return payload
+
+    task_type = (detection_task.task_type or '').lower()
+    summary = result.get('summary')
+    risk_level = result.get('overall_risk_level')
+
+    payload.update({
+        'summary': summary,
+        'overall_risk_level': risk_level,
+    })
+
+    if 'review' in task_type:
+        ai_tendency = result.get('ai_tendency') if isinstance(result.get('ai_tendency'), dict) else {}
+        template_tendency = result.get('template_tendency') if isinstance(result.get('template_tendency'), dict) else {}
+        suspicious_segments = result.get('suspicious_segments') if isinstance(result.get('suspicious_segments'), list) else []
+        ai_prob = result.get('overall_ai_probability', ai_tendency.get('score'))
+        template_score = result.get('template_score', template_tendency.get('score'))
+        high_risk_count = result.get('high_risk_count', len(suspicious_segments))
+        payload.update({
+            'overall_ai_probability': ai_prob,
+            'template_score': template_score,
+            'is_template_like': result.get('is_template_like'),
+            'sentence_count': result.get('sentence_count'),
+            'high_risk_count': high_risk_count,
+            'anomaly_count': high_risk_count,
+            'anomaly_segments': high_risk_count,
+            'bias_risk': risk_level,
+            'suggestion': summary,
+            'ai_ratio': _format_ratio(ai_prob),
+        })
+        if not payload.get('confidence_score') and ai_prob is not None:
+            payload['confidence_score'] = ai_prob
+    elif 'paper' in task_type:
+        ratio = result.get('ai_contribution_ratio')
+        paragraphs = result.get('paragraphs') if isinstance(result.get('paragraphs'), list) else []
+        paper_summary = result.get('paper_summary') if isinstance(result.get('paper_summary'), dict) else {}
+        high_risk_count = sum(
+            1
+            for item in paragraphs
+            if isinstance(item, dict) and str(item.get('risk_level', '')).lower() == 'high'
+        )
+        if not high_risk_count and paper_summary.get('high_risk_paragraph_count') is not None:
+            high_risk_count = paper_summary.get('high_risk_paragraph_count')
+        payload.update({
+            'ai_contribution_ratio': ratio,
+            'ai_ratio': _format_ratio(ratio),
+            'paragraph_count': len(paragraphs) or paper_summary.get('paragraph_count'),
+            'high_risk_paragraphs': high_risk_count,
+            'high_risk_segments': high_risk_count,
+            'fact_check_hint': _first_factual_hint(result) or summary,
+        })
+        if not payload.get('confidence_score') and ratio is not None:
+            payload['confidence_score'] = ratio
+
+    return payload
 
 
 @api_view(['GET'])
@@ -714,15 +812,180 @@ def _serialize_sub_methods_for_review(detection_result, request):
     return rows
 
 
+def _read_media_json(relative_path):
+    if not relative_path:
+        return None
+    path = Path(settings.MEDIA_ROOT) / str(relative_path)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except Exception:
+        return None
+
+
+def _read_media_text(relative_path):
+    if not relative_path:
+        return ''
+    path = Path(settings.MEDIA_ROOT) / str(relative_path)
+    if not path.exists():
+        return ''
+    try:
+        return path.read_text(encoding='utf-8', errors='ignore')
+    except Exception:
+        return ''
+
+
+def _load_text_task_meta(detection_task):
+    file_id = getattr(detection_task, 'paper_file_id', None)
+    if not file_id:
+        return {}
+    task_type = (detection_task.task_type or '').lower()
+    folder = 'review_uploads' if 'review' in task_type else 'paper_uploads'
+    meta_path = Path(settings.MEDIA_ROOT) / folder / f'{file_id}_meta.json'
+    if not meta_path.exists():
+        return {}
+    try:
+        payload = json.loads(meta_path.read_text(encoding='utf-8'))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _normalize_text_ai_result(detection_task, result):
+    if not isinstance(result, dict):
+        return {}
+    if not isinstance(result.get('results'), list):
+        return result
+
+    try:
+        from . import views_paper
+
+        task_type = (detection_task.task_type or '').lower() if detection_task else ''
+        if 'review' in task_type:
+            return views_paper._build_review_result_from_ai(detection_task, result)
+        if 'paper' in task_type:
+            return views_paper._build_aigc_result_from_ai(detection_task, result)
+    except Exception:
+        pass
+
+    results = result.get('results') or []
+    return results[0] if results and isinstance(results[0], dict) else {}
+
+
+def _split_text_units(text, *, label_prefix, ai_note):
+    pieces = [
+        x.strip()
+        for x in re.split(r'\n{2,}|(?<=[。！？.!?])\s+', text or '')
+        if x.strip()
+    ]
+    if not pieces and text.strip():
+        pieces = [text.strip()]
+    return [
+        {
+            'id': idx,
+            'label': f'{label_prefix} {idx}',
+            'content': piece,
+            'ai_note': ai_note,
+        }
+        for idx, piece in enumerate(pieces, start=1)
+    ]
+
+
+def _paper_segments_from_meta(detection_task, meta):
+    result = _normalize_text_ai_result(detection_task, _read_media_json(meta.get('ai_result_path')))
+    ai_paragraphs = []
+    if isinstance(result, dict) and isinstance(result.get('paragraphs'), list):
+        ai_paragraphs = result.get('paragraphs') or []
+
+    source_paragraphs = []
+    loaded = _read_media_json(meta.get('paragraphs_path'))
+    if isinstance(loaded, list):
+        source_paragraphs = loaded
+
+    paragraphs = source_paragraphs or ai_paragraphs
+    risk_by_index = {
+        item.get('index'): item
+        for item in ai_paragraphs
+        if isinstance(item, dict) and item.get('index') is not None
+    }
+
+    segments = []
+    for idx, item in enumerate(paragraphs, start=1):
+        if not isinstance(item, dict):
+            continue
+        content = str(item.get('text') or item.get('excerpt') or '').strip()
+        if not content:
+            continue
+        paragraph_index = item.get('index') or idx
+        risk_item = risk_by_index.get(paragraph_index, item)
+        risk = risk_item.get('risk_level') or risk_item.get('risk_score') or 'unknown'
+        segments.append({
+            'id': int(paragraph_index),
+            'label': f'论文段落 {paragraph_index}',
+            'content': content,
+            'ai_note': f'AI 风险：{risk}',
+        })
+    if segments:
+        return segments
+
+    text = _read_media_text(meta.get('cleaned_text_path') or meta.get('text_path'))
+    return _split_text_units(
+        text,
+        label_prefix='论文段落',
+        ai_note=f'自动检测类型：{detection_task.task_type or "unknown"}',
+    )
+
+
+def _review_segments_from_meta(detection_task, meta):
+    result = _normalize_text_ai_result(detection_task, _read_media_json(meta.get('ai_result_path')))
+    sentences = []
+    if isinstance(result, dict) and isinstance(result.get('sentences'), list):
+        sentences = result.get('sentences') or []
+    elif isinstance(result, dict) and isinstance(result.get('suspicious_segments'), list):
+        sentences = result.get('suspicious_segments') or []
+
+    segments = []
+    for idx, item in enumerate(sentences[:12], start=1):
+        if not isinstance(item, dict):
+            continue
+        content = str(item.get('text') or '').strip()
+        if not content:
+            continue
+        risk = item.get('risk_level') or item.get('ai_probability') or 'unknown'
+        segments.append({
+            'id': int(item.get('index') or idx),
+            'label': f'Review 句段 {item.get("index") or idx}',
+            'content': content,
+            'ai_note': f'AI 风险：{risk}',
+        })
+    if segments:
+        return segments
+
+    text = _read_media_text(meta.get('cleaned_text_path') or meta.get('text_path'))
+    return _split_text_units(
+        text,
+        label_prefix='Review 句段',
+        ai_note=f'自动检测类型：{detection_task.task_type or "unknown"}',
+    )
+
+
 def _build_text_segments_for_task(detection_task, review_request):
+    meta = _load_text_task_meta(detection_task)
+    task_type = (detection_task.task_type or '').lower()
+    if 'review' in task_type:
+        segments = _review_segments_from_meta(detection_task, meta)
+    else:
+        segments = _paper_segments_from_meta(detection_task, meta)
+    if segments:
+        return segments
+
     reason = (review_request.reason or '').strip()
-    label = '申请说明'
-    content = reason or f'检测任务 #{detection_task.id}（{detection_task.task_type or "unknown"}）'
     return [{
         'id': 1,
-        'label': label,
-        'content': content,
-        'ai_note': f'自动检测类型：{detection_task.task_type or "—"}',
+        'label': '申请说明',
+        'content': reason or f'检测任务 #{detection_task.id}（{detection_task.task_type or "unknown"}）',
+        'ai_note': f'自动检测类型：{detection_task.task_type or "unknown"}；未找到预处理文本',
     }]
 
 
@@ -851,12 +1114,7 @@ def get_review_detail(request, manual_review_id):
     image_ids = [x['id'] for x in imgs]
     image_urls = [x['url'] for x in imgs]
 
-    ai_detection_result = {
-        'is_fake': detection_result.is_fake,
-        'confidence_score': detection_result.confidence_score,
-        'detection_time': _fmt_dt(detection_result.detection_time),
-        'llm_judgment': detection_result.llm_judgment or '',
-    }
+    ai_detection_result = _build_text_ai_detection_result(detection_task, detection_result)
     sub_methods = _serialize_sub_methods_for_review(detection_result, request)
 
     reviewers_results = []
