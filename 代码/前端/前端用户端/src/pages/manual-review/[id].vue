@@ -396,6 +396,8 @@
             <v-list-item title="判定为造假" :subtitle="aiDetectionSummary.is_fake ? '是' : '否'" />
             <v-list-item title="置信度" :subtitle="formatNumber(aiDetectionSummary.confidence_score)" />
             <v-list-item title="检测时间" :subtitle="aiDetectionSummary.detection_time || '—'" />
+            <v-list-item v-if="aiDetectionSummary.overall_risk_level" title="整体风险" :subtitle="String(aiDetectionSummary.overall_risk_level)" />
+            <v-list-item v-if="aiDetectionSummary.summary" title="AI 检测摘要" :subtitle="String(aiDetectionSummary.summary)" />
           </v-list>
           <p class="text-caption text-medium-emphasis mt-2">
             完整报告可由发布者在检测任务结果中查看；此处仅摘要供人工审核参考。
@@ -555,6 +557,8 @@ const aiDetectionSummary = ref<{
   is_fake: boolean
   confidence_score: number
   detection_time?: string
+  overall_risk_level?: unknown
+  summary?: unknown
 } | null>(null)
 
 const manualReviewStatus = ref<string>('undo')
@@ -697,6 +701,12 @@ const formatNumber = (result: number) => {
   return `${(result * 100).toFixed(2)}%`
 }
 
+const compactSummary = (value: unknown) => {
+  const text = String(value ?? '').trim()
+  if (!text) return '—'
+  return text.length > 72 ? `${text.slice(0, 72)}...` : text
+}
+
 function clearTextualWorkspace() {
   textualUnits.value = []
   dimensionsPerTextUnit.value = []
@@ -796,16 +806,18 @@ function initTextualTaskFromResponse(response: Record<string, unknown>) {
 
   if (isRev) {
     textualAiSummaryList.value = [
+      { label: 'AI 检测摘要', value: compactSummary(ai.summary ?? ai.llm_judgment) },
       { label: '模板化倾向', value: String(ai.template_score ?? '—') },
       { label: '文本异常片段', value: String(ai.anomaly_segments ?? ai.anomaly_count ?? '—') },
       { label: '立场风险提示', value: String(ai.bias_risk ?? '—') },
-      { label: '综合建议（AI）', value: String(ai.suggestion ?? '—') },
+      { label: '综合建议（AI）', value: compactSummary(ai.suggestion ?? ai.summary) },
     ]
   } else {
     textualAiSummaryList.value = [
+      { label: 'AI 检测摘要', value: compactSummary(ai.summary ?? ai.llm_judgment) },
       { label: '全文异常倾向', value: formatNumber(conf) },
       { label: '高敏段落数', value: String(ai.high_risk_segments ?? ai.high_risk_paragraphs ?? '—') },
-      { label: 'AIGC 占比（若有）', value: String(ai.ai_ratio ?? '—') },
+      { label: 'AIGC 占比（若有）', value: String(ai.ai_ratio ?? ai.ai_contribution_ratio ?? '—') },
       { label: '事实性子结论', value: String(ai.fact_check_hint ?? '—') },
     ]
   }

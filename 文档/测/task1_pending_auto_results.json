@@ -1,0 +1,163 @@
+{
+  "generated_at": "2026-05-23 15:32:46",
+  "services": {
+    "user_frontend": "http://127.0.0.1:3000/",
+    "admin_frontend": "http://127.0.0.1:3001/",
+    "django": "http://127.0.0.1:8000/admin/",
+    "ai": "http://127.0.0.1:8010/health"
+  },
+  "cases": {
+    "12": {
+      "result": "通过",
+      "method": "API + 源码断言",
+      "note": "检测历史支持按状态、任务类型、时间范围筛选；接口返回与筛选条件一致。",
+      "api_checks": [
+        {
+          "params": {
+            "page": 1,
+            "page_size": 10,
+            "status": "completed"
+          },
+          "status": 200,
+          "count": 1,
+          "ok": true
+        },
+        {
+          "params": {
+            "page": 1,
+            "page_size": 10,
+            "task_type": "paper_aigc"
+          },
+          "status": 200,
+          "count": 1,
+          "ok": true
+        },
+        {
+          "params": {
+            "page": 1,
+            "page_size": 10,
+            "startTime": "2025-11-24 15:32:46",
+            "endTime": "2026-05-23 15:32:46"
+          },
+          "status": 200,
+          "count": 2,
+          "ok": true
+        }
+      ],
+      "static_ok": true
+    },
+    "21": {
+      "result": "通过",
+      "method": "源码断言",
+      "note": "批量提交逻辑能识别 DOCX，并在前端直接置为失败提示，不创建后端检测任务。",
+      "checks": {
+        "detects_docx": true,
+        "docx_resource_type": true,
+        "blocks_before_backend": true,
+        "expected_prompt": true,
+        "no_docx_in_accept": true
+      }
+    },
+    "27": {
+      "result": "通过",
+      "method": "API + 源码断言",
+      "note": "人工审核申请列表支持按状态与时间筛选；脚本创建并审批了一条申请用于列表校验。",
+      "created_review_request_id": 3,
+      "api_checks": [
+        {
+          "params": {
+            "page": 1,
+            "page_size": 10
+          },
+          "status": 200,
+          "count": 3,
+          "ok": true
+        },
+        {
+          "params": {
+            "page": 1,
+            "page_size": 10,
+            "status": "in_progress"
+          },
+          "status": 200,
+          "count": 3,
+          "ok": true
+        },
+        {
+          "params": {
+            "page": 1,
+            "page_size": 10,
+            "startTime": "2025-05-23 15:32:46",
+            "endTime": "2026-05-23 15:32:46"
+          },
+          "status": 200,
+          "count": 2,
+          "ok": true
+        }
+      ],
+      "static_ok": true
+    },
+    "33": {
+      "result": "通过",
+      "method": "API",
+      "note": "专家审核论文任务详情接口可返回文本片段或 AI 参考信息；页面仍建议浏览器目视确认排版。",
+      "review_request_id": 4,
+      "manual_review_id": 4,
+      "detail_status": 200,
+      "has_text_segments": true,
+      "has_ai_reference": true,
+      "detail_keys": [
+        "ai_detection_result",
+        "count",
+        "detection_task_id",
+        "image_ids",
+        "image_urls",
+        "imgs",
+        "manual_review_status",
+        "overall",
+        "publisher_avatar",
+        "publisher_username",
+        "review_request",
+        "reviewers_results",
+        "segments",
+        "sub_methods",
+        "task_kind",
+        "task_type",
+        "text_units"
+      ]
+    },
+    "41": {
+      "result": "通过",
+      "method": "源码断言",
+      "note": "发布者侧栏只有统一的“学术检测”入口，没有独立“论文检测”或“多模态融合”菜单项。",
+      "checks": {
+        "publisher_academic_detection": true,
+        "publisher_history": true,
+        "publisher_manual_request": true,
+        "no_paper_detection_menu": true,
+        "no_multimodal_menu": true
+      }
+    },
+    "42": {
+      "result": "通过",
+      "method": "源码断言",
+      "note": "用户端路由守卫已实现 /detect/image 与 /detect/paper 到 /upload 的旧路径重定向。",
+      "checks": {
+        "detect_image_to_upload": true,
+        "detect_paper_to_upload": true,
+        "paper_tab_mapping": true,
+        "requires_login_guard": true
+      }
+    },
+    "43": {
+      "result": "通过",
+      "method": "源码断言",
+      "note": "管理端路由守卫已实现 /paper-logs 与 /review-logs 到 /logs 的旧路径重定向。",
+      "checks": {
+        "paper_logs_to_logs": true,
+        "review_logs_to_logs": true,
+        "requires_login_guard": true
+      }
+    }
+  }
+}
