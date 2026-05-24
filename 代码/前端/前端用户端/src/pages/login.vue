@@ -79,9 +79,6 @@
               class="role-btn">编辑</v-btn>
             <v-btn value="reviewer" :class="{ 'active-role': selectedRole === 'reviewer' }" class="role-btn">专家</v-btn>
           </v-btn-toggle>
-          <div class="text-caption text-medium-emphasis mt-2">
-            「专家」与文档中的「审稿人」为同一类账号（系统内角色 reviewer），负责管理端通过后的<strong>人工复核</strong>；与期刊「审稿」业务流程不是同一概念。
-          </div>
         </div>
 
         <v-alert

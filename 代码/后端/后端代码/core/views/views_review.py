@@ -1340,7 +1340,8 @@ def post_review(request, manual_review_id):
 
     # 更新ManualReview状态
     manual_review.status = 'completed'
-    manual_review.save()
+    manual_review.review_time = timezone.now()
+    manual_review.save(update_fields=['status', 'review_time'])
 
     # 更新ReviewRequest状态
     review_request = manual_review.review_request

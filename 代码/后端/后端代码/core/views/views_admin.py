@@ -93,7 +93,7 @@ class AdminDashboardView(APIView):
         ]
 
         recent_tasks = _dashboard_recent_tasks(request.user)
-        task_stats = _dashboard_task_stats(recent_tasks)
+        task_stats = _dashboard_task_stats(recent_tasks, admin_user=request.user)
 
         return JsonResponse({'users': user_data, 'task_stats': task_stats})
 
@@ -139,6 +139,28 @@ def _org_scoped_tasks(user, queryset=None):
     return qs.filter(
         Q(organization=org) | Q(organization__isnull=True, user__organization=org)
     )
+
+
+def _org_scoped_review_requests(user, queryset=None):
+    """组织管理员可见人工审核申请（与 get_all_review_requests 范围一致）。"""
+    qs = queryset if queryset is not None else ReviewRequest.objects.all()
+    if _is_software_admin(user):
+        return qs
+    org = user.organization
+    if not org:
+        return qs.none()
+    return qs.filter(organization=org)
+
+
+def _dashboard_pending_admin_review_count(user):
+    """近 30 日待组织管理员审批的人工审核申请（status2=pending）。"""
+    return _org_scoped_review_requests(
+        user,
+        ReviewRequest.objects.filter(
+            status2='pending',
+            request_time__gte=_dashboard_window_start(),
+        ),
+    ).count()
 
 
 def _org_scoped_users(user, queryset=None):
@@ -213,13 +235,21 @@ def _with_effective_status(queryset):
     )
 
 
-def _dashboard_task_stats(queryset):
-    """近 30 日任务各状态计数（互斥；与 effective_status 一致）。"""
+def _dashboard_task_stats(queryset, *, admin_user=None):
+    """
+    近 30 日任务各状态计数。
+    DetectionTask 各 effective_status 互斥；pending_tasks 另加「待管理员审批」的 ReviewRequest（status2=pending），
+    故 total 可能小于 completed+in_progress+pending+failed。
+    """
     qs = _with_effective_status(queryset)
+    pending_detection = qs.filter(effective_status='pending').count()
+    pending_reviews = (
+        _dashboard_pending_admin_review_count(admin_user) if admin_user is not None else 0
+    )
     stats = {
         'total_tasks': qs.count(),
         'completed_tasks': qs.filter(effective_status='completed').count(),
-        'pending_tasks': qs.filter(effective_status='pending').count(),
+        'pending_tasks': pending_detection + pending_reviews,
         'in_progress_tasks': qs.filter(effective_status='in_progress').count(),
         'failed_tasks': qs.filter(effective_status='failed').count(),
     }

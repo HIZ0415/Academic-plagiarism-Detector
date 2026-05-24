@@ -107,29 +107,49 @@
             >
               详情
             </v-btn>
-            <v-btn
-              size="small"
-              variant="flat"
-              color="success"
-              class="text-none"
-              prepend-icon="mdi-check"
-              :disabled="!canHandlePending(item)"
-              :loading="processingRequestId === item.id"
-              @click="approveRequest(item)"
+            <v-tooltip
+              :text="getHandleDisabledReason(item) || ''"
+              :disabled="canHandlePending(item)"
+              location="top"
             >
-              通过
-            </v-btn>
-            <v-btn
-              size="small"
-              variant="outlined"
-              color="error"
-              class="text-none"
-              prepend-icon="mdi-close"
-              :disabled="!canHandlePending(item)"
-              @click="startReject(item)"
+              <template #activator="{ props: tipProps }">
+                <span v-bind="tipProps" class="d-inline-block">
+                  <v-btn
+                    size="small"
+                    variant="flat"
+                    color="success"
+                    class="text-none action-btn"
+                    prepend-icon="mdi-check"
+                    :disabled="!canHandlePending(item)"
+                    :loading="processingRequestId === item.id"
+                    @click="approveRequest(item)"
+                  >
+                    通过
+                  </v-btn>
+                </span>
+              </template>
+            </v-tooltip>
+            <v-tooltip
+              :text="getHandleDisabledReason(item) || ''"
+              :disabled="canHandlePending(item)"
+              location="top"
             >
-              拒绝
-            </v-btn>
+              <template #activator="{ props: tipProps }">
+                <span v-bind="tipProps" class="d-inline-block">
+                  <v-btn
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    class="text-none action-btn"
+                    prepend-icon="mdi-close"
+                    :disabled="!canHandlePending(item)"
+                    @click="startReject(item)"
+                  >
+                    拒绝
+                  </v-btn>
+                </span>
+              </template>
+            </v-tooltip>
           </div>
         </template>
       </v-data-table>
@@ -287,8 +307,41 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="error" variant="text" :disabled="!canHandlePending(selectedRequest)" @click="startReject">拒绝</v-btn>
-          <v-btn color="success" :disabled="!canHandlePending(selectedRequest)" @click="approveRequest">通过</v-btn>
+          <v-tooltip
+            :text="getHandleDisabledReason(selectedRequest) || ''"
+            :disabled="canHandlePending(selectedRequest)"
+            location="top"
+          >
+            <template #activator="{ props: tipProps }">
+              <span v-bind="tipProps" class="d-inline-block">
+                <v-btn
+                  color="error"
+                  variant="text"
+                  :disabled="!canHandlePending(selectedRequest)"
+                  @click="startReject()"
+                >
+                  拒绝
+                </v-btn>
+              </span>
+            </template>
+          </v-tooltip>
+          <v-tooltip
+            :text="getHandleDisabledReason(selectedRequest) || ''"
+            :disabled="canHandlePending(selectedRequest)"
+            location="top"
+          >
+            <template #activator="{ props: tipProps }">
+              <span v-bind="tipProps" class="d-inline-block">
+                <v-btn
+                  color="success"
+                  :disabled="!canHandlePending(selectedRequest)"
+                  @click="approveRequest()"
+                >
+                  通过
+                </v-btn>
+              </span>
+            </template>
+          </v-tooltip>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -321,6 +374,7 @@ import { ref, onMounted, computed } from 'vue'
 import reviewApi from '@/api/review'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useAdminCapabilities } from '@/composables/useAdminCapabilities'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 const snackbar = useSnackbarStore()
 const { isSoftwareAdmin, canApproveManualReview } = useAdminCapabilities()
@@ -397,9 +451,7 @@ const timeRangeOptions = [
 ]
 
 
-const getImageUrl =(url:string)=>{
-  return import.meta.env.VITE_API_URL + url
-}
+const getImageUrl = (url: string) => resolveBackendMediaUrl(url)
 
 // 审核详情对话框相关
 const showReviewDialog = ref(false)
@@ -468,22 +520,57 @@ function canHandlePending(request: ReviewRequest | null) {
   )
 }
 
-function startReject(request?: ReviewRequest) {
-  if (request) {
-    selectedRequest.value = request
+function getHandleDisabledReason(request: ReviewRequest | null): string | undefined {
+  if (!request) return '请先选择一条申请'
+  if (!canApproveManualReview.value) {
+    if (isSoftwareAdmin.value) {
+      return '软件管理员仅可查看；请使用组织管理员账号（如 org_admin@example.com）登录后再审批'
+    }
+    return '当前账号无审批权限'
+  }
+  if (request.state !== 'pending') {
+    return `该申请状态为「${getStateName(request.state)}」，无法再审批`
+  }
+  if (processingRequestId.value === request.id) {
+    return '正在处理中，请稍候'
+  }
+  return undefined
+}
+
+function startReject(request?: ReviewRequest | Event) {
+  const target = resolveReviewRequest(request)
+  if (target) {
+    selectedRequest.value = target
   }
   rejectReason.value = ''
   showRejectDialog.value = true
 }
 
-async function approveRequest(request?: ReviewRequest) {
-  if (request) {
-    selectedRequest.value = request
+function resolveReviewRequest(request?: ReviewRequest | Event): ReviewRequest | null {
+  if (request && typeof request === 'object' && 'id' in request && typeof request.id === 'number') {
+    return request as ReviewRequest
   }
-  if (!selectedRequest.value) return
+  return selectedRequest.value
+}
+
+function extractApiError(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('response' in error)) return undefined
+  const data = (error as { response?: { data?: Record<string, unknown> } }).response?.data
+  if (!data) return undefined
+  const err = data.error ?? data.detail ?? data.message
+  return typeof err === 'string' ? err : undefined
+}
+
+async function approveRequest(request?: ReviewRequest | Event) {
+  const target = resolveReviewRequest(request)
+  if (!target?.id) {
+    snackbar.showMessage('无法识别审核申请，请关闭详情后重试', 'error')
+    return
+  }
+  selectedRequest.value = target
   try {
-    processingRequestId.value = selectedRequest.value.id
-    await reviewApi.handleReviewRequest(selectedRequest.value.id, { choice: 1, reason: '' })
+    processingRequestId.value = target.id
+    await reviewApi.handleReviewRequest(target.id, { choice: 1, reason: '' })
     snackbar.showMessage('已通过审核，已进入专家分配队列', 'success')
     showReviewDialog.value = false
     showRejectDialog.value = false
@@ -491,11 +578,7 @@ async function approveRequest(request?: ReviewRequest) {
     fetchRequests(currentPage.value, pageSize.value)
   } catch (error: unknown) {
     console.error('处理审核请求失败:', error)
-    const msg =
-      error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined
-    snackbar.showMessage(msg || '处理审核请求失败', 'error')
+    snackbar.showMessage(extractApiError(error) || '处理审核请求失败', 'error')
   } finally {
     processingRequestId.value = null
   }
@@ -520,11 +603,7 @@ async function confirmReject() {
     fetchRequests(currentPage.value, pageSize.value)
   } catch (error: unknown) {
     console.error('处理审核请求失败:', error)
-    const msg =
-      error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-        : undefined
-    snackbar.showMessage(msg || '处理审核请求失败', 'error')
+    snackbar.showMessage(extractApiError(error) || '处理审核请求失败', 'error')
   } finally {
     processingRequestId.value = null
   }
@@ -704,11 +783,17 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.v-btn.v-btn--size-small {
+.v-btn.v-btn--icon.v-btn--size-small {
   width: 32px;
   height: 32px;
   padding: 0;
   border-radius: 8px;
+}
+
+.action-btn {
+  min-width: auto;
+  height: auto;
+  padding-inline: 12px;
 }
 
 .v-btn--icon.v-btn--size-small .v-icon {
