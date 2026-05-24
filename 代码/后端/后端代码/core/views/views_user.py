@@ -266,16 +266,35 @@ class PasswordResetRequestView(views.APIView):
                 # 生成并设置验证码
                 user.set_reset_code()
 
-                # 发送重置密码的邮件
-                send_mail(
-                    'Password Reset Request',
-                    f'Your password reset code is: {user.reset_code}',
-                    '2406854677@qq.com',
-                    [email],
-                    fail_silently=False,
-                )
+                email_sent = False
+                email_error = None
+                try:
+                    send_mail(
+                        'Password Reset Request',
+                        f'Your password reset code is: {user.reset_code}',
+                        '2406854677@qq.com',
+                        [email],
+                        fail_silently=False,
+                    )
+                    email_sent = True
+                except Exception as exc:
+                    email_error = str(exc)
+                    from django.conf import settings
+                    if not settings.DEBUG:
+                        return Response(
+                            {"message": "Failed to send password reset email."},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        )
 
-                return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
+                payload = {
+                    "message": "Password reset email sent." if email_sent else "验证码已生成（邮件发送失败，开发环境请使用 debug_reset_code）。",
+                }
+                from django.conf import settings
+                if settings.DEBUG:
+                    payload["debug_reset_code"] = user.reset_code
+                    if email_error:
+                        payload["email_error"] = email_error
+                return Response(payload, status=status.HTTP_200_OK)
             except get_user_model().DoesNotExist:
                 return Response({"message": "Email not found."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -348,15 +367,16 @@ def get_task_summary_lzy(request):
     completed_task_count = completed_tasks.count()
     recent_task_count = recent_tasks.count()
 
-    # 获取最近任务的详细信息（例如，任务上传时间和完成时间）
+    # 获取最近任务的详细信息（按上传时间倒序，最多 20 条）
     task_details = []
-    for task in recent_tasks:
+    for task in recent_tasks.order_by("-upload_time")[:20]:
         task_details.append({
             "task_id": task.id,
             "task_name": task.task_name,
+            "task_type": task.task_type or "",
             "status": task.status,
-            "upload_time": timezone.localtime(task.upload_time),
-            "completion_time": timezone.localtime(task.completion_time),
+            "upload_time": timezone.localtime(task.upload_time).strftime("%Y-%m-%d %H:%M:%S"),
+            "completion_time": timezone.localtime(task.completion_time).strftime("%Y-%m-%d %H:%M:%S") if task.completion_time else "",
         })
 
     return Response({
@@ -497,42 +517,27 @@ class SingleUserActionLogView(views.APIView):
 
 class ReviewerTasksView(views.APIView):
     """
-    返回 editor 总共收到的任务数和已完成的任务数
+    返回专家已分配的人工审核任务数与已完成数（与 get_reviewer_tasks 列表口径一致）。
     """
 
     def get(self, request):
         user = request.user
-        user_id = request.user.id
-        my_user = User.objects.get(id=user_id)
 
         if user.role != 'reviewer':
             return Response({'error': 'Only reviewers can view review details'}, status=403)
 
-        # 获取所有分配给当前 reviewer 的任务 ID 列表（不设时间限制）
-        assigned_tasks_ids = ReviewRequest.objects.filter(
-            organization=my_user.organization,
-            reviewers=user
-        ).values_list('detection_result__detection_task_id', flat=True)
-
-        # 所有收到的任务（关联 DetectionTask）
-        received_tasks = DetectionTask.objects.filter(id__in=assigned_tasks_ids)
-
-        # 所有已完成的任务（ManualReview 中状态为 completed）
-        completed_tasks_ids = ManualReview.objects.filter(
-            organization=my_user.organization,
+        # 与 get_reviewer_manual_request 相同：以 ManualReview 为准，且仅统计管理端已通过的任务
+        manual_reviews = ManualReview.objects.filter(
             reviewer=user,
-            status='completed'
-        ).values_list('review_request__detection_result__detection_task_id', flat=True)
-
-        completed_tasks = DetectionTask.objects.filter(id__in=completed_tasks_ids)
-
-        # 统计总数
-        total_received_tasks = received_tasks.count()
-        total_completed_tasks = completed_tasks.count()
+            review_request__status2='accepted',
+        )
+        total_received_tasks = manual_reviews.count()
+        total_completed_tasks = manual_reviews.filter(status='completed').count()
 
         return Response({
             'total_received_tasks': total_received_tasks,
-            'total_completed_tasks': total_completed_tasks
+            'total_completed_tasks': total_completed_tasks,
+            'total_pending_tasks': total_received_tasks - total_completed_tasks,
         }, status=status.HTTP_200_OK)
 
 

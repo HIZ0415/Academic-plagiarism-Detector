@@ -5,23 +5,11 @@
       <v-card-subtitle class="text-body-2 text-wrap mt-1">
         论文检测<strong>仅支持 PDF</strong>。含「全篇 AIGC」与「学术资源规范性」两类检测，结果分别展示在对应标签页中。
       </v-card-subtitle>
-      <div class="d-flex flex-wrap align-center ga-2 mt-3">
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
-          人工审核申请
-        </v-btn>
-        <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
-      </div>
     </v-card-item>
     <v-card-item v-else class="pb-0">
       <v-card-subtitle class="text-body-2 text-wrap">
         论文 PDF 专项：AIGC 段落分析 / 参考文献规范性（与「批量提交」中的论文任务互补；批量提交侧重同批图像+论文+Review）。
       </v-card-subtitle>
-      <div class="d-flex flex-wrap align-center ga-2 mt-2">
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
-          人工审核申请
-        </v-btn>
-        <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
-      </div>
     </v-card-item>
 
     <v-card-text>
@@ -99,6 +87,10 @@
             <div class="text-h6 mb-1">任务概览</div>
             <p class="text-caption text-medium-emphasis mb-3">当前标签页独立队列；切换标签会清空未提交的本地队列，避免两类结果混淆。</p>
             <div class="text-body-2 mb-1">检测类型：<strong>{{ panelB.modeLabel }}</strong></div>
+            <div v-if="batchSessionId" class="text-body-2 mb-1">
+              批次编号：<strong>{{ formatBatchSessionLabel(batchSessionId).short }}</strong>
+              <span class="text-caption text-medium-emphasis">（{{ batchSessionId }}）</span>
+            </div>
             <div class="text-body-2 mb-1">总任务数：{{ tasks.length }}</div>
             <div class="text-body-2 mb-1">已完成：{{ completedCount }}</div>
             <div class="text-body-2 mb-3">失败：{{ failedCount }}</div>
@@ -106,7 +98,7 @@
             <div class="text-caption mt-2">总体进度：{{ overallProgress }}%</div>
             <v-divider class="my-3" />
             <div class="text-caption text-medium-emphasis">
-              <template v-if="activeTab === 'aigc'">完成后请查看下方「段落分析」；若对自动结论有疑义，可通过上方「人工审核申请」进入发布者侧流程。</template>
+              <template v-if="activeTab === 'aigc'">完成后请查看下方「段落分析」；若对自动结论有疑义，可在侧栏「人工审核申请」中发起复核。</template>
               <template v-else>完成后请查看下方「学术资源问题分析」；本视图不展示 AIGC 段落表。</template>
             </div>
           </v-card>
@@ -249,6 +241,8 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import paperApi from '@/api/paper'
+import { newBatchSessionId, formatBatchSessionLabel } from '@shared/batchSessionId.ts'
+import { extractApiError } from '@shared/apiError.ts'
 import type { ResourceIssue, TaskStatus } from '@/types/core'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 import { useDetectionMode } from '@/composables/useDetectionMode'
@@ -295,6 +289,7 @@ const taskNamePrefix = ref('aigc-paper')
 const batchLimit = ref(5)
 const isSubmitting = ref(false)
 const error = ref('')
+const batchSessionId = ref('')
 const tasks = ref<BatchTaskRow[]>([])
 const latestResult = ref<LatestResult | null>(null)
 const paragraphRows = ref<ParagraphResult[]>([])
@@ -408,6 +403,7 @@ function clearWorkspace() {
   selectedParagraphIndex.value = null
   resourceIssueRows.value = []
   error.value = ''
+  batchSessionId.value = ''
   selectedFiles.value = []
 }
 
@@ -444,13 +440,17 @@ const submitBatchTasks = async () => {
   }))
 
   isSubmitting.value = true
-  try {
-    for (let i = 0; i < limitedFiles.length; i += 1) {
-      const row = tasks.value[i]
-      const file = limitedFiles[i]
-      row.status = 'in_progress'
-      row.progress = 15
+  batchSessionId.value = newBatchSessionId()
+  const currentBatchId = batchSessionId.value
 
+  for (let i = 0; i < limitedFiles.length; i += 1) {
+    const row = tasks.value[i]
+    const file = limitedFiles[i]
+    row.status = 'in_progress'
+    row.progress = 15
+    row.errorMessage = ''
+
+    try {
       if (useMockAigc) {
         row.taskId = String(Date.now() + i).slice(-8)
         await sleep(400)
@@ -460,20 +460,36 @@ const submitBatchTasks = async () => {
         row.progress = 100
       } else {
         const taskName = createTaskName(i)
-        const modeOpts = { detection_mode: detectionModePayload() }
+        const modeOpts = { detection_mode: detectionModePayload(), batch_session_id: currentBatchId }
         const submitRes =
           tab === 'aigc'
             ? await paperApi.uploadAndSubmitAigcTask(file, taskName, modeOpts)
             : await paperApi.uploadAndSubmitResourceTask(file, taskName, modeOpts)
-        row.taskId = String(submitRes.data.task_id)
+        const payload = submitRes.data as { task_id?: string | number; status?: string; error_message?: string }
+        row.taskId = String(payload.task_id ?? '')
+        if (payload.status === 'failed') {
+          row.status = 'failed'
+          row.progress = 100
+          row.errorMessage =
+            payload.error_message ||
+            '论文检测提交失败（常见原因：AI 服务未启动、PDF 无法解析或账号无权限）'
+          error.value = row.errorMessage
+          continue
+        }
         row.progress = 30
       }
+    } catch (e: unknown) {
+      row.status = 'failed'
+      row.progress = 100
+      row.errorMessage = extractApiError(e, '批量提交失败。')
+      error.value = row.errorMessage
     }
+  }
 
+  try {
     await syncAllTaskStatus()
   } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } }; message?: string }
-    error.value = err?.response?.data?.message || err?.message || '批量提交失败。'
+    error.value = extractApiError(e, '同步任务状态失败。')
   } finally {
     isSubmitting.value = false
   }

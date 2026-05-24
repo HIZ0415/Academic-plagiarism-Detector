@@ -2,7 +2,7 @@ import http from './request'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 
 export default {
-  uploadFile(data: any) {
+  uploadFile(data: FormData, options?: { timeout?: number }) {
     if (mockAigcFeaturesEnabled()) {
       const id = Math.floor(Date.now() / 1000) % 900000 + 100000
       return Promise.resolve({
@@ -14,10 +14,11 @@ export default {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: options?.timeout ?? 15000,
     })
   },
 
-  getExtractedImages(data: any) {
+  getExtractedImages(data: any, options?: { timeout?: number }) {
     if (mockAigcFeaturesEnabled()) {
       const base = Number(data.file_id) || 1
       const images = [1, 2, 3].map((i) => ({
@@ -36,6 +37,7 @@ export default {
     }
     return http.get(
       `/upload/${data.file_id}/extract_images/?page=${data.page_number}&page_size=${data.page_size}`,
+      { timeout: options?.timeout },
     )
   },
 

@@ -1,18 +1,11 @@
 <template>
   <v-container class="py-4 detection-hub">
-    <v-row class="mb-2" align="center">
-      <v-col cols="12" md="8">
-        <div class="text-h4 font-weight-bold mb-1">学术检测</div>
-        <div class="text-body-2 text-medium-emphasis">
-          图像、论文 PDF、Review 文本等检测均在本页完成：通过下方标签切换<strong>批量提交</strong>、<strong>论文工作台</strong>与 <strong>Review 结果</strong>。
-        </div>
-      </v-col>
-      <v-col cols="12" md="4" class="d-flex justify-end">
-        <v-chip :color="USE_MOCK ? 'warning' : 'success'" variant="tonal">
-          {{ USE_MOCK ? 'Mock 模式' : '后端模式' }}
-        </v-chip>
-      </v-col>
-    </v-row>
+    <div class="mb-4">
+      <div class="text-h4 font-weight-bold mb-1">学术检测</div>
+      <div class="text-body-2 text-medium-emphasis">
+        图像、论文 PDF、Review 文本等检测均在本页完成：通过下方标签切换<strong>批量提交</strong>、<strong>论文检测</strong>与 <strong>Review 检测</strong>。
+      </div>
+    </div>
 
     <v-tabs v-model="section" color="primary" class="mb-4" density="comfortable">
       <v-tab value="submit" class="text-none">批量提交</v-tab>
@@ -23,11 +16,11 @@
     <v-window v-model="section" class="detection-hub-window">
       <v-window-item value="submit">
     <v-alert v-if="route.query.task_id" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      正在基于历史任务（编号 {{ route.query.task_id }}）发起再次检测。旧任务结果请回到检测历史点击「查看报告」；本页只用于重新选择文件或粘贴 Review 后创建新检测。
+      正在基于历史任务（编号 {{ route.query.task_id }}）发起再次检测。旧任务结果请回到检测历史点击「任务详情」；本页只用于重新选择文件或粘贴 Review 后创建新检测。
     </v-alert>
 
     <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      <strong>格式说明：</strong>论文检测仅 <strong>.pdf</strong>（不支持 DOCX）；Review 为下方文本框或 <strong>.txt</strong>；<strong>ZIP/RAR</strong> 将自动解压并抽取图像送检。
+      <strong>格式说明：</strong>论文检测仅 <strong>.pdf</strong>（不支持 DOCX）；Review 为下方文本框或 <strong>.txt</strong>；<strong>ZIP</strong> 将自动解压并抽取图像送检（<strong>RAR</strong> 请先转为 ZIP）。ZIP 内每张图（含 PDF 内嵌图）各占用 1 次组织配额；标准/精准模式分别扣减不同额度，解压后会在提交前校验。
     </v-alert>
 
     <v-card class="pa-4" variant="outlined">
@@ -106,7 +99,7 @@
             prepend-icon="mdi-clipboard-text-outline"
             :to="{ path: '/comprehensive-report', query: { batch_session_id: batchSessionId } }"
           >
-            查看鉴伪报告
+            查看综合报告
           </v-btn>
         </v-col>
       </v-row>
@@ -121,10 +114,10 @@
         <div class="mb-2">
           本批共 <strong>{{ batchSummary.total }}</strong> 个子任务：图像 {{ batchSummary.counts.image }}，
           论文 PDF {{ batchSummary.counts.paper }}，Review {{ batchSummary.counts.review }}，
-          其他 {{ batchSummary.counts.unknown }}。
+          压缩包 {{ batchSummary.counts.archive }}，其他 {{ batchSummary.counts.unknown }}。
         </div>
         <div class="text-medium-emphasis">
-          同一批次编号会关联本批各子任务，便于在检测历史、鉴伪报告中按批查看，以及发起人工审核时引用整批上下文。
+          同一批次编号会关联本批各子任务，便于在检测历史、综合报告中按批查看，以及发起人工审核时引用整批上下文。
         </div>
       </v-card-text>
     </v-card>
@@ -193,15 +186,19 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import PaperDetectWorkbench from '@/pages/detect/paper.vue'
+import { newBatchSessionId, formatBatchSessionLabel } from '@shared/batchSessionId.ts'
+import { extractApiError, formatImageQuotaExceeded } from '@shared/apiError.ts'
 import ReviewDetectWorkbench from '@/pages/detect/review.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
 import paperApi from '@/api/paper'
 import publisherApi from '@/api/publisher'
 import uploadApi from '@/api/upload'
+import userApi from '@/api/user'
 import { submitReviewDetection } from '@/api/reviewDetection'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 import { useDetectionMode } from '@/composables/useDetectionMode'
+import { imageExtractListTimeoutMs, imageSubmitTimeoutMs } from '@/utils/paperTimeout'
 
 type ResourceType = 'image' | 'paper' | 'review' | 'archive' | 'docx' | 'unknown'
 type RowStatus = 'pending' | 'running' | 'completed' | 'failed'
@@ -276,7 +273,7 @@ const running = ref(false)
 const batchSessionId = ref('')
 
 const headers = [
-  { title: '批次', key: 'batchSessionId', align: 'center' as const, width: 120 },
+  { title: '批次编号', key: 'batchSessionId', align: 'center' as const, width: 140 },
   { title: '文件名', key: 'name', align: 'start' as const },
   { title: '类型', key: 'type', align: 'center' as const, width: 120 },
   { title: '进度', key: 'progress', align: 'center' as const, width: 220 },
@@ -285,24 +282,32 @@ const headers = [
   { title: '操作', key: 'actions', align: 'center' as const, sortable: false, width: 100 },
 ] as const
 
-/** 从 axios / 后端响应取出可读说明，便于编辑模式下自助排查 */
-function axiosDetail(err: unknown): string {
-  const ax = err as {
-    response?: { data?: Record<string, unknown>; status?: number }
-    message?: string
+type OrgQuota = { remaining_non_llm_uses: number; remaining_llm_uses: number }
+
+let cachedOrgQuota: OrgQuota | null = null
+
+async function loadOrganizationQuota(): Promise<OrgQuota | null> {
+  if (USE_MOCK) return { remaining_non_llm_uses: 9999, remaining_llm_uses: 9999 }
+  try {
+    const res = await userApi.getOrganizationUsage()
+    cachedOrgQuota = {
+      remaining_non_llm_uses: Number(res.data.remaining_non_llm_uses) || 0,
+      remaining_llm_uses: Number(res.data.remaining_llm_uses) || 0,
+    }
+    return cachedOrgQuota
+  } catch {
+    return null
   }
-  const d = ax.response?.data
-  if (d && typeof d === 'object') {
-    const detail = d.detail
-    const message = d.message
-    if (typeof detail === 'string') return detail
-    if (Array.isArray(detail) && typeof detail[0] === 'string') return detail[0]
-    if (typeof message === 'string') return message
+}
+
+function assertImageQuota(imageCount: number, quota: OrgQuota | null) {
+  if (!quota || imageCount <= 0) return
+  const mode = detectionMode.value
+  const remaining =
+    mode === 'precise' ? quota.remaining_llm_uses : quota.remaining_non_llm_uses
+  if (imageCount > remaining) {
+    throw new Error(formatImageQuotaExceeded(mode, remaining, imageCount))
   }
-  if (ax.response?.status === 403) {
-    return '无提交权限：请确认账号已加入组织且具备检测提交权限。'
-  }
-  return typeof ax.message === 'string' ? ax.message : '请求失败，请打开 F12 → Network 查看接口返回'
 }
 
 const rows = ref<QueueRow[]>([])
@@ -310,16 +315,19 @@ const rows = ref<QueueRow[]>([])
 const batchSummary = computed(() => {
   const id = batchSessionId.value
   if (!id || !rows.value.length) return null
-  const counts = { image: 0, paper: 0, review: 0, unknown: 0 }
+  const counts = { image: 0, paper: 0, review: 0, archive: 0, unknown: 0 }
   for (const r of rows.value) {
-    counts[r.type]++
+    if (r.type in counts) {
+      counts[r.type as keyof typeof counts]++
+    } else {
+      counts.unknown++
+    }
   }
   return { id, counts, total: rows.value.length }
 })
 
 function shortBatch(id: string) {
-  if (!id) return '—'
-  return id.length > 14 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id
+  return formatBatchSessionLabel(id).short
 }
 
 function detectType(file: File): ResourceType {
@@ -400,6 +408,121 @@ function reset() {
   batchSessionId.value = ''
 }
 
+function isImageFile(file: File): boolean {
+  if (file.type.startsWith('image/')) return true
+  const name = file.name.toLowerCase()
+  return /\.(png|jpe?g|bmp|gif|webp)$/.test(name)
+}
+
+function isZipFile(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return name.endsWith('.zip')
+}
+
+function isRarFile(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return name.endsWith('.rar')
+}
+
+async function fetchAllExtractedImageIds(fileId: string | number): Promise<Array<string | number>> {
+  const pageSize = 100
+  let page = 1
+  const ids: Array<string | number> = []
+  let total = Number.POSITIVE_INFINITY
+  const pageTimeoutMs = imageExtractListTimeoutMs()
+
+  while (ids.length < total) {
+    const imagesRes = await uploadApi.getExtractedImages({
+      file_id: fileId,
+      page_number: page,
+      page_size: pageSize,
+    }, { timeout: pageTimeoutMs })
+    const data = imagesRes.data as {
+      images?: Array<{ image_id?: string | number }>
+      total?: number
+    }
+    const batch = (data.images || [])
+      .map((item) => item.image_id)
+      .filter((id): id is string | number => id !== undefined && id !== null)
+    ids.push(...batch)
+    total = typeof data.total === 'number' ? data.total : ids.length
+    if (!batch.length) break
+    page += 1
+  }
+
+  return ids
+}
+
+async function submitImageDetectionTask(
+  row: QueueRow,
+  images: Array<string | number>,
+  quota: OrgQuota | null,
+) {
+  if (!images.length) {
+    row.error = '未找到可检测的图片，请确认压缩包内包含图片或含图的 PDF。'
+    throw new Error(row.error)
+  }
+
+  try {
+    assertImageQuota(images.length, quota)
+  } catch (e: unknown) {
+    row.error = e instanceof Error ? e.message : String(e)
+    throw e
+  }
+
+  row.progress = 70
+  const taskName = `${row.batchSessionId.slice(0, 24)}-${row.name}`
+  const mode = detectionModePayload()
+  const submitTimeoutMs = imageSubmitTimeoutMs(images.length)
+  const submitRes = await publisherApi.submitDetection({
+    image_ids: images,
+    task_name: taskName,
+    batch_session_id: row.batchSessionId,
+    detection_mode: mode,
+    mode: imageSubmitMode(),
+  }, { timeout: submitTimeoutMs })
+  row.taskId = String((submitRes.data as { task_id?: string | number }).task_id ?? '')
+  row.progress = 100
+  row.status = 'completed'
+}
+
+async function uploadAndSubmitImages(
+  row: QueueRow,
+  file: File,
+  uploadTimeoutMs: number,
+  quota: OrgQuota | null,
+) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const uploadRes = await uploadApi.uploadFile(formData, { timeout: uploadTimeoutMs })
+  row.progress = 45
+
+  const uploadPayload = uploadRes.data as {
+    file_id?: string | number
+    id?: string | number
+    image_count?: number
+  }
+  const fileId = uploadPayload.file_id ?? uploadPayload.id
+  if (!fileId) {
+    row.error = '文件上传成功，但后端未返回 file_id。'
+    throw new Error(row.error)
+  }
+
+  const extractedCount =
+    typeof uploadPayload.image_count === 'number' ? uploadPayload.image_count : null
+  if (extractedCount != null && extractedCount > 0) {
+    try {
+      assertImageQuota(extractedCount, quota)
+    } catch (e: unknown) {
+      row.error = e instanceof Error ? e.message : String(e)
+      throw e
+    }
+  }
+
+  const images = await fetchAllExtractedImageIds(fileId)
+  await submitImageDetectionTask(row, images, quota)
+}
+
 function toTaskType(t: ResourceType) {
   if (t === 'paper') return 'paper_aigc'
   if (t === 'image' || t === 'archive') return 'image_detection'
@@ -419,7 +542,7 @@ function nowString() {
 }
 
 function newBatchId() {
-  return `batch-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  return newBatchSessionId()
 }
 
 function saveLocalTasks(rowsToSave: QueueRow[]) {
@@ -467,50 +590,26 @@ async function backendRun(row: QueueRow) {
     throw new Error(row.error)
   }
 
-  if (row.type === 'image' || row.type === 'archive') {
-    if (!row.file.type.startsWith('image/')) {
+  if (row.type === 'archive') {
+    if (isRarFile(row.file)) {
+      row.error = 'RAR 压缩包暂不支持，请将文件转为 ZIP 后上传。'
+      throw new Error(row.error)
+    }
+    if (!isZipFile(row.file)) {
+      row.error = '压缩包仅支持 ZIP 格式。'
+      throw new Error(row.error)
+    }
+    const archiveUploadTimeoutMs = Math.max(600_000, Math.ceil(row.file.size / 1024 / 10) * 1000)
+    await uploadAndSubmitImages(row, row.file, archiveUploadTimeoutMs, cachedOrgQuota)
+    return
+  }
+
+  if (row.type === 'image') {
+    if (!isImageFile(row.file)) {
       row.error = '图像检测仅支持图片文件。'
       throw new Error(row.error)
     }
-
-    const formData = new FormData()
-    formData.append('file', row.file)
-    const uploadRes = await uploadApi.uploadFile(formData)
-    row.progress = 45
-
-    const fileId = (uploadRes.data as { file_id?: string | number; id?: string | number }).file_id
-      ?? (uploadRes.data as { id?: string | number }).id
-    if (!fileId) {
-      row.error = '图片上传成功，但后端未返回 file_id。'
-      throw new Error(row.error)
-    }
-
-    const imagesRes = await uploadApi.getExtractedImages({
-      file_id: fileId,
-      page_number: 1,
-      page_size: 100,
-    })
-    const images = ((imagesRes.data as { images?: Array<{ image_id?: string | number }> }).images || [])
-      .map((item) => item.image_id)
-      .filter((id): id is string | number => id !== undefined && id !== null)
-    if (!images.length) {
-      row.error = '图片已上传，但后端未生成可检测的 image_id。'
-      throw new Error(row.error)
-    }
-
-    row.progress = 70
-    const taskName = `${row.batchSessionId.slice(0, 24)}-${row.name}`
-    const mode = detectionModePayload()
-    const submitRes = await publisherApi.submitDetection({
-      image_ids: images,
-      task_name: taskName,
-      batch_session_id: row.batchSessionId,
-      detection_mode: mode,
-      mode: imageSubmitMode(),
-    })
-    row.taskId = String((submitRes.data as { task_id?: string | number }).task_id ?? '')
-    row.progress = 100
-    row.status = 'completed'
+    await uploadAndSubmitImages(row, row.file, 120_000, cachedOrgQuota)
     return
   }
 
@@ -582,8 +681,16 @@ async function start() {
 
   const batchId = newBatchId()
   batchSessionId.value = batchId
+  cachedOrgQuota = null
 
   running.value = true
+  const needsImageQuota = files.value.some((f) => {
+    const t = detectType(f)
+    return t === 'image' || t === 'archive'
+  })
+  if (needsImageQuota && !USE_MOCK) {
+    await loadOrganizationQuota()
+  }
   const built: QueueRow[] = files.value.map((f) => ({
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     file: f,
@@ -622,7 +729,7 @@ async function start() {
     } catch (e: unknown) {
       row.status = row.status === 'completed' ? 'completed' : 'failed'
       if (!row.error) {
-        row.error = axiosDetail(e)
+        row.error = extractApiError(e)
       }
     }
   }

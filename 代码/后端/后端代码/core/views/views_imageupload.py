@@ -37,7 +37,7 @@ def upload_file(request):
     file_type = uploaded_file.content_type
     raw_bytes = uploaded_file.read()
     try:
-        detect_upload_kind(file_name, file_type, raw_bytes)
+        upload_kind = detect_upload_kind(file_name, file_type, raw_bytes)
     except ValueError:
         return Response({"message": "Unsupported upload type."}, status=400)
 
@@ -53,6 +53,10 @@ def upload_file(request):
     try:
         file_path = save_original_upload(file_name, raw_bytes, "uploads")
         image_count = preprocess_uploaded_image_resource(file_management, file_name, file_type, raw_bytes)
+        if upload_kind == "zip" and image_count == 0:
+            raise ValueError(
+                "ZIP 压缩包内未找到可检测的图片（支持 PNG/JPG/JPEG/BMP/GIF 及 PDF 内嵌图）。"
+            )
     except ValueError as exc:
         file_management.delete()
         return Response({"message": str(exc)}, status=400)

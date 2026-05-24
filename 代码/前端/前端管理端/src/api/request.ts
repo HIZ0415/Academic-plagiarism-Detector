@@ -1,51 +1,84 @@
 //引入axios
 import axios from 'axios'
 import router from '@/router'
-// 根据环境变量或代理，设置baseURL
-const baseApiUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/api' : '/api'
+
+/** 未配置或无效时使用相对路径 `/api`，走 Vite 代理到本机 Django */
+function getApiOrigin(): string {
+  const raw = import.meta.env.VITE_API_URL as string | undefined
+  const t = typeof raw === 'string' ? raw.trim() : ''
+  if (!t || t === 'undefined' || t === 'null') return ''
+  return t.replace(/\/$/, '')
+}
+
+const apiOrigin = getApiOrigin()
+const baseApiUrl = apiOrigin ? `${apiOrigin}/api` : '/api'
+
+/** 这些路径绝不能附带旧 JWT，否则 JWTAuthentication 会先 401，登录体根本执行不到 */
+const NO_AUTH_HEADER_PATHS = [
+  '/login/',
+  '/register/',
+  '/admin-login/',
+  '/password-reset/',
+  '/password-reset/confirm/',
+  '/token/refresh/',
+  '/logout/',
+]
+
+function isNoAuthHeaderPath(url: string | undefined): boolean {
+  if (!url) return false
+  return NO_AUTH_HEADER_PATHS.some((p) => url.includes(p))
+}
+
 // 创建axios实例
 const instance = axios.create({
-    //配置
-    baseURL: baseApiUrl, //接口请求的域名地址
-    timeout: 5000,//请求超时时间
-    headers:{}, //设置请求头信息
+    baseURL: baseApiUrl,
+    timeout: 5000,
+    headers: {},
 })
  
 //请求拦截处理 
 instance.interceptors.request.use(config=>{
-    let token = localStorage.getItem('1-token')
-    if(token){
-        config.headers['Authorization'] = 'Bearer ' + token
+    const path = config.url || ''
+    if (isNoAuthHeaderPath(path)) {
+        delete config.headers.Authorization
+    } else {
+        const token = localStorage.getItem('1-token')
+        if (token) {
+            config.headers['Authorization'] = 'Bearer ' + token
+        }
     }
     return config
 },
-    //请求报错的返回信息
     error=>{
         return Promise.reject(error)
     }
 )
  
-//相应拦截处理
+//相应拦截处理：登录/登出/注册等返回的 401 不得走刷新令牌，否则会误刷新并整页跳转
 instance.interceptors.response.use(response=>{
     return response
 },
  error=>{
-    // 处理401错误，尝试刷新token
-    if (error.response && error.response.status === 401) {
-        return refreshToken().then(newToken => {
-            // 更新请求头中的token
-            error.config.headers['Authorization'] = 'Bearer ' + newToken
-            // 重试原始请求
-            return instance(error.config)
-        }).catch(err => {
-            // 刷新token失败，跳转到登录页
-            localStorage.removeItem('1-token')
-            localStorage.removeItem('1-refresh')
-            router.push('/login')
-            return Promise.reject(err)
-        })
+    const status = error.response?.status
+    const cfg = error.config as { url?: string; headers?: Record<string, string>; _retry?: boolean } | undefined
+    const path = cfg?.url || ''
+
+    if (!cfg || status !== 401 || isNoAuthHeaderPath(path) || cfg._retry) {
+        return Promise.reject(error)
     }
-    return Promise.reject(error)
+
+    return refreshToken().then(newToken => {
+        cfg._retry = true
+        cfg.headers = cfg.headers || {}
+        cfg.headers['Authorization'] = 'Bearer ' + newToken
+        return instance(cfg)
+    }).catch(err => {
+        localStorage.removeItem('1-token')
+        localStorage.removeItem('1-refresh')
+        localStorage.setItem('1-isLoggedIn', 'false')
+        router.push('/login')
+        return Promise.reject(err)
+    })
   }
 )
 
@@ -56,22 +89,14 @@ const refreshToken = async () => {
         return Promise.reject(new Error('No refresh token available'))
     }
     
-    try {
-        const response = await axios.post(
-            import.meta.env.VITE_API_URL + '/api/token/refresh/',
-            { refresh: refresh }
-        )
+    const refreshUrl = apiOrigin ? `${apiOrigin}/api/token/refresh/` : '/api/token/refresh/'
+    const response = await axios.post(refreshUrl, { refresh })
         
-        if (response.data && response.data.access) {
-            // 保存新的access token
-            localStorage.setItem('1-token', response.data.access)
-            return response.data.access
-        } else {
-            return Promise.reject(new Error('Invalid response format'))
-        }
-    } catch (error) {
-        return Promise.reject(error)
+    if (response.data?.access) {
+        localStorage.setItem('1-token', response.data.access)
+        return response.data.access
     }
+    return Promise.reject(new Error('Invalid response format'))
 }
  
 //导出axios

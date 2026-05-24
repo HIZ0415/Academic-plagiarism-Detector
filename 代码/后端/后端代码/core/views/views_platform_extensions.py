@@ -31,6 +31,7 @@ from ..models import (
     User,
     UserReport,
 )
+from ..util import detection_history_url, detection_task_type_label
 from ..utils.report_generator import _load_result_json, _risk_label, generate_comprehensive_forgery_pdf
 from .views_manual_review_adapter import _aggregate_manual_review_status
 
@@ -267,6 +268,7 @@ def community_feedback_feed(request):
 
     notifs = Notification.objects.filter(receiver_id=uid).order_by("-notified_at")
     items = []
+    notified_task_ids = set()
     for n in notifs[:200]:
         cat = "system"
         if n.category == Notification.GLOBAL:
@@ -275,6 +277,15 @@ def community_feedback_feed(request):
             cat = "detection"
         elif n.category in (Notification.P2R, Notification.R2P):
             cat = "review"
+        url = n.url or ""
+        for marker in ("detail_id=", "task_id="):
+            if marker in url:
+                try:
+                    part = url.split(marker, 1)[1].split("&", 1)[0]
+                    if part.isdigit():
+                        notified_task_ids.add(int(part))
+                except Exception:
+                    pass
         items.append({
             "id": f"n-{n.id}",
             "source": "notification",
@@ -282,8 +293,30 @@ def community_feedback_feed(request):
             "title": n.title,
             "content": n.content,
             "status": n.status,
-            "url": n.url or "",
+            "url": url,
             "time": timezone.localtime(n.notified_at).strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+    # 回填：历史已完成任务若未写入通知，也在「检测反馈」中展示
+    completed_tasks = (
+        DetectionTask.objects.filter(user=request.user, status="completed")
+        .order_by("-completion_time")[:40]
+    )
+    for task in completed_tasks:
+        if task.id in notified_task_ids:
+            continue
+        if any(f"编号 {task.id}" in (i.get("content") or "") for i in items if i.get("category") == "detection"):
+            continue
+        label = detection_task_type_label(task.task_type)
+        items.append({
+            "id": f"t-{task.id}",
+            "source": "task_backfill",
+            "category": "detection",
+            "title": f"{label}已完成",
+            "content": f"您的任务「{task.task_name}」（编号 {task.id}）已完成，点击查看检测结果。",
+            "status": "read",
+            "url": detection_history_url(task),
+            "time": timezone.localtime(task.completion_time or task.upload_time).strftime("%Y-%m-%d %H:%M:%S"),
         })
 
     my_reports = UserReport.objects.filter(reporter=request.user).order_by("-created_at")[:50]

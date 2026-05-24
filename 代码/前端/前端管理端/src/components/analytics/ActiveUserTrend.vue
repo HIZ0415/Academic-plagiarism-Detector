@@ -108,16 +108,18 @@ const renderChart = (data: {
                 data: data.publishers,
                 symbol: 'circle',
                 symbolSize: 8,
-                lineStyle: { width: 3 },
+                showSymbol: true,
+                lineStyle: { width: 3, type: 'solid' },
                 itemStyle: { color: '#3f51b5' }
             },
             {
                 name: '专家',
                 type: 'line',
                 data: data.reviewers,
-                symbol: 'circle',
+                symbol: 'diamond',
                 symbolSize: 8,
-                lineStyle: { width: 3 },
+                showSymbol: true,
+                lineStyle: { width: 3, type: 'dashed' },
                 itemStyle: { color: '#4caf50' }
             }
         ]

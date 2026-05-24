@@ -119,6 +119,22 @@ export interface AdminDashboardTaskStats {
   completed_tasks: number
   pending_tasks: number
   in_progress_tasks: number
+  failed_tasks?: number
+}
+
+export interface PublisherRankingRow {
+  username: string
+  total_tasks: number
+  completed_tasks?: number
+  image_detection: number
+  paper_aigc: number
+  resource_check: number
+  review_detection: number
+  high_risk_count: number
+  high_risk_ratio: number
+  total_images?: number
+  fake_count?: number
+  fake_ratio?: number
 }
 
 export interface AdminDashboardResponse {

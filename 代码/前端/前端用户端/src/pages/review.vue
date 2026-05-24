@@ -2,11 +2,7 @@
   <div class="review-page pb-12">
     <v-row class="mb-4" align="center">
       <v-col cols="12" md="8">
-        <h1 class="text-h4 font-weight-bold mb-2">人工审核任务池</h1>
-        <p class="text-body-2 text-medium-emphasis mb-0">
-          本页供<strong>专家（审稿人）</strong>使用：组织管理员在管理端<strong>通过</strong>申请后，任务会出现在此列表。
-          点击<strong>进入审核</strong>打开详情页，查看 AI 参考结论并提交人工鉴定（按图像、论文或 Review 等材料类型区分）。
-        </p>
+        <h1 class="text-h4 font-weight-bold mb-0">人工审核任务池</h1>
       </v-col>
     </v-row>
 
@@ -78,8 +74,8 @@
         <template #top>
           <div class="d-flex align-center justify-space-between flex-wrap pa-4 ga-2">
             <span class="text-caption text-medium-emphasis">共 {{ totalCount }} 条（仅显示管理端已通过的任务）</span>
-            <v-chip v-if="pendingCount > 0" color="warning" size="small" variant="tonal">
-              待处理 {{ pendingCount }}
+            <v-chip v-if="stats.pending > 0" color="warning" size="small" variant="tonal">
+              待处理 {{ stats.pending }}
             </v-chip>
           </div>
         </template>
@@ -191,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import reviewerApi from '@/api/reviewer'
 import { useSnackbarStore } from '@/stores/snackbar'
@@ -258,22 +254,27 @@ const requestStatusOptions = [
   { title: '已完成', value: 'completed' },
 ]
 
-const pendingCount = computed(() => tasks.value.filter((t) => t.status === 'undo').length)
-
 const stats = ref({ received: 0, completed: 0, pending: 0 })
 
 async function loadStats() {
   try {
     const res = await reviewerApi.getTaskCount()
-    const d = res.data as { total_received_tasks?: number; total_completed_tasks?: number }
+    const d = res.data as {
+      total_received_tasks?: number
+      total_completed_tasks?: number
+      total_pending_tasks?: number
+    }
     stats.value.received = Number(d.total_received_tasks ?? 0)
     stats.value.completed = Number(d.total_completed_tasks ?? 0)
-    stats.value.pending = Math.max(0, stats.value.received - stats.value.completed)
+    stats.value.pending =
+      d.total_pending_tasks != null
+        ? Number(d.total_pending_tasks)
+        : Math.max(0, stats.value.received - stats.value.completed)
   } catch {
     stats.value = {
       received: totalCount.value,
       completed: tasks.value.filter((t) => t.status === 'completed').length,
-      pending: pendingCount.value,
+      pending: tasks.value.filter((t) => t.status === 'undo').length,
     }
   }
 }
@@ -419,7 +420,7 @@ function handleSearch() {
 }
 
 function reloadList() {
-  fetchTasks(currentPage.value, pageSize.value)
+  fetchTasks(currentPage.value, pageSize.value).then(() => loadStats())
 }
 
 function onPageChange(page: number) {

@@ -183,7 +183,7 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 # AI service bridge. If AI_SERVICE_URL is empty, the backend uses the historical
 # SSH/SCP bridge in core/call_figure_detection.py.
 AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "")
-AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT", "1200"))
+AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT_SECONDS", os.getenv("AI_SERVICE_TIMEOUT", "1200")))
 AI_SERVICE_API_TOKEN = os.getenv("AI_SERVICE_API_TOKEN", "")
 
 CORS_ALLOW_ALL_ORIGINS = True

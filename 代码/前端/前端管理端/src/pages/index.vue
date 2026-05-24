@@ -3,9 +3,6 @@
     <v-row class="mb-2">
       <v-col cols="12">
         <div class="text-h4 font-weight-bold">工作台</div>
-        <p class="text-body-2 text-medium-emphasis mb-0 mt-2">
-          首页汇总近期任务与活跃度；侧栏按「工作台 → 检测与资源 → 用户与组织 → 人工审核审批 → 系统日志」进入各模块。
-        </p>
       </v-col>
     </v-row>
 
@@ -87,13 +84,37 @@
           </v-card-actions>
         </v-card>
       </v-col>
+      <v-col cols="12" sm="6" md="4">
+        <v-card border class="h-100" hover to="/model-config">
+          <v-card-title class="d-flex align-center text-subtitle-1">
+            <v-icon class="me-2" color="blue-grey">mdi-cog-outline</v-icon>
+            模型配置
+          </v-card-title>
+          <v-card-subtitle>管理检测模型参数、阈值与版本等系统级配置。</v-card-subtitle>
+          <v-card-actions>
+            <v-btn color="primary" variant="tonal" to="/model-config" prepend-icon="mdi-arrow-right">进入</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="4">
+        <v-card border class="h-100" hover to="/reports">
+          <v-card-title class="d-flex align-center text-subtitle-1">
+            <v-icon class="me-2" color="red">mdi-flag-outline</v-icon>
+            举报处理
+          </v-card-title>
+          <v-card-subtitle>查看并处理用户提交的举报与申诉工单。</v-card-subtitle>
+          <v-card-actions>
+            <v-btn color="primary" variant="tonal" to="/reports" prepend-icon="mdi-arrow-right">进入</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-col>
     </v-row>
 
     <v-row class="mt-6 mb-2">
       <v-col cols="12">
         <div class="text-h5 font-weight-bold">数据看板</div>
         <p class="text-body-2 text-medium-emphasis mb-0 mt-1">
-          近 30 日任务汇总、标签分布、活跃度与趋势；图表按管理员类型切换组织或发布者维度。
+          近 30 日任务汇总、检测类型分布、活跃度与趋势；组织管理员查看本组织数据，软件管理员查看全平台数据。
         </p>
       </v-col>
     </v-row>
@@ -133,15 +154,15 @@ import TaskTrend from '@/components/analytics/TaskTrend.vue'
 import ActiveUserTrend from '@/components/analytics/ActiveUserTrend.vue'
 import ActiveOrgTrend from '@/components/analytics/ActiveOrgTrend.vue'
 import DashboardSummaryCards from '@/components/analytics/DashboardSummaryCards.vue'
-import userApi from '@/api/user'
 import analyticsApi from '@/api/analytics'
 import type { AdminDashboardTaskStats } from '@/types/core'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
 
-const isOrganizationAdmin = ref(false)
 const dashboardStats = ref<AdminDashboardTaskStats | null>(null)
+
+const isOrganizationAdmin = computed(() => userStore.admin_type === 'organization_admin')
 
 const roleLabel = computed(() => {
   if (userStore.admin_type === 'software_admin') return '软件管理员'
@@ -161,8 +182,9 @@ const roleHint = computed(() => {
 
 onMounted(async () => {
   try {
-    const res = await userApi.getUserInfo()
-    isOrganizationAdmin.value = res.data.admin_type === 'organization_admin'
+    if (!userStore.admin_type) {
+      await userStore.fetchUserInfo()
+    }
   } catch (error) {
     console.error('获取用户信息失败:', error)
   }

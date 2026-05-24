@@ -37,7 +37,7 @@
                   <v-icon>mdi-text-box</v-icon>
                 </template>
                 <v-list-item-title>个人简介</v-list-item-title>
-                <v-list-item-subtitle>{{ userStore.profile || '未设置' }}</v-list-item-subtitle>
+                <v-list-item-subtitle>{{ profileDisplay }}</v-list-item-subtitle>
               </v-list-item>
               <v-list-item v-if="effectiveRole === 'publisher'">
                 <template v-slot:prepend>
@@ -124,11 +124,12 @@
                   :dot-color="getStatusColor(activity.status)" size="small">
                   <div class="d-flex justify-space-between align-center w-100">
                     <div class="activity-info">
-                      <div class="text-subtitle-1">{{ activity.title }}</div>
+                      <div class="text-subtitle-1 font-weight-medium">{{ activity.title }}</div>
+                      <div v-if="activity.subtitle" class="text-body-2 text-medium-emphasis">{{ activity.subtitle }}</div>
                       <div class="text-caption text-grey">{{ formatDateTime(activity.timestamp) || '时间未知' }}</div>
                     </div>
                     <v-chip :color="getStatusColor(activity.status)" size="small" class="activity-status">
-                      {{ getStatusType(activity.status) }}
+                      {{ activity.statusLabel }}
                     </v-chip>
                   </div>
                 </v-timeline-item>
@@ -214,7 +215,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, computed, onUnmounted } from 'vue'
+import { onMounted, ref, computed, onUnmounted, watch } from 'vue'
 import user, { isLoggedIn } from '@/api/user'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
@@ -225,6 +226,11 @@ import { useEffectiveRole } from '@/composables/useEffectiveRole'
 import platform from '@/api/platform'
 import { useDetectionMode, type DetectionMode } from '@/composables/useDetectionMode'
 import { useRoute } from 'vue-router'
+import {
+  activityStatusLabel,
+  formatActivitySubtitle,
+  formatActivityTitle,
+} from '@shared/activityDisplay.ts'
 
 const route = useRoute()
 const { setMode: setGlobalDetectionMode } = useDetectionMode()
@@ -360,12 +366,45 @@ const startCountdown = () => {
   }, 1000)
 }
 
+const profileDisplay = computed(() => {
+  const p = (userStore.profile || '').trim()
+  if (!p) return '未设置'
+  if (p.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(p) as { detection_preferences?: unknown }
+      if (parsed.detection_preferences) {
+        return '检测偏好已在右侧卡片中配置'
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return p
+})
+
+watch(showPasswordDialog, (open) => {
+  if (open && userStore.email) {
+    passwordForm.value.email = userStore.email
+  }
+})
+
 // 请求重置密码邮件
 const requestResetEmail = async () => {
+  const email = passwordForm.value.email || userStore.email
+  if (!email) {
+    snackbar.showMessage('请先完善邮箱信息', 'warning')
+    return
+  }
   try {
     sendingEmail.value = true
-    await user.requestPasswordReset(passwordForm.value.email)
-    snackbar.showMessage('验证码已发送，请查收邮箱', 'success')
+    const res = await user.requestPasswordReset(email)
+    const debugCode = (res.data as { debug_reset_code?: string })?.debug_reset_code
+    if (debugCode) {
+      passwordForm.value.verificationCode = debugCode
+      snackbar.showMessage(`开发模式：验证码 ${debugCode} 已填入`, 'success')
+    } else {
+      snackbar.showMessage('验证码已发送，请查收邮箱', 'success')
+    }
     startCountdown()
   } catch (error: unknown) {
     console.error('发送验证码失败:', error)
@@ -388,16 +427,19 @@ const resetPassword = async () => {
 
   try {
     resettingPassword.value = true
-    await user.confirmPasswordReset({
-      email: passwordForm.value.email,
+    const res = await user.confirmPasswordReset({
+      email: passwordForm.value.email || userStore.email,
       reset_code: passwordForm.value.verificationCode,
       new_password: passwordForm.value.newPassword
     })
-    snackbar.showMessage('密码重置成功', 'success')
+    snackbar.showMessage((res.data as { message?: string })?.message || '密码重置成功', 'success')
     closePasswordDialog()
   } catch (error: unknown) {
     console.error('重置密码失败:', error)
-    const errorMsg = '重置密码失败'
+    const errorMsg =
+      error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || '重置密码失败'
+        : '重置密码失败'
     snackbar.showMessage(errorMsg, 'error')
   } finally {
     resettingPassword.value = false
@@ -424,6 +466,7 @@ const stats = ref({
 interface RecentActivity {
   id: string
   title: string
+  subtitle: string
   timestamp: string
   status: string
   statusLabel: string
@@ -433,18 +476,8 @@ interface RecentActivity {
 const recentActivities = ref<RecentActivity[]>([])
 
 function normalizeActivityStatus(status?: string) {
-  switch (status) {
-    case 'completed':
-      return { value: 'completed', label: '成功' }
-    case 'pending':
-      return { value: 'pending', label: '等待' }
-    case 'in_progress':
-      return { value: 'in_progress', label: '进行中' }
-    case 'failed':
-      return { value: 'failed', label: '失败' }
-    default:
-      return { value: 'unknown', label: '未知' }
-  }
+  const value = status || 'unknown'
+  return { value, label: activityStatusLabel(status) }
 }
 
 function pickActivityTime(raw: Record<string, unknown>) {
@@ -453,14 +486,6 @@ function pickActivityTime(raw: Record<string, unknown>) {
     if (typeof candidate === 'string' && candidate.trim()) return candidate
   }
   return ''
-}
-
-function pickActivityTitle(raw: Record<string, unknown>, role: 'publisher' | 'reviewer') {
-  const candidates = [raw.task_name, raw.title, raw.operation_type, raw.task_type]
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
-  }
-  return role === 'reviewer' ? '人工审核任务更新' : '检测任务更新'
 }
 
 function normalizeActivities(items: unknown[], role: 'publisher' | 'reviewer') {
@@ -472,7 +497,8 @@ function normalizeActivities(items: unknown[], role: 'publisher' | 'reviewer') {
       const fallbackId = `${role}-${index}-${timestamp || 'na'}`
       return {
         id: String(raw.id ?? raw.task_id ?? raw.manual_review_id ?? fallbackId),
-        title: pickActivityTitle(raw, role),
+        title: formatActivityTitle(raw, role),
+        subtitle: formatActivitySubtitle(raw),
         timestamp,
         status: normalizedStatus.value,
         statusLabel: normalizedStatus.label,
@@ -580,19 +606,6 @@ const handleUpdateProfile = async () => {
     snackbar.showMessage('更新个人信息失败', 'error')
   } finally {
     updating.value = false
-  }
-}
-
-const getStatusType = (status: string) => {
-  switch (status) {
-    case 'completed':
-      return '成功'
-    case 'pending':
-      return '等待'
-    case 'in_progress':
-      return '进行中'
-    default:
-      return '未知'
   }
 }
 

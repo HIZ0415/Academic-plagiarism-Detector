@@ -1,7 +1,7 @@
 <template>
   <v-container class="py-8 text-center">
     <v-progress-circular indeterminate color="primary" />
-    <p class="text-body-2 text-medium-emphasis mt-4">正在跳转到鉴伪报告…</p>
+    <p class="text-body-2 text-medium-emphasis mt-4">正在跳转到综合鉴伪报告…</p>
   </v-container>
 </template>
 

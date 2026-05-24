@@ -2,7 +2,7 @@
   <v-card class="mb-6 chart-card" elevation="2">
     <v-card-title class="text-h5 font-weight-bold primary--text py-4">
       <v-icon large color="primary" class="mr-2">mdi-chart-pie</v-icon>
-      图像标签统计分析
+      检测类型统计
     </v-card-title>
     <v-card-text class="pa-4">
       <v-row>
@@ -44,7 +44,12 @@
           </v-btn>
         </v-col>
       </v-row>
-      <div ref="chartContainer" class="chart-wrapper"></div>
+      <div ref="chartContainer" class="chart-wrapper">
+        <div v-if="isEmpty" class="chart-empty-state">
+          <v-icon size="48" color="grey-lighten-1">mdi-chart-donut</v-icon>
+          <p class="text-body-1 text-medium-emphasis mt-3 mb-0">该时间范围内暂无检测任务</p>
+        </div>
+      </div>
     </v-card-text>
   </v-card>
 </template>
@@ -62,6 +67,7 @@ const startTimeError = ref('')
 const endTimeError = ref('')
 const chartContainer = ref<HTMLElement | null>(null)
 const chart = ref<echarts.ECharts | null>(null)
+const isEmpty = ref(false)
 const snackbar = useSnackbarStore()
 const themeStore = useThemeStore()
 
@@ -79,7 +85,7 @@ const formatDateTime = (date: Date): string => {
 const initDefaultTime = () => {
   const end = new Date()
   const start = new Date(end)
-  start.setDate(start.getDate() - 1)
+  start.setDate(start.getDate() - 30)
   endTime.value = formatDateTime(end)
   startTime.value = formatDateTime(start)
 }
@@ -131,6 +137,15 @@ const updateChart = (data: Record<string, number>) => {
     name,
     value: Number(value)
   }))
+  const total = chartData.reduce((sum, item) => sum + item.value, 0)
+
+  if (total === 0) {
+    isEmpty.value = true
+    chart.value.clear()
+    return
+  }
+
+  isEmpty.value = false
 
   const isDark = themeStore.theme === 'dark'
   const textColor = isDark ? '#fff' : '#333'
@@ -190,7 +205,7 @@ const updateChart = (data: Record<string, number>) => {
     },
     series: [
       {
-        name: '标签数量',
+        name: '任务数量',
         type: 'pie',
         radius: ['45%', '75%'],
         center: ['40%', '50%'],
@@ -305,6 +320,18 @@ watch(() => themeStore.theme, () => {
 .chart-wrapper {
   width: 100%;
   height: 400px;
+  position: relative;
+}
+
+.chart-empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
 }
 
 @media (max-width: 600px) {

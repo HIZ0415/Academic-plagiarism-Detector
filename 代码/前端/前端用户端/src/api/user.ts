@@ -46,4 +46,10 @@ export default {
       },
     })
   },
+  getOrganizationUsage() {
+    return http.get<{
+      remaining_non_llm_uses: number
+      remaining_llm_uses: number
+    }>('/organization/usage/')
+  },
 }

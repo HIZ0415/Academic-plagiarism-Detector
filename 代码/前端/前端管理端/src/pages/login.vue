@@ -94,7 +94,7 @@
             <template v-if="mode === 'login'">
               <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-caption">
                 本地联调：<strong>组织内人工审核审批</strong>请用
-                <code>org_admin@example.com</code> / <code>OrgAdmin123!</code>；
+                <code>org_admin@example.com</code> / <code>OrgAdmin123!</code><br>
                 跨组织治理用 <code>admin@mail.com</code> / <code>Admin123!</code>。
               </v-alert>
               <v-text-field
