@@ -84,27 +84,11 @@
 
               <div class="task-stats d-flex align-center justify-center justify-md-end flex-grow-0">
                 <div class="answer-card elevation-1">
-                  <div class="d-flex flex-column flex-sm-row align-sm-center ga-3 mb-3">
+                  <div class="d-flex flex-column flex-sm-row align-sm-center ga-3">
                     <div class="text-h6 font-weight-medium">审核进度</div>
                     <v-btn color="primary" :disabled="manualReviewStatus === 'completed'" @click="handleSubmit">
                       {{ manualReviewStatus === 'completed' ? '已提交' : '提交审核' }}
                     </v-btn>
-                  </div>
-                  <div class="answer-grid">
-                    <template v-if="isImageTaskKind">
-                      <v-btn v-for="(image, index) in images" :key="index" :color="getAnswerButtonColor(index)"
-                        variant="outlined" size="small" class="answer-btn" density="compact"
-                        @click="handleImageSelect(index)">
-                        {{ index + 1 }}
-                      </v-btn>
-                    </template>
-                    <template v-else>
-                      <v-btn v-for="(unit, index) in textualUnits" :key="unit.id" :color="getTextUnitAnswerColor(index)"
-                        variant="outlined" size="small" class="answer-btn answer-btn-wide" density="compact"
-                        @click="handleTextUnitSelect(index)">
-                        {{ index + 1 }}
-                      </v-btn>
-                    </template>
                   </div>
                 </div>
               </div>

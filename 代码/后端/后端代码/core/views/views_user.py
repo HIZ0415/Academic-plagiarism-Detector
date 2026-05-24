@@ -542,35 +542,49 @@ class ReviewerTasksView(views.APIView):
 
 
 class ReviewerActivityLogView(views.APIView):
+    """与 reviewer/tasks/、get_reviewer_manual_request 口径一致：按 reviewer + 管理端已通过筛选。"""
+
     def get(self, request):
-        user_id = request.user.id
-        user = User.objects.get(id=user_id)
+        user = request.user
         if user.role != 'reviewer':
             return Response({'error': 'Only reviewers can view review details'}, status=403)
 
-        # 获取最近7天的数据
-        days_ago = timezone.now() - timezone.timedelta(days=7)
+        one_month_ago = timezone.now() - timedelta(days=30)
 
-        # 查询 ManualReview 中 reviewer 为当前用户且 review_time 在最近7天内的记录
-        manual_reviews = ManualReview.objects.filter(
-            organization=user.organization,
-            reviewer=user,
-            review_time__gte=days_ago
-        ).order_by('-review_time')
+        manual_reviews = (
+            ManualReview.objects.filter(
+                reviewer=user,
+                review_request__status2='accepted',
+                review_time__gte=one_month_ago,
+            )
+            .select_related(
+                'review_request__detection_result__detection_task',
+            )
+            .order_by('-review_time')[:20]
+        )
 
         result = []
         for review in manual_reviews:
-            # 获取关联 DetectionTask 的 task_name
-            detection_task = review.imgs.first().detection_task if review.imgs.exists() else None
-
-            task_name = detection_task.task_name if detection_task else "Unknown Task"
-            completion_time = review.review_time
-            task_status = review.status
+            review_request = review.review_request
+            detection_result = getattr(review_request, 'detection_result', None)
+            detection_task = (
+                detection_result.detection_task
+                if detection_result is not None
+                else None
+            )
+            task_name = detection_task.task_name if detection_task else 'Unknown Task'
 
             result.append({
+                'manual_review_id': review.id,
+                'task_id': detection_task.id if detection_task else None,
                 'task_name': task_name,
-                'completion_time': completion_time,
-                'status': task_status
+                'task_type': detection_task.task_type if detection_task else '',
+                'completion_time': (
+                    timezone.localtime(review.review_time).strftime('%Y-%m-%d %H:%M:%S')
+                    if review.review_time
+                    else ''
+                ),
+                'status': review.status,
             })
 
         return Response(result, status=status.HTTP_200_OK)

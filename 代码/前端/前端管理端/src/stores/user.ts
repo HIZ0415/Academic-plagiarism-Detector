@@ -1,6 +1,7 @@
 // stores/user.ts
 import { defineStore } from 'pinia';
 import user from '@/api/user';
+import { resolveBackendMediaUrl } from '@/utils/backendUrl';
 
 interface UserState {
   username: string;
@@ -12,8 +13,6 @@ interface UserState {
   admin_type: string;
   organization: number;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
@@ -35,7 +34,7 @@ export const useUserStore = defineStore('user', {
         this.email = response.data.email || '';
         this.role = response.data.role || '';
         this.profile = response.data.profile ?? '';
-        this.avatar = response.data.avatar ? `${API_BASE_URL}${response.data.avatar}` : './192.png';
+        this.avatar = response.data.avatar ? resolveBackendMediaUrl(response.data.avatar) : './192.png';
         this.admin_type = response.data.admin_type ?? '';
         this.isLoaded = true;
         this.organization = response.data.organization ?? 0;
