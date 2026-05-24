@@ -47,6 +47,23 @@ from ..tasks import run_ai_detection, run_ai_detection_batch
 from ..tasks_new import fetch_batch
 
 
+def _dispatch_fetch_batch(*, dr_ids, batch_dir, image_num, task_pk, priority):
+    """Local dev uses CELERY_TASK_ALWAYS_EAGER, which would block the HTTP request on AI."""
+    kwargs = {
+        "args": [dr_ids, str(batch_dir), image_num, task_pk],
+        "queue": "ai",
+        "priority": priority,
+    }
+    if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+        threading.Thread(
+            target=lambda: fetch_batch.apply_async(**kwargs),
+            daemon=True,
+            name=f"fetch-batch-{task_pk}-{batch_dir.name}",
+        ).start()
+        return
+    fetch_batch.apply_async(**kwargs)
+
+
 # @api_view(['POST'])
 # @permission_classes([IsAuthenticated])
 # def submit_detection(request):
@@ -116,7 +133,9 @@ from ..tasks_new import fetch_batch
 
 
 from pathlib import Path
+import threading
 import time
+from django.conf import settings
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_detection2(request):
@@ -157,17 +176,23 @@ def submit_detection2(request):
     # 检查剩余次数是否足够
     if if_use_llm:
         if not organization.can_use_llm(num_images):
+            remaining = organization.remaining_llm_uses
             return Response({
-                                "message": f"You have exceeded your LLM method usage limit for this week. Your organization can only submit {organization.remaining_llm_uses} more images."},
-                            status=400)
-        # 使用 LLM 方法时，减少组织的 LLM 方法剩余次数
+                "message": (
+                    f"本周精准检测（LLM）配额不足：本组织还可提交 {remaining} 张图，"
+                    f"本次请求 {num_images} 张。请减少图片、分批提交或联系管理员充值。"
+                ),
+            }, status=400)
         organization.decrement_llm_uses(num_images)
     else:
         if not organization.can_use_non_llm(num_images):
+            remaining = organization.remaining_non_llm_uses
             return Response({
-                                "message": f"You have exceeded your non-LLM method usage limit for this week. Your organization can only submit {organization.remaining_non_llm_uses} more images."},
-                            status=400)
-        # 使用非 LLM 方法时，减少组织的非 LLM 方法剩余次数
+                "message": (
+                    f"本周标准检测配额不足：本组织还可提交 {remaining} 张图，"
+                    f"本次请求 {num_images} 张。请减少 ZIP/批量中的图片、分批提交或联系管理员充值。"
+                ),
+            }, status=400)
         organization.decrement_non_llm_uses(num_images)
 
     # 创建一个新的检测任务
@@ -235,10 +260,12 @@ def submit_detection2(request):
             pri = 0
         else:
             pri = 1
-        fetch_batch.apply_async(
-            args=[[dr.id for dr in batch_drs], str(batch_dir), len(image_ids), detection_task.pk],
-            queue='ai',
-            priority=pri
+        _dispatch_fetch_batch(
+            dr_ids=[dr.id for dr in batch_drs],
+            batch_dir=batch_dir,
+            image_num=len(image_ids),
+            task_pk=detection_task.pk,
+            priority=pri,
         )
         continue
 

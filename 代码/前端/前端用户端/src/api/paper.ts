@@ -1,6 +1,12 @@
 import http from './request'
 import type { PaperAigcResult, ResourceCheckResult, TaskStatus } from '@/types/core'
+import { throwPaperFlowError } from '@/utils/httpError'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
+import { paperSubmitTimeoutMs, paperUploadTimeoutMs } from '@/utils/paperTimeout'
+
+export { paperSubmitTimeoutMs, paperUploadTimeoutMs } from '@/utils/paperTimeout'
+
+type HttpConfig = { timeout?: number }
 
 const mockOk = <T>(data: T) => Promise.resolve({ data, headers: {} } as any)
 
@@ -38,11 +44,14 @@ export interface PaperUploadResponse {
 export interface SubmitTaskPayload {
   paper_file_id: number
   task_name: string
+  batch_session_id?: string
+  detection_mode?: string
 }
 
 export interface SubmitTaskResponse {
   task_id: number | string
   status?: string
+  error_message?: string
 }
 
 export interface PaperTaskStatus {
@@ -63,8 +72,14 @@ function mockPaperFileId(): number {
   return Math.floor(Date.now() / 1000) % 800000 + 100000
 }
 
+function taskIdFromResponse(data: unknown): number | string | undefined {
+  if (!data || typeof data !== 'object') return undefined
+  const tid = (data as SubmitTaskResponse).task_id
+  return tid === 0 || tid ? tid : undefined
+}
+
 export default {
-  uploadPaper(formData: FormData) {
+  uploadPaper(formData: FormData, config?: HttpConfig) {
     if (mockAigcFeaturesEnabled()) {
       return mockOk({
         paper_file_id: mockPaperFileId(),
@@ -77,16 +92,19 @@ export default {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: config?.timeout ?? paperUploadTimeoutMs(0),
     })
   },
 
-  submitAigcTask(data: SubmitTaskPayload) {
+  submitAigcTask(data: SubmitTaskPayload, config?: HttpConfig) {
     if (mockAigcFeaturesEnabled()) {
       const tid = `mock-paper-${Date.now()}`
       registerMockPaperTask(tid)
       return mockOk({ task_id: tid, status: 'pending' as TaskStatus })
     }
-    return http.post('/paper/aigc/submit/', data)
+    return http.post('/paper/aigc/submit/', data, {
+      timeout: config?.timeout ?? paperSubmitTimeoutMs(0, 'aigc'),
+    })
   },
 
   getTaskStatus(taskId: number | string) {
@@ -118,13 +136,15 @@ export default {
     return http.get<PaperAigcResult>(`/paper/aigc/${taskId}/result/`)
   },
 
-  submitResourceCheck(data: SubmitTaskPayload) {
+  submitResourceCheck(data: SubmitTaskPayload, config?: HttpConfig) {
     if (mockAigcFeaturesEnabled()) {
       const tid = `mock-res-${Date.now()}`
       registerMockPaperTask(tid)
       return mockOk({ task_id: tid, status: 'pending' as TaskStatus })
     }
-    return http.post('/paper/resource-check/submit/', data)
+    return http.post('/paper/resource-check/submit/', data, {
+      timeout: config?.timeout ?? paperSubmitTimeoutMs(0, 'resource'),
+    })
   },
 
   getResourceResult(taskId: number | string) {
@@ -161,16 +181,30 @@ export default {
     taskName: string,
     opts?: { batch_session_id?: string; detection_mode?: string },
   ) {
+    const uploadTimeout = paperUploadTimeoutMs(file.size)
+    const submitTimeout = paperSubmitTimeoutMs(file.size, 'aigc')
     const formData = new FormData()
     formData.append('file', file)
-    const uploadRes = await this.uploadPaper(formData)
-    const paperFileId = uploadRes.data.paper_file_id
-    return this.submitAigcTask({
-      paper_file_id: paperFileId,
-      task_name: taskName,
-      batch_session_id: opts?.batch_session_id,
-      detection_mode: opts?.detection_mode,
-    })
+    let paperFileId: number | undefined
+    try {
+      const uploadRes = await this.uploadPaper(formData, { timeout: uploadTimeout })
+      paperFileId = uploadRes.data.paper_file_id
+    } catch (err) {
+      throwPaperFlowError(err, { stage: 'upload' })
+    }
+    try {
+      return await this.submitAigcTask(
+        {
+          paper_file_id: paperFileId!,
+          task_name: taskName,
+          batch_session_id: opts?.batch_session_id,
+          detection_mode: opts?.detection_mode,
+        },
+        { timeout: submitTimeout },
+      )
+    } catch (err) {
+      throwPaperFlowError(err, { stage: 'submit', paper_file_id: paperFileId })
+    }
   },
 
   async uploadAndSubmitResourceTask(
@@ -178,16 +212,31 @@ export default {
     taskName: string,
     opts?: { batch_session_id?: string; detection_mode?: string },
   ) {
+    const uploadTimeout = paperUploadTimeoutMs(file.size)
+    const submitTimeout = paperSubmitTimeoutMs(file.size, 'resource')
     const formData = new FormData()
     formData.append('file', file)
-    const uploadRes = await this.uploadPaper(formData)
-    const paperFileId = uploadRes.data.paper_file_id
-    return this.submitResourceCheck({
-      paper_file_id: paperFileId,
-      task_name: taskName,
-      batch_session_id: opts?.batch_session_id,
-      detection_mode: opts?.detection_mode,
-    })
+    let paperFileId: number | undefined
+    try {
+      const uploadRes = await this.uploadPaper(formData, { timeout: uploadTimeout })
+      paperFileId = uploadRes.data.paper_file_id
+    } catch (err) {
+      throwPaperFlowError(err, { stage: 'upload' })
+    }
+    try {
+      return await this.submitResourceCheck(
+        {
+          paper_file_id: paperFileId!,
+          task_name: taskName,
+          batch_session_id: opts?.batch_session_id,
+          detection_mode: opts?.detection_mode,
+        },
+        { timeout: submitTimeout },
+      )
+    } catch (err) {
+      throwPaperFlowError(err, { stage: 'submit', paper_file_id: paperFileId })
+    }
   },
-}
 
+  taskIdFromResponse,
+}

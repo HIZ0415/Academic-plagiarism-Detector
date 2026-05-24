@@ -13,8 +13,11 @@
 import json
 import hashlib
 import re
+import threading
 import uuid
 from pathlib import Path
+
+from django.db import close_old_connections
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -557,6 +560,63 @@ def _detection_mode_fields(request, default_llm: bool):
     }
 
 
+def _execute_paper_detection(task_id, expected_type):
+    """在后台线程或 Celery 中执行论文检测，避免阻塞 HTTP 提交响应。"""
+    try:
+        task = DetectionTask.objects.select_related("paper_file", "user").get(pk=task_id)
+    except DetectionTask.DoesNotExist:
+        return
+
+    file_obj = task.paper_file
+    if not file_obj:
+        _fail_text_task(task, "论文任务缺少 paper_file 关联。")
+        return
+
+    meta = _load_paper_meta(file_obj.id)
+    if not meta or not meta.get("ai_payload_path") or int(meta.get("paragraph_count") or 0) <= 0:
+        _fail_text_task(task, "Paper preprocessing output is missing or invalid.")
+        return
+
+    try:
+        if expected_type == "paper_aigc":
+            result = _run_ai_task_from_meta(task, meta, task_type="paper")
+            _complete_text_task(
+                task,
+                result,
+                meta_loader=_load_paper_meta,
+                meta_saver=_save_paper_meta,
+                file_id=file_obj.id,
+                folder="paper_uploads",
+            )
+        elif expected_type == "resource_check":
+            paper_text, loaded_meta = _get_paper_text(file_obj.id)
+            if not paper_text.strip() or loaded_meta is None:
+                raise ValueError("Paper text is missing after preprocessing.")
+            result = _build_resource_result(task, paper_text)
+            _complete_text_task(
+                task,
+                result,
+                meta_loader=_load_paper_meta,
+                meta_saver=_save_paper_meta,
+                file_id=file_obj.id,
+                folder="paper_uploads",
+            )
+    except (AIGatewayError, ValueError) as exc:
+        _fail_text_task(task, str(exc))
+
+
+def _dispatch_paper_detection(task_id, expected_type):
+    """本地开发 Celery eager 模式会阻塞请求，因此用守护线程异步执行检测。"""
+    def _worker():
+        close_old_connections()
+        try:
+            _execute_paper_detection(task_id, expected_type)
+        finally:
+            close_old_connections()
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 def _submit_paper_task(request, expected_type):
     """通用提交逻辑：paper_aigc / resource_check"""
     user = User.objects.get(id=request.user.id)
@@ -602,32 +662,7 @@ def _submit_paper_task(request, expected_type):
 
     task.status = "in_progress"
     task.save(update_fields=["status"])
-    try:
-        if expected_type == "paper_aigc":
-            result = _run_ai_task_from_meta(task, meta, task_type="paper")
-            _complete_text_task(
-                task,
-                result,
-                meta_loader=_load_paper_meta,
-                meta_saver=_save_paper_meta,
-                file_id=file_obj.id,
-                folder="paper_uploads",
-            )
-        elif expected_type == "resource_check":
-            paper_text, loaded_meta = _get_paper_text(file_obj.id)
-            if not paper_text.strip() or loaded_meta is None:
-                raise ValueError("Paper text is missing after preprocessing.")
-            result = _build_resource_result(task, paper_text)
-            _complete_text_task(
-                task,
-                result,
-                meta_loader=_load_paper_meta,
-                meta_saver=_save_paper_meta,
-                file_id=file_obj.id,
-                folder="paper_uploads",
-            )
-    except (AIGatewayError, ValueError) as exc:
-        _fail_text_task(task, str(exc))
+    _dispatch_paper_detection(task.id, expected_type)
 
     return Response(
         {
@@ -636,6 +671,7 @@ def _submit_paper_task(request, expected_type):
             "error_message": task.error_message,
             "paper_file_id": file_obj.id,
             "paragraph_count": meta.get("paragraph_count", 0),
+            "batch_session_id": mode_fields.get("batch_session_id") or "",
         }
     )
 

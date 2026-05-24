@@ -101,7 +101,7 @@ export default {
     return http.get('/user-tasks/', { params: data })
   },
 
-  submitDetection(data: any) {
+  submitDetection(data: any, config?: { timeout?: number }) {
     if (useMock()) {
       return ok({
         task_id: `mock-img-${Date.now()}`,
@@ -109,7 +109,9 @@ export default {
         ...data,
       })
     }
-    return http.post('/detection/submit/', data)
+    return http.post('/detection/submit/', data, {
+      timeout: config?.timeout,
+    })
   },
 
   getTaskResults(data: any) {

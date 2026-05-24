@@ -675,7 +675,7 @@ CELERY_RESULT_BACKEND = "cache+memory://"
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "$aiServiceUrl")
-AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT", "1200"))
+AI_SERVICE_TIMEOUT = int(os.getenv("AI_SERVICE_TIMEOUT_SECONDS", os.getenv("AI_SERVICE_TIMEOUT", "1200")))
 AI_SERVICE_API_TOKEN = os.getenv("AI_SERVICE_API_TOKEN", "")
 "@
     Set-Content -LiteralPath $LocalSettingsPath -Value $content -Encoding UTF8

@@ -22,9 +22,11 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Case, When, Value, CharField, F, Exists, OuterRef
 from core.util import send_notification, detection_task_type_label
 from core.models import Notification
+from core.utils.report_generator import _load_result_json
+from core.tasks_paper import _risk_level as paper_risk_level_from_score
 
 
 class AdminDetailSerializer(serializers.ModelSerializer):
@@ -48,7 +50,6 @@ class AdminDetailSerializer(serializers.ModelSerializer):
         return obj.organization.name if obj.organization else None
 
 
-@permission_classes([IsAdminUser])
 class AdminDetailView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAdminUser]
@@ -71,11 +72,12 @@ class AdminDashboardView(APIView):
     """
     管理员仪表盘视图
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdminUser]
 
-    @permission_classes([IsAdminUser])
     def get(self, request):
         # 获取所有用户信息
-        if request.user.email == 'admin@mail.com':
+        if _is_software_admin(request.user):
             users = User.objects.all()
         else:
             users = User.objects.filter(organization=request.user.organization)
@@ -90,21 +92,263 @@ class AdminDashboardView(APIView):
             } for user in users
         ]
 
-        # 获取最近30天的检测任务统计
-        one_month_ago = timezone.now() - timedelta(days=30)
-        if request.user.email == 'admin@mail.com':
-            recent_tasks = DetectionTask.objects.filter(upload_time__gte=one_month_ago)
-        else:
-            recent_tasks = DetectionTask.objects.filter(upload_time__gte=one_month_ago,
-                                                        organization=request.user.organization)
-        task_stats = {
-            'total_tasks': recent_tasks.count(),
-            'completed_tasks': recent_tasks.filter(status='completed').count(),
-            'pending_tasks': recent_tasks.filter(status='pending').count(),
-            'in_progress_tasks': recent_tasks.filter(status='in_progress').count(),
-        }
+        recent_tasks = _dashboard_recent_tasks(request.user)
+        task_stats = _dashboard_task_stats(recent_tasks)
 
         return JsonResponse({'users': user_data, 'task_stats': task_stats})
+
+
+def _is_software_admin(user):
+    return user.email == 'admin@mail.com' or (user.is_staff and user.organization is None)
+
+
+def _parse_dashboard_datetime(value, *, as_end=False):
+    """将前端 datetime-local 字符串解析为带时区的 datetime（Asia/Shanghai）。"""
+    if not value:
+        return None
+    text = str(value).strip().replace('T', ' ')
+    dt = None
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+        try:
+            dt = datetime.strptime(text, fmt)
+            break
+        except ValueError:
+            continue
+    if dt is None:
+        try:
+            parsed = datetime.fromisoformat(text)
+            dt = parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+        except ValueError as exc:
+            raise ValueError('Invalid datetime format') from exc
+    if as_end and len(text) <= 10:
+        dt = datetime.combine(dt.date(), datetime.max.time().replace(microsecond=0))
+    tz = timezone.get_current_timezone()
+    if timezone.is_aware(dt):
+        return dt
+    return timezone.make_aware(dt, tz)
+
+
+def _org_scoped_tasks(user, queryset=None):
+    """组织管理员可见任务：优先 task.organization，兼容 organization 为空的历史数据。"""
+    qs = queryset if queryset is not None else DetectionTask.objects.all()
+    if _is_software_admin(user):
+        return qs
+    org = user.organization
+    if not org:
+        return qs.none()
+    return qs.filter(
+        Q(organization=org) | Q(organization__isnull=True, user__organization=org)
+    )
+
+
+def _org_scoped_users(user, queryset=None):
+    """组织管理员可见用户（publisher 排行等）。"""
+    qs = queryset if queryset is not None else User.objects.all()
+    if _is_software_admin(user):
+        return qs
+    org = user.organization
+    if not org:
+        return qs.none()
+    return qs.filter(organization=org)
+
+
+DASHBOARD_WINDOW_DAYS = 30
+
+
+def _dashboard_window_start():
+    return timezone.now() - timedelta(days=DASHBOARD_WINDOW_DAYS)
+
+
+def _dashboard_recent_tasks(user, queryset=None):
+    """仪表盘统一口径：组织范围 + 近 30 日（按 upload_time）。"""
+    base = queryset if queryset is not None else DetectionTask.objects.all()
+    return _org_scoped_tasks(
+        user,
+        base.filter(upload_time__gte=_dashboard_window_start()),
+    )
+
+
+def _with_effective_status(queryset):
+    """
+    仪表盘用互斥状态：修正 DB status 未及时更新但已实质结束的任务。
+    进行中 = 仅 pending 或 in_progress 且尚无完成信号；不含 failed。
+    """
+    incomplete_dr = DetectionResult.objects.filter(
+        detection_task_id=OuterRef('pk'),
+    ).exclude(status='completed')
+    has_dr = DetectionResult.objects.filter(detection_task_id=OuterRef('pk'))
+
+    return queryset.annotate(
+        _dr_incomplete=Exists(incomplete_dr),
+        _has_dr=Exists(has_dr),
+    ).annotate(
+        effective_status=Case(
+            When(status='failed', then=Value('failed')),
+            When(status='completed', then=Value('completed')),
+            When(
+                status='in_progress',
+                completion_time__isnull=False,
+                then=Value('completed'),
+            ),
+            When(
+                status='in_progress',
+                report_file__gt='',
+                then=Value('completed'),
+            ),
+            When(
+                status='in_progress',
+                task_type='image_detection',
+                _has_dr=True,
+                _dr_incomplete=False,
+                then=Value('completed'),
+            ),
+            When(
+                status='pending',
+                completion_time__isnull=False,
+                then=Value('completed'),
+            ),
+            default=F('status'),
+            output_field=CharField(),
+        ),
+    )
+
+
+def _dashboard_task_stats(queryset):
+    """近 30 日任务各状态计数（互斥；与 effective_status 一致）。"""
+    qs = _with_effective_status(queryset)
+    stats = {
+        'total_tasks': qs.count(),
+        'completed_tasks': qs.filter(effective_status='completed').count(),
+        'pending_tasks': qs.filter(effective_status='pending').count(),
+        'in_progress_tasks': qs.filter(effective_status='in_progress').count(),
+        'failed_tasks': qs.filter(effective_status='failed').count(),
+    }
+    # 论文 / 资源 / Review：结果 JSON 已落盘但 status 仍为 in_progress 的修正
+    stale_text = queryset.filter(
+        status='in_progress',
+        completion_time__isnull=True,
+        task_type__in=('paper_aigc', 'resource_check', 'review_detection'),
+    ).filter(Q(report_file='') | Q(report_file__isnull=True))
+    reclassified = 0
+    for task in stale_text.only('id', 'task_type', 'paper_file_id', 'status', 'report_file'):
+        if _load_result_json(task):
+            reclassified += 1
+    if reclassified:
+        stats['completed_tasks'] += reclassified
+        stats['in_progress_tasks'] = max(0, stats['in_progress_tasks'] - reclassified)
+    return stats
+
+
+def _effective_completed_task_ids(tasks):
+    """与摘要卡片一致的「有效已完成」任务 ID 集合。"""
+    ids = set(
+        _with_effective_status(tasks)
+        .filter(effective_status='completed')
+        .values_list('id', flat=True)
+    )
+    stale_text = tasks.filter(
+        status='in_progress',
+        completion_time__isnull=True,
+        task_type__in=('paper_aigc', 'resource_check', 'review_detection'),
+    ).filter(Q(report_file='') | Q(report_file__isnull=True))
+    for task in stale_text.only('id', 'task_type', 'paper_file_id', 'status', 'report_file'):
+        if _load_result_json(task):
+            ids.add(task.id)
+    return ids
+
+
+def _effective_completed_tasks(tasks):
+    """排行/风险统计用的已完成任务集（与摘要卡片口径一致）。"""
+    ids = _effective_completed_task_ids(tasks)
+    if not ids:
+        return tasks.none()
+    return tasks.filter(id__in=ids)
+
+
+def _task_type_count_map(tasks):
+    counts = {task_type: 0 for task_type, _ in DetectionTask.TASK_TYPE_CHOICES}
+    for row in tasks.values('task_type').annotate(count=Count('id')):
+        counts[row['task_type']] = row['count']
+    return counts
+
+
+def _text_task_is_high_risk(task):
+    """论文 / 资源 / Review 已完成任务是否为中高风险。"""
+    raw = _load_result_json(task)
+    if not raw:
+        return False
+    level = raw.get('overall_risk_level')
+    if level in ('high', 'medium'):
+        return True
+    ratio = raw.get('ai_contribution_ratio')
+    if ratio is None:
+        score = raw.get('overall_risk_score')
+        if score is not None:
+            ratio = float(score)
+        else:
+            return False
+    return paper_risk_level_from_score(float(ratio)) in ('high', 'medium')
+
+
+def _comprehensive_risk_stats(tasks):
+    """跨检测类型的高风险/异常任务数（有效已完成任务中任一项命中即计 1）。"""
+    completed = _effective_completed_tasks(tasks)
+    total_completed = completed.count()
+    if not total_completed:
+        return 0, 0, 0.0
+
+    image_completed = completed.filter(task_type='image_detection')
+    image_task_ids_with_risk = set(
+        DetectionResult.objects.filter(
+            detection_task__in=image_completed,
+            status='completed',
+            is_fake=True,
+        ).values_list('detection_task_id', flat=True).distinct()
+    )
+    high_risk = len(image_task_ids_with_risk)
+
+    for task in completed.exclude(task_type='image_detection').iterator(chunk_size=32):
+        if _text_task_is_high_risk(task):
+            high_risk += 1
+
+    ratio = round(high_risk / total_completed, 4) if total_completed else 0.0
+    return high_risk, total_completed, ratio
+
+
+def _publisher_ranking_row(publisher, tasks):
+    type_counts = _task_type_count_map(tasks)
+    total_images, fake_count, image_fake_ratio = _image_fake_stats_for_tasks(tasks)
+    high_risk_count, completed_count, high_risk_ratio = _comprehensive_risk_stats(tasks)
+    effective = _with_effective_status(tasks)
+    return {
+        'username': publisher.username,
+        'total_tasks': tasks.count(),
+        'in_progress_tasks': effective.filter(effective_status='in_progress').count(),
+        'completed_tasks': completed_count,
+        'task_counts': type_counts,
+        'image_detection': type_counts.get('image_detection', 0),
+        'paper_aigc': type_counts.get('paper_aigc', 0),
+        'resource_check': type_counts.get('resource_check', 0),
+        'review_detection': type_counts.get('review_detection', 0),
+        'total_images': total_images,
+        'fake_count': fake_count,
+        'fake_ratio': image_fake_ratio,
+        'high_risk_count': high_risk_count,
+        'high_risk_ratio': high_risk_ratio,
+    }
+
+
+def _image_fake_stats_for_tasks(tasks):
+    """统计图像检测任务中已完成检测的图片数与造假比例（以 DetectionResult 为准）。"""
+    image_tasks = tasks.filter(task_type='image_detection')
+    completed = DetectionResult.objects.filter(
+        detection_task__in=image_tasks,
+        status='completed',
+    )
+    total_images = completed.count()
+    fake_count = completed.filter(is_fake=True).count()
+    fake_ratio = round(fake_count / total_images, 4) if total_images else 0.0
+    return total_images, fake_count, fake_ratio
 
 
 @api_view(['GET'])
@@ -115,29 +359,23 @@ def dashboard_img_tag(request):
     参数: startTime, endTime（ISO 8601 格式）
     示例响应: {"图像检测": 12, "论文 AIGC 检测": 5, ...}
     """
-    start_time = request.query_params.get('startTime')
-    end_time = request.query_params.get('endTime')
+    start_time_str = request.query_params.get('startTime')
+    end_time_str = request.query_params.get('endTime')
 
     now = timezone.now()
-    default_start = now.replace(year=now.year - 1)
+    default_start = now - timedelta(days=30)
     default_end = now
 
     try:
-        if start_time:
-            start_time = timezone.datetime.fromisoformat(start_time)
-        else:
-            start_time = default_start
-
-        if end_time:
-            end_time = timezone.datetime.fromisoformat(end_time)
-        else:
-            end_time = default_end
+        start_time = _parse_dashboard_datetime(start_time_str) if start_time_str else default_start
+        end_time = _parse_dashboard_datetime(end_time_str, as_end=True) if end_time_str else default_end
     except ValueError:
         return Response({'error': 'Invalid datetime format'}, status=400)
 
-    tasks = DetectionTask.objects.filter(upload_time__range=[start_time, end_time])
-    if not _is_software_admin(request.user):
-        tasks = tasks.filter(organization=request.user.organization)
+    tasks = _org_scoped_tasks(
+        request.user,
+        DetectionTask.objects.filter(upload_time__range=[start_time, end_time]),
+    )
 
     type_counts = {
         detection_task_type_label(task_type): 0
@@ -151,46 +389,20 @@ def dashboard_img_tag(request):
     return Response(type_counts)
 
 
-def _is_software_admin(user):
-    return user.email == 'admin@mail.com' or (user.is_staff and user.organization is None)
-
-
-def _image_fake_stats_for_tasks(tasks):
-    images = ImageUpload.objects.filter(detection_task__in=tasks, isDetect=True)
-    total_images = images.count()
-    fake_count = images.filter(isFake=True).count()
-    fake_ratio = round(fake_count / total_images, 4) if total_images else 0.0
-    return total_images, fake_count, fake_ratio
-
-
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def top_publishers_with_fake_ratio(request):
-    # 获取所有 publisher 用户
-    user_id = request.user.id
-    user = User.objects.get(id=user_id)
-    if request.user.email == 'admin@mail.com':
-        publishers = User.objects.filter(role='publisher')
-    else:
-        publishers = User.objects.filter(role='publisher', organization=user.organization)
-
+    """本组织成员排行：近 30 日、各检测类型任务数 + 图像已检/造假 + 综合高风险占比。"""
+    publishers = _org_scoped_users(request.user, User.objects.filter(role='publisher'))
     result = []
-
     for publisher in publishers:
-        tasks = DetectionTask.objects.filter(user=publisher)
-        total_images, fake_count, fake_ratio = _image_fake_stats_for_tasks(tasks)
-
-        result.append({
-            "username": publisher.username,
-            "total_tasks": tasks.count(),
-            "total_images": total_images,
-            "fake_count": fake_count,
-            "fake_ratio": fake_ratio
-        })
-
-    # 排序并取前10
+        tasks = _dashboard_recent_tasks(
+            request.user,
+            DetectionTask.objects.filter(user=publisher),
+        )
+        if tasks.exists():
+            result.append(_publisher_ranking_row(publisher, tasks))
     top_10 = sorted(result, key=lambda x: x['total_tasks'], reverse=True)[:10]
-
     return Response(top_10)
 
 
@@ -200,31 +412,39 @@ def top_organizations_with_fake_ratio(request):
     """
     获取假图率最高的前10个组织（按总任务数排序）
     """
-    user_id = request.user.id
-    user = User.objects.get(id=user_id)
-
-    # 权限控制：如果是全局管理员则获取所有组织，否则仅获取当前用户所在组织
-    if request.user.email == 'admin@mail.com':
+    if _is_software_admin(request.user):
         organizations = Organization.objects.all()
     else:
-        organizations = Organization.objects.filter(id=user.organization.id)
+        org = request.user.organization
+        organizations = Organization.objects.filter(id=org.id) if org else Organization.objects.none()
 
     result = []
+    window_start = _dashboard_window_start()
 
     for org in organizations:
-        # 获取该组织下的所有 publisher 用户
         publishers = User.objects.filter(role='publisher', organization=org)
-
-        # 获取该组织下所有 publisher 的任务
-        tasks = DetectionTask.objects.filter(user__in=publishers)
+        tasks = DetectionTask.objects.filter(
+            Q(organization=org) | Q(organization__isnull=True, user__organization=org),
+            user__in=publishers,
+            upload_time__gte=window_start,
+        )
+        type_counts = _task_type_count_map(tasks)
         total_images, fake_count, fake_ratio = _image_fake_stats_for_tasks(tasks)
-
+        high_risk_count, completed_count, high_risk_ratio = _comprehensive_risk_stats(tasks)
         result.append({
             "organization_name": org.name,
             "total_tasks": tasks.count(),
+            "completed_tasks": completed_count,
+            "task_counts": type_counts,
+            "image_detection": type_counts.get('image_detection', 0),
+            "paper_aigc": type_counts.get('paper_aigc', 0),
+            "resource_check": type_counts.get('resource_check', 0),
+            "review_detection": type_counts.get('review_detection', 0),
             "total_images": total_images,
             "fake_count": fake_count,
-            "fake_ratio": fake_ratio
+            "fake_ratio": fake_ratio,
+            "high_risk_count": high_risk_count,
+            "high_risk_ratio": high_risk_ratio,
         })
 
     # 按总任务数排序并取前10
@@ -250,16 +470,21 @@ def daily_active_users(request):
 
     result = []
 
+    org_user_ids = None
+    if not _is_software_admin(request.user) and request.user.organization_id:
+        org_user_ids = User.objects.filter(
+            organization=request.user.organization,
+        ).values_list('id', flat=True)
+
     for target_date in date_list:
         start_of_day = timezone.make_aware(datetime.combine(target_date, datetime.min.time()))
         end_of_day = timezone.make_aware(datetime.combine(target_date, datetime.max.time()))
 
-        # 查询当天有操作记录的用户ID
-        user_ids = Log.objects.filter(
-            operation_time__range=[start_of_day, end_of_day]
-        ).values_list('user', flat=True).distinct()
+        logs = Log.objects.filter(operation_time__range=[start_of_day, end_of_day])
+        if org_user_ids is not None:
+            logs = logs.filter(user_id__in=org_user_ids)
+        user_ids = logs.values_list('user', flat=True).distinct()
 
-        # 获取这些用户的信息
         users = User.objects.filter(id__in=user_ids)
 
         # 按角色统计
@@ -344,11 +569,10 @@ def daily_task_count(request):
         start_of_day = timezone.make_aware(datetime.combine(target_date, datetime.min.time()))
         end_of_day = timezone.make_aware(datetime.combine(target_date, datetime.max.time()))
 
-        if request.user.email == 'admin@mail.com':
-            count = DetectionTask.objects.filter(upload_time__range=[start_of_day, end_of_day]).count()
-        else:
-            count = DetectionTask.objects.filter(upload_time__range=[start_of_day, end_of_day],
-                                                 user__organization=user.organization).count()
+        count = _org_scoped_tasks(
+            request.user,
+            DetectionTask.objects.filter(upload_time__range=[start_of_day, end_of_day]),
+        ).count()
 
         result.append({
             'date': target_date.strftime('%Y-%m-%d'),
@@ -465,13 +689,15 @@ def get_sub_method_distribution_by_tag(request):
     for tag in TAG_CHOICES:
         # Step 1: 获取该 tag 下的所有 image_upload
         if request.user.email == 'admin@mail.com':
-            image_uploads = ImageUpload.objects.filter(
-                file_management__tag=tag
-            )
+            image_uploads = ImageUpload.objects.filter(file_management__tag=tag)
         else:
+            scoped_task_ids = _org_scoped_tasks(
+                user,
+                DetectionTask.objects.filter(task_type='image_detection'),
+            ).values_list('id', flat=True)
             image_uploads = ImageUpload.objects.filter(
                 file_management__tag=tag,
-                detection_task__user__organization=user.organization
+                detection_task_id__in=scoped_task_ids,
             )
 
         # Step 2: 获取这些 image_upload 对应的 detection_result
@@ -562,8 +788,9 @@ class UserPermissionView(APIView):
     """
     用户权限管理视图
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdminUser]
 
-    @permission_classes([IsAdminUser])
     def post(self, request, user_id):
         try:
             user = User.objects.get(id=user_id)
@@ -810,10 +1037,8 @@ def get_task_summary(request):
     one_month_ago = timezone.now() - timedelta(days=30)
     user_id = request.user.id
     user = User.objects.get(id=user_id)
-    # 权限控制
     if request.user.email != 'admin@mail.com':
-        organization = user.organization
-        tasks = DetectionTask.objects.filter(organization=organization)
+        tasks = _org_scoped_tasks(request.user)
     else:
         organization_id = request.query_params.get('organization')
         if organization_id:
@@ -857,8 +1082,7 @@ def get_detection_task_status(request, task_id):
     try:
         # 权限控制
         if request.user.email != 'admin@mail.com':
-            user_organization = user.organization
-            detection_task = DetectionTask.objects.get(id=task_id, organization=user_organization)
+            detection_task = _org_scoped_tasks(request.user).get(id=task_id)
         else:
             organization_id = request.query_params.get('organization')
             if organization_id:
@@ -902,8 +1126,7 @@ def get_all_user_tasks(request):
     try:
         # 权限控制
         if request.user.email != 'admin@mail.com':
-            user_organization = user.organization
-            tasks = DetectionTask.objects.filter(organization=user_organization)
+            tasks = _org_scoped_tasks(request.user)
         else:
             organization_id = request.query_params.get('organization')
             if organization_id:
@@ -911,7 +1134,6 @@ def get_all_user_tasks(request):
             else:
                 tasks = DetectionTask.objects.all()
 
-        # 收集任务信息
         task_data = [
             {
                 "task_id": task.id,
@@ -948,10 +1170,12 @@ def get_users(request):
     user_id = request.user.id
     user = User.objects.get(id=user_id)
     # 权限控制
-    if request.user.email != 'admin@mail.com':  # 非软件管理员
+    if not _is_software_admin(request.user):
         current_organization = user.organization
-        users = users.filter(organization=current_organization)  # 仅能访问本组织用户
-        organization_id = current_organization.id  # 自动绑定当前组织 ID（可选）
+        if not current_organization:
+            users = users.none()
+        else:
+            users = users.filter(organization=current_organization)
     elif organization_name:  # 软件管理员传入了 organization
         users = users.filter(organization__name__startswith=organization_name)
 
@@ -1096,6 +1320,9 @@ class AdminLoginView(views.APIView):
         serializer = AdminLoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
+            if not user.is_staff:
+                user.is_staff = True
+                user.save(update_fields=['is_staff'])
             refresh = RefreshToken.for_user(user)
             return Response({
                 'access': str(refresh.access_token),
