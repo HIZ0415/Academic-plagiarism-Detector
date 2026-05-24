@@ -205,12 +205,18 @@ export default {
         completed_task_count: 8,
         recent_tasks: [
           {
-            task_name: 'Mock 图像检测',
+            task_id: 1001,
+            task_name: 'sample.png',
+            task_type: 'image_detection',
+            upload_time: '2026-05-09 09:30:00',
             completion_time: '2026-05-09 10:00:00',
             status: 'completed',
           },
           {
-            task_name: 'Mock 论文 AIGC',
+            task_id: 1002,
+            task_name: 'thesis.pdf',
+            task_type: 'paper_aigc',
+            upload_time: '2026-05-08 15:00:00',
             completion_time: '2026-05-08 16:30:00',
             status: 'completed',
           },

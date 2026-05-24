@@ -56,8 +56,13 @@ def send_task_completion_notification(user, task_id):
         'completion_time': current_time
     }
 
-    # # wyt shit here
-    # send_ai_detection_complete_notification(user.id, user.username,task_id)
+    try:
+        from core.models import DetectionTask
+        from core.util import notify_detection_task_completed
+        task = DetectionTask.objects.select_related("user").get(pk=task_id)
+        notify_detection_task_completed(task)
+    except Exception:
+        pass
 
     # 发送通知到 WebSocket 群组
     async_to_sync(channel_layer.group_send)(

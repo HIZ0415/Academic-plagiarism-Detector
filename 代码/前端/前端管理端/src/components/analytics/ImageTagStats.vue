@@ -2,7 +2,7 @@
   <v-card class="mb-6 chart-card" elevation="2">
     <v-card-title class="text-h5 font-weight-bold primary--text py-4">
       <v-icon large color="primary" class="mr-2">mdi-chart-pie</v-icon>
-      图像标签统计分析
+      检测类型统计
     </v-card-title>
     <v-card-text class="pa-4">
       <v-row>
@@ -190,7 +190,7 @@ const updateChart = (data: Record<string, number>) => {
     },
     series: [
       {
-        name: '标签数量',
+        name: '任务数量',
         type: 'pie',
         radius: ['45%', '75%'],
         center: ['40%', '50%'],

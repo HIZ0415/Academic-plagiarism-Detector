@@ -3,7 +3,7 @@
     <div class="d-flex align-center flex-wrap ga-2 mb-4">
       <v-btn icon="mdi-arrow-left" variant="text" @click="router.back()" />
       <div>
-        <h1 class="text-h4 font-weight-bold mb-0">鉴伪报告</h1>
+        <h1 class="text-h4 font-weight-bold mb-0">综合鉴伪报告</h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
           <span v-if="batchSessionId">批次 {{ shortBatch(batchSessionId) }}</span>
           <span v-if="batchSessionId && focusedTaskId"> · </span>
@@ -323,6 +323,7 @@ import platform from '@/api/platform'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { savePdfFromAxiosResponse } from '@/utils/downloadPdf'
 import { API_BASE_URL } from '@/api/request'
+import { formatBatchSessionLabel } from '@shared/batchSessionId.ts'
 
 type SidebarKey = 'batch' | 'overview' | 'image' | 'paper' | 'review' | 'manual'
 type FusionTask = {
@@ -391,8 +392,7 @@ const sidebarTasks = computed((): FusionTask[] => {
 })
 
 function shortBatch(id: string) {
-  if (!id) return '—'
-  return id.length > 18 ? `${id.slice(0, 10)}…${id.slice(-6)}` : id
+  return formatBatchSessionLabel(id).short
 }
 
 function riskLevelLabel(level: string | undefined) {
@@ -497,7 +497,7 @@ async function refreshPage() {
   focusedTaskId.value = qTask
 
   if (!batchSessionId.value && !qTask) {
-    pageError.value = '请从检测历史或批量提交完成页进入鉴伪报告'
+    pageError.value = '请从检测历史或批量提交完成页进入综合鉴伪报告'
     return
   }
 
@@ -537,7 +537,7 @@ function downloadHtmlSnapshot() {
     task_id: focusedTaskId.value,
     sections: taskSections.value,
   }
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>鉴伪报告</title></head><body><pre>${JSON.stringify(payload, null, 2)}</pre></body></html>`
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>综合鉴伪报告</title></head><body><pre>${JSON.stringify(payload, null, 2)}</pre></body></html>`
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)

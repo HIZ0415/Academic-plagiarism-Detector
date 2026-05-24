@@ -4,20 +4,21 @@
       <v-icon large color="primary" class="mr-2">mdi-office-building</v-icon>
       组织排行榜
     </v-card-title>
+    <v-card-subtitle class="px-4 pb-2">全平台组织按任务量排序，统计各组织图像检测造假情况。</v-card-subtitle>
     <v-card-text class="pa-4">
       <v-table class="org-table">
         <thead>
           <tr>
-            <th class="text-left">排名</th>
-            <th class="text-left">组织名称</th>
-            <th class="text-right">总任务数</th>
-            <th class="text-right">总图片数</th>
-            <th class="text-right">造假数量</th>
-            <th class="text-right">造假比例</th>
+            <th class="text-left col-rank">排名</th>
+            <th class="text-left col-name">组织名称</th>
+            <th class="text-right col-num">总任务数</th>
+            <th class="text-right col-num">已检图片数</th>
+            <th class="text-right col-num">造假数量</th>
+            <th class="text-right col-num">造假比例</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(org, index) in organizations" :key="org.organization">
+          <tr v-for="(org, index) in organizations" :key="org.organization_name">
             <td>{{ index + 1 }}</td>
             <td>{{ org.organization_name }}</td>
             <td class="text-right">{{ org.total_tasks }}</td>
@@ -25,7 +26,7 @@
             <td class="text-right">{{ org.fake_count }}</td>
             <td class="text-right">
               <v-chip :color="getFakeRatioColor(org.fake_ratio)" text-color="white" size="small">
-                {{ (org.fake_ratio * 100).toFixed(1) }}%
+                {{ formatFakeRatioPercent(org.fake_ratio) }}
               </v-chip>
             </td>
           </tr>
@@ -39,12 +40,26 @@
 import { ref, onMounted } from 'vue'
 import analyticsApi from '@/api/analytics'
 
-const organizations = ref<any[]>([])
+interface RankingRow {
+  organization_name: string
+  total_tasks: number
+  total_images: number
+  fake_count: number
+  fake_ratio: number
+}
+
+const organizations = ref<RankingRow[]>([])
+
+const formatFakeRatioPercent = (ratio: number): string => {
+  const pct = ratio <= 1 ? ratio * 100 : ratio
+  return `${pct.toFixed(1)}%`
+}
 
 const getFakeRatioColor = (ratio: number): string => {
-  if (ratio >= 0.5) return 'error'
-  if (ratio >= 0.3) return 'warning'
-  if (ratio >= 0.1) return 'info'
+  const normalized = ratio <= 1 ? ratio : ratio / 100
+  if (normalized >= 0.5) return 'error'
+  if (normalized >= 0.3) return 'warning'
+  if (normalized >= 0.1) return 'info'
   return 'success'
 }
 
@@ -52,10 +67,7 @@ const fetchOrganizationsData = async () => {
   try {
     const res = await analyticsApi.getTopOrganizations()
     if (res.data && Array.isArray(res.data)) {
-      organizations.value = res.data.map(org => ({
-        ...org,
-        fake_ratio: org.fake_count / (org.total_images || 1)
-      }))
+      organizations.value = res.data
     }
   } catch (error) {
     console.error('获取组织排行榜数据失败:', error)
@@ -103,16 +115,24 @@ onMounted(() => {
   background: #555;
 }
 
-.sticky-header {
-  position: sticky;
-  top: 0;
-  background-color: white;
-  z-index: 1;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-}
-
 .org-table {
   width: 100%;
+}
+
+.org-table th {
+  white-space: nowrap;
+}
+
+.org-table .col-rank {
+  width: 56px;
+}
+
+.org-table .col-name {
+  min-width: 120px;
+}
+
+.org-table .col-num {
+  min-width: 88px;
 }
 
 @media (max-width: 600px) {
@@ -120,4 +140,4 @@ onMounted(() => {
     max-height: 400px;
   }
 }
-</style> 
+</style>

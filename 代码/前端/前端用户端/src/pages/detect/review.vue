@@ -5,26 +5,11 @@
       <v-card-subtitle class="text-body-2 text-wrap mt-1">
         对同行评审（Review）<strong>意见文本</strong>做自动检测；输入为在线文本或 <strong>.txt</strong>（非论文 PDF）。
       </v-card-subtitle>
-      <div class="d-flex flex-wrap align-center ga-2 mt-3">
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-upload" class="text-none" :to="{ path: '/upload', query: { section: 'submit' } }">
-          新检测（批量提交）
-        </v-btn>
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
-          人工审核申请
-        </v-btn>
-        <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
-      </div>
     </v-card-item>
     <v-card-item v-else class="pb-0">
       <v-card-subtitle class="text-body-2 text-wrap">
         Review 文本自动检测：可在此提交或查看历史任务结果；同批送检也可在「批量提交」标签粘贴 Review。
       </v-card-subtitle>
-      <div class="d-flex flex-wrap align-center ga-2 mt-2">
-        <v-btn variant="tonal" color="primary" size="small" class="text-none" :to="{ path: '/upload', query: { section: 'submit' } }">
-          去批量提交
-        </v-btn>
-        <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
-      </div>
     </v-card-item>
 
     <v-card-text>
@@ -202,6 +187,7 @@ import {
   type ReviewDetectionResult,
   type ReviewDetectionStatus,
 } from '@/api/reviewDetection'
+import { newBatchSessionId } from '@shared/batchSessionId.ts'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 import { useDetectionMode } from '@/composables/useDetectionMode'
@@ -392,6 +378,7 @@ async function submit() {
       file: file || undefined,
       text: file ? undefined : text,
       detection_mode: detectionModePayload(),
+      batch_session_id: newBatchSessionId(),
     })
     lastResponse.value = res.data as Record<string, unknown>
     snackbar.showMessage('Review 检测任务已提交', 'success')

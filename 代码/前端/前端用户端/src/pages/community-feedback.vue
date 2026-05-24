@@ -32,7 +32,9 @@
         </v-list-item>
       </v-list>
       <v-card-text v-else>
-        <v-alert type="info" variant="tonal">暂无消息</v-alert>
+        <v-alert type="info" variant="tonal">
+          {{ emptyMessage }}
+        </v-alert>
       </v-card-text>
     </v-card>
 
@@ -73,6 +75,16 @@ const filteredItems = computed(() => {
   if (tab.value === 'review') return items.value.filter((i) => i.category === 'review')
   if (tab.value === 'report') return items.value.filter((i) => i.category === 'report')
   return items.value.filter((i) => i.category === 'admin')
+})
+
+const emptyMessage = computed(() => {
+  if (tab.value === 'detection') {
+    return '暂无检测完成通知。提交检测并任务完成后，结果会出现在此；也可在侧栏「检测历史」查看全部记录。'
+  }
+  if (tab.value === 'review') return '暂无人工审核相关消息。'
+  if (tab.value === 'report') return '暂无举报处理消息。'
+  if (tab.value === 'admin') return '暂无管理员通知。'
+  return '暂无消息'
 })
 
 function categoryLabel(c: string) {

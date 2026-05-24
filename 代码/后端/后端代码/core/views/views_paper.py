@@ -126,6 +126,24 @@ def _complete_text_task(task, result, *, meta_loader, meta_saver, file_id, folde
     task.error_message = ""
     task.save(update_fields=["status", "completion_time", "error_message"])
 
+    try:
+        from core.utils.report_generator import generate_unified_task_report
+        generate_unified_task_report(task)
+        Log.objects.create(
+            user=task.user,
+            operation_type="report_generation",
+            related_model="DetectionTask",
+            related_id=task.id,
+        )
+    except Exception:
+        pass
+
+    try:
+        from core.util import notify_detection_task_completed
+        notify_detection_task_completed(task)
+    except Exception:
+        pass
+
 
 def _fail_text_task(task, message):
     task.status = "failed"

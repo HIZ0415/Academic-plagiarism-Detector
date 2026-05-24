@@ -25,8 +25,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.models import DetectionTask, Log
-from core.util import send_notification
-from core.models import Notification
+from core.util import notify_detection_task_completed
 
 logger = logging.getLogger(__name__)
 
@@ -106,14 +105,7 @@ def _complete_task(task: DetectionTask):
 
     # 发系统通知
     try:
-        send_notification(
-            receiver_id=task.user_id,
-            receiver_name=task.user.username,
-            category=Notification.SYSTEM,
-            title="检测已完成",
-            content=f"您的任务「{task.task_name}」已完成，请查看结果。",
-            url=f"/task/{task.id}",
-        )
+        notify_detection_task_completed(task)
     except Exception as exc:
         logger.warning("发送任务完成通知失败: %s", exc)
 

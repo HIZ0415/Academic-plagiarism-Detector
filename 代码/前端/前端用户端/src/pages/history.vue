@@ -20,8 +20,16 @@
                 <v-col cols="12" md="3" class="text-body-2">状态：{{ getStatus(effectiveDetailStatus) }}</v-col>
                 <v-col cols="12" md="3" class="text-body-2">进度：{{ detailTask.progress || 0 }}%</v-col>
                 <v-col cols="12" md="3" class="text-body-2">时间：{{ formatDateTime(detailTask.upload_time) || '暂无' }}</v-col>
-                <v-col v-if="detailTask.batch_session_id" cols="12" class="text-body-2 mt-2">
-                  统一检测批次：{{ detailTask.batch_session_id }}（与同批其他子任务关联）
+                <v-col cols="12" class="text-body-2 mt-2">
+                  <span class="text-medium-emphasis">批次编号：</span>
+                  <template v-if="detailTask.batch_session_id">
+                    <code class="batch-id-full">{{ detailTask.batch_session_id }}</code>
+                    <span class="text-caption text-medium-emphasis ms-2">（{{ formatBatchLabel(detailTask.batch_session_id).short }}）</span>
+                    <v-btn size="x-small" variant="text" class="text-none ms-1" @click="filterByBatch(detailTask.batch_session_id!)">
+                      查看同批任务
+                    </v-btn>
+                  </template>
+                  <span v-else class="text-medium-emphasis">单独提交（未归入统一批次）</span>
                 </v-col>
                 <v-col v-if="manualReviewWorkflowPayload?.found" cols="12" class="text-body-2 mt-2">
                   人工审核申请单：{{ manualReviewWorkflowPayload.review_request_id }}；
@@ -245,8 +253,9 @@
     </v-tabs>
 
     <v-alert v-if="batchSessionFilter" type="info" variant="tonal" density="compact" class="mt-3 mb-2">
-      当前按<strong>统一检测批次</strong>筛选：{{ batchSessionFilter }}。列表仅显示该批次的子任务。
-      点击「清除批次筛选」可恢复完整列表。
+      当前按<strong>批次编号</strong>筛选：
+      <code class="batch-id-full">{{ batchSessionFilter }}</code>
+      <span class="text-caption ms-1">（{{ formatBatchLabel(batchSessionFilter).short }}）</span>
       <v-btn size="small" variant="text" class="ms-2" @click="clearBatchFilter">清除批次筛选</v-btn>
     </v-alert>
 
@@ -325,7 +334,7 @@
           <div class="d-flex justify-center gap-2">
             <v-btn size="small" color="primary" variant="text" @click="handleNext(item)"
               :disabled="!canEnterDetail(item)">
-              查看报告
+              任务详情
             </v-btn>
             <v-btn
               size="small"
@@ -334,7 +343,7 @@
               :disabled="item.status !== 'completed'"
               @click="goComprehensiveReport(item)"
             >
-              鉴伪报告
+              综合报告
             </v-btn>
             <v-btn size="small" color="secondary" variant="text" @click="goRepeatDetection(item)">
               再次检测
@@ -347,7 +356,23 @@
         </template>
 
         <template v-slot:item.batch_session_id="{ item }">
-          <span class="text-caption text-medium-emphasis">{{ shortBatchId(item.batch_session_id) }}</span>
+          <div class="d-flex justify-center">
+            <v-tooltip v-if="item.batch_session_id" :text="item.batch_session_id" location="top">
+              <template #activator="{ props: tipProps }">
+                <v-chip
+                  v-bind="tipProps"
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  class="batch-chip text-none font-mono"
+                  @click.stop="filterByBatch(item.batch_session_id!)"
+                >
+                  {{ formatBatchLabel(item.batch_session_id).short }}
+                </v-chip>
+              </template>
+            </v-tooltip>
+            <span v-else class="text-caption text-disabled">单独任务</span>
+          </div>
         </template>
 
         <template v-slot:top>
@@ -383,6 +408,7 @@ import publisher from '@/api/publisher'
 import platform from '@/api/platform'
 import { getManualReviewApplicationByDetectionTask } from '@/api/manualReviewWorkflow'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
+import { formatBatchSessionLabel } from '@shared/batchSessionId.ts'
 import { savePdfFromAxiosResponse } from '@/utils/downloadPdf'
 
 const router = useRouter()
@@ -403,7 +429,7 @@ const PAPER_TASK_TYPES = ['paper_aigc', 'resource_check'] as const
 const headers = [
   { title: '任务编号', key: 'task_id', align: 'center' as const, width: '120px' },
   { title: '论文子类', key: 'task_type', align: 'center' as const, width: '120px' },
-  { title: '批次', key: 'batch_session_id', align: 'center' as const, width: '130px' },
+  { title: '批次编号', key: 'batch_session_id', align: 'center' as const, width: '168px' },
   { title: '上传时间', key: 'upload_time', align: 'center' as const, width: '180px' },
   { title: '完成时间', key: 'completion_time', align: 'center' as const, width: '180px' },
   { title: '检测状态', key: 'status', align: 'center' as const, width: '200px' },
@@ -700,9 +726,14 @@ const hasActiveFilters = computed(() => {
 
 const batchSessionFilter = computed(() => String(route.query.batch_session_id || '').trim())
 
-function shortBatchId(id?: string) {
-  if (!id) return '—'
-  return id.length > 18 ? `${id.slice(0, 10)}…${id.slice(-6)}` : id
+function formatBatchLabel(id?: string) {
+  return formatBatchSessionLabel(id)
+}
+
+function filterByBatch(id: string) {
+  const batchId = String(id || '').trim()
+  if (!batchId) return
+  router.push({ path: '/history', query: { ...route.query, batch_session_id: batchId } })
 }
 
 function formatTaskId(id?: string | number) {
@@ -1152,5 +1183,17 @@ const formatDateTime = (dateTime: string) => {
   transform: translateX(-50%);
   z-index: 1000;
   min-width: 300px;
+}
+
+.batch-id-full {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+.batch-chip {
+  max-width: 156px;
+  font-size: 0.6875rem !important;
+  letter-spacing: 0.01em;
 }
 </style>

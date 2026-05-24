@@ -22,8 +22,8 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
-from core.util import send_notification
+from django.db.models import Q, Count
+from core.util import send_notification, detection_task_type_label
 from core.models import Notification
 
 
@@ -111,14 +111,13 @@ class AdminDashboardView(APIView):
 @permission_classes([IsAdminUser])
 def dashboard_img_tag(request):
     """
-    返回符合对应Tag的ImageUpload数量统计（包含值为0的tag）
-    参数: startTime, endTime（ISO 8601格式）
-    示例响应: {"Biology": 1, "Medicine": 5, "Chemistry": 50, "Graphics": 2, "Other": 3, "Math": 0}
+    返回各检测类型的任务数量统计（时间范围内）。
+    参数: startTime, endTime（ISO 8601 格式）
+    示例响应: {"图像检测": 12, "论文 AIGC 检测": 5, ...}
     """
     start_time = request.query_params.get('startTime')
     end_time = request.query_params.get('endTime')
 
-    # 默认时间范围为最近一年
     now = timezone.now()
     default_start = now.replace(year=now.year - 1)
     default_end = now
@@ -136,26 +135,32 @@ def dashboard_img_tag(request):
     except ValueError:
         return Response({'error': 'Invalid datetime format'}, status=400)
 
-    # 获取所有预设 tag（从 FileManagement 中提取）
-    from core.models import FileManagement
-    TAG_CHOICES = dict(FileManagement.TAG_CHOICES)  # [('Biology', 'Biology'), ...]
+    tasks = DetectionTask.objects.filter(upload_time__range=[start_time, end_time])
+    if not _is_software_admin(request.user):
+        tasks = tasks.filter(organization=request.user.organization)
 
-    # 初始化所有 tag 的计数为 0
-    tag_counts = {tag: 0 for tag in TAG_CHOICES.keys()}
+    type_counts = {
+        detection_task_type_label(task_type): 0
+        for task_type, _ in DetectionTask.TASK_TYPE_CHOICES
+    }
 
-    # 查询在时间范围内的所有 FileManagement 数据并预取 image_uploads
-    file_managements = FileManagement.objects.filter(
-        upload_time__range=[start_time, end_time]
-    ).prefetch_related('image_uploads')
+    for row in tasks.values('task_type').annotate(count=Count('id')):
+        label = detection_task_type_label(row['task_type'])
+        type_counts[label] = row['count']
 
-    # 统计每个 tag 下的图片数量
-    for fm in file_managements:
-        count = fm.image_uploads.count()
-        tag = fm.get_tag_display()  # 获取 human-readable tag 名称
-        if tag in tag_counts:
-            tag_counts[tag] += count
+    return Response(type_counts)
 
-    return Response(tag_counts)
+
+def _is_software_admin(user):
+    return user.email == 'admin@mail.com' or (user.is_staff and user.organization is None)
+
+
+def _image_fake_stats_for_tasks(tasks):
+    images = ImageUpload.objects.filter(detection_task__in=tasks, isDetect=True)
+    total_images = images.count()
+    fake_count = images.filter(isFake=True).count()
+    fake_ratio = round(fake_count / total_images, 4) if total_images else 0.0
+    return total_images, fake_count, fake_ratio
 
 
 @api_view(['GET'])
@@ -171,24 +176,15 @@ def top_publishers_with_fake_ratio(request):
 
     result = []
 
-    for user in publishers:
-        # 获取该用户的所有任务
-        tasks = DetectionTask.objects.filter(user=user)
-        # 获取所有相关图片
-        images = ImageUpload.objects.filter(detection_task__in=tasks)
-        total_images = images.count()
-
-        if total_images == 0:
-            fake_ratio = 0
-        else:
-            fake_count = images.filter(isFake=True).count()
-            fake_ratio = round(fake_count / total_images, 2)
+    for publisher in publishers:
+        tasks = DetectionTask.objects.filter(user=publisher)
+        total_images, fake_count, fake_ratio = _image_fake_stats_for_tasks(tasks)
 
         result.append({
-            "username": user.username,
+            "username": publisher.username,
             "total_tasks": tasks.count(),
             "total_images": total_images,
-            "fake_count": images.filter(isFake=True).count(),
+            "fake_count": fake_count,
             "fake_ratio": fake_ratio
         })
 
@@ -221,17 +217,7 @@ def top_organizations_with_fake_ratio(request):
 
         # 获取该组织下所有 publisher 的任务
         tasks = DetectionTask.objects.filter(user__in=publishers)
-
-        # 获取这些任务下的所有图片
-        images = ImageUpload.objects.filter(detection_task__in=tasks)
-        total_images = images.count()
-
-        if total_images == 0:
-            fake_count = 0
-            fake_ratio = 0.0
-        else:
-            fake_count = images.filter(isFake=True).count()
-            fake_ratio = round(fake_count / total_images, 2)
+        total_images, fake_count, fake_ratio = _image_fake_stats_for_tasks(tasks)
 
         result.append({
             "organization_name": org.name,

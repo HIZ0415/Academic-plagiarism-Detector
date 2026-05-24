@@ -5,7 +5,7 @@ export default {
   getAdminDashboard() {
     return http.get<AdminDashboardResponse>('/admin_dashboard/')
   },
-  // 获取图像标签统计
+  // 获取检测类型任务统计
   getImgTag: (params: { startTime?: string; endTime?: string }) => {
     return http.get('/dashboard/img_tag/', { params })
   },

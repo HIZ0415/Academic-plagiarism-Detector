@@ -1,18 +1,11 @@
 <template>
   <v-container class="py-4 detection-hub">
-    <v-row class="mb-2" align="center">
-      <v-col cols="12" md="8">
-        <div class="text-h4 font-weight-bold mb-1">学术检测</div>
-        <div class="text-body-2 text-medium-emphasis">
-          图像、论文 PDF、Review 文本等检测均在本页完成：通过下方标签切换<strong>批量提交</strong>、<strong>论文工作台</strong>与 <strong>Review 结果</strong>。
-        </div>
-      </v-col>
-      <v-col cols="12" md="4" class="d-flex justify-end">
-        <v-chip :color="USE_MOCK ? 'warning' : 'success'" variant="tonal">
-          {{ USE_MOCK ? 'Mock 模式' : '后端模式' }}
-        </v-chip>
-      </v-col>
-    </v-row>
+    <div class="mb-4">
+      <div class="text-h4 font-weight-bold mb-1">学术检测</div>
+      <div class="text-body-2 text-medium-emphasis">
+        图像、论文 PDF、Review 文本等检测均在本页完成：通过下方标签切换<strong>批量提交</strong>、<strong>论文检测</strong>与 <strong>Review 检测</strong>。
+      </div>
+    </div>
 
     <v-tabs v-model="section" color="primary" class="mb-4" density="comfortable">
       <v-tab value="submit" class="text-none">批量提交</v-tab>
@@ -23,7 +16,7 @@
     <v-window v-model="section" class="detection-hub-window">
       <v-window-item value="submit">
     <v-alert v-if="route.query.task_id" type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
-      正在基于历史任务（编号 {{ route.query.task_id }}）发起再次检测。旧任务结果请回到检测历史点击「查看报告」；本页只用于重新选择文件或粘贴 Review 后创建新检测。
+      正在基于历史任务（编号 {{ route.query.task_id }}）发起再次检测。旧任务结果请回到检测历史点击「任务详情」；本页只用于重新选择文件或粘贴 Review 后创建新检测。
     </v-alert>
 
     <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-body-2">
@@ -106,7 +99,7 @@
             prepend-icon="mdi-clipboard-text-outline"
             :to="{ path: '/comprehensive-report', query: { batch_session_id: batchSessionId } }"
           >
-            查看鉴伪报告
+            查看综合报告
           </v-btn>
         </v-col>
       </v-row>
@@ -124,7 +117,7 @@
           其他 {{ batchSummary.counts.unknown }}。
         </div>
         <div class="text-medium-emphasis">
-          同一批次编号会关联本批各子任务，便于在检测历史、鉴伪报告中按批查看，以及发起人工审核时引用整批上下文。
+          同一批次编号会关联本批各子任务，便于在检测历史、综合报告中按批查看，以及发起人工审核时引用整批上下文。
         </div>
       </v-card-text>
     </v-card>
@@ -193,6 +186,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import PaperDetectWorkbench from '@/pages/detect/paper.vue'
+import { newBatchSessionId, formatBatchSessionLabel } from '@shared/batchSessionId.ts'
 import ReviewDetectWorkbench from '@/pages/detect/review.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSnackbarStore } from '@/stores/snackbar'
@@ -276,7 +270,7 @@ const running = ref(false)
 const batchSessionId = ref('')
 
 const headers = [
-  { title: '批次', key: 'batchSessionId', align: 'center' as const, width: 120 },
+  { title: '批次编号', key: 'batchSessionId', align: 'center' as const, width: 140 },
   { title: '文件名', key: 'name', align: 'start' as const },
   { title: '类型', key: 'type', align: 'center' as const, width: 120 },
   { title: '进度', key: 'progress', align: 'center' as const, width: 220 },
@@ -318,8 +312,7 @@ const batchSummary = computed(() => {
 })
 
 function shortBatch(id: string) {
-  if (!id) return '—'
-  return id.length > 14 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id
+  return formatBatchSessionLabel(id).short
 }
 
 function detectType(file: File): ResourceType {
@@ -419,7 +412,7 @@ function nowString() {
 }
 
 function newBatchId() {
-  return `batch-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  return newBatchSessionId()
 }
 
 function saveLocalTasks(rowsToSave: QueueRow[]) {

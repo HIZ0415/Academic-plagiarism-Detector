@@ -2,18 +2,19 @@
   <v-card class="mb-6 chart-card scrollable-card" elevation="2">
     <v-card-title class="text-h5 font-weight-bold primary--text py-4">
       <v-icon large color="primary" class="mr-2">mdi-account-group</v-icon>
-      编辑排行榜
+      本组织成员排行
     </v-card-title>
+    <v-card-subtitle class="px-4 pb-2">按任务量排序，统计本组织内成员图像检测造假情况。</v-card-subtitle>
     <v-card-text class="pa-4">
       <v-table class="publisher-table">
         <thead>
           <tr>
-            <th class="text-left">排名</th>
-            <th class="text-left">用户名</th>
-            <th class="text-right">总任务数</th>
-            <th class="text-right">总图片数</th>
-            <th class="text-right">造假数量</th>
-            <th class="text-right">造假比例</th>
+            <th class="text-left col-rank">排名</th>
+            <th class="text-left col-name">用户名</th>
+            <th class="text-right col-num">总任务数</th>
+            <th class="text-right col-num">已检图片数</th>
+            <th class="text-right col-num">造假数量</th>
+            <th class="text-right col-num">造假比例</th>
           </tr>
         </thead>
         <tbody>
@@ -25,7 +26,7 @@
             <td class="text-right">{{ publisher.fake_count }}</td>
             <td class="text-right">
               <v-chip :color="getFakeRatioColor(publisher.fake_ratio)" text-color="white" size="small">
-                {{ (publisher.fake_ratio * 100).toFixed(1) }}%
+                {{ formatFakeRatioPercent(publisher.fake_ratio) }}
               </v-chip>
             </td>
           </tr>
@@ -39,12 +40,26 @@
 import { ref, onMounted } from 'vue'
 import analyticsApi from '@/api/analytics'
 
-const publishers = ref<any[]>([])
+interface RankingRow {
+  username: string
+  total_tasks: number
+  total_images: number
+  fake_count: number
+  fake_ratio: number
+}
+
+const publishers = ref<RankingRow[]>([])
+
+const formatFakeRatioPercent = (ratio: number): string => {
+  const pct = ratio <= 1 ? ratio * 100 : ratio
+  return `${pct.toFixed(1)}%`
+}
 
 const getFakeRatioColor = (ratio: number): string => {
-  if (ratio >= 0.5) return 'error'
-  if (ratio >= 0.3) return 'warning'
-  if (ratio >= 0.1) return 'info'
+  const normalized = ratio <= 1 ? ratio : ratio / 100
+  if (normalized >= 0.5) return 'error'
+  if (normalized >= 0.3) return 'warning'
+  if (normalized >= 0.1) return 'info'
   return 'success'
 }
 
@@ -52,10 +67,7 @@ const fetchPublishersData = async () => {
   try {
     const res = await analyticsApi.getTopPublishers()
     if (res.data && Array.isArray(res.data)) {
-      publishers.value = res.data.map(p => ({
-        ...p,
-        fake_ratio: p.fake_count / (p.total_images || 1)
-      }))
+      publishers.value = res.data
     }
   } catch (error) {
     console.error('获取排行榜数据失败:', error)
@@ -103,16 +115,24 @@ onMounted(() => {
   background: #555;
 }
 
-.sticky-header {
-  position: sticky;
-  top: 0;
-  background-color: white;
-  z-index: 1;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-}
-
 .publisher-table {
   width: 100%;
+}
+
+.publisher-table th {
+  white-space: nowrap;
+}
+
+.publisher-table .col-rank {
+  width: 56px;
+}
+
+.publisher-table .col-name {
+  min-width: 120px;
+}
+
+.publisher-table .col-num {
+  min-width: 88px;
 }
 
 @media (max-width: 600px) {
@@ -120,4 +140,4 @@ onMounted(() => {
     max-height: 400px;
   }
 }
-</style> 
+</style>

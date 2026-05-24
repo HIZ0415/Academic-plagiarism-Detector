@@ -5,23 +5,11 @@
       <v-card-subtitle class="text-body-2 text-wrap mt-1">
         论文检测<strong>仅支持 PDF</strong>。含「全篇 AIGC」与「学术资源规范性」两类检测，结果分别展示在对应标签页中。
       </v-card-subtitle>
-      <div class="d-flex flex-wrap align-center ga-2 mt-3">
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
-          人工审核申请
-        </v-btn>
-        <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
-      </div>
     </v-card-item>
     <v-card-item v-else class="pb-0">
       <v-card-subtitle class="text-body-2 text-wrap">
         论文 PDF 专项：AIGC 段落分析 / 参考文献规范性（与「批量提交」中的论文任务互补；批量提交侧重同批图像+论文+Review）。
       </v-card-subtitle>
-      <div class="d-flex flex-wrap align-center ga-2 mt-2">
-        <v-btn color="primary" variant="tonal" prepend-icon="mdi-gavel" class="text-none" to="/annual">
-          人工审核申请
-        </v-btn>
-        <v-btn variant="text" size="small" class="text-none" to="/history">检测历史</v-btn>
-      </div>
     </v-card-item>
 
     <v-card-text>
@@ -106,7 +94,7 @@
             <div class="text-caption mt-2">总体进度：{{ overallProgress }}%</div>
             <v-divider class="my-3" />
             <div class="text-caption text-medium-emphasis">
-              <template v-if="activeTab === 'aigc'">完成后请查看下方「段落分析」；若对自动结论有疑义，可通过上方「人工审核申请」进入发布者侧流程。</template>
+              <template v-if="activeTab === 'aigc'">完成后请查看下方「段落分析」；若对自动结论有疑义，可在侧栏「人工审核申请」中发起复核。</template>
               <template v-else>完成后请查看下方「学术资源问题分析」；本视图不展示 AIGC 段落表。</template>
             </div>
           </v-card>
@@ -249,6 +237,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import paperApi from '@/api/paper'
+import { newBatchSessionId } from '@shared/batchSessionId.ts'
 import type { ResourceIssue, TaskStatus } from '@/types/core'
 import { mockAigcFeaturesEnabled } from '@/utils/mockMode'
 import { useDetectionMode } from '@/composables/useDetectionMode'
@@ -444,6 +433,7 @@ const submitBatchTasks = async () => {
   }))
 
   isSubmitting.value = true
+  const batchSessionId = newBatchSessionId()
   try {
     for (let i = 0; i < limitedFiles.length; i += 1) {
       const row = tasks.value[i]
@@ -460,7 +450,7 @@ const submitBatchTasks = async () => {
         row.progress = 100
       } else {
         const taskName = createTaskName(i)
-        const modeOpts = { detection_mode: detectionModePayload() }
+        const modeOpts = { detection_mode: detectionModePayload(), batch_session_id: batchSessionId }
         const submitRes =
           tab === 'aigc'
             ? await paperApi.uploadAndSubmitAigcTask(file, taskName, modeOpts)
