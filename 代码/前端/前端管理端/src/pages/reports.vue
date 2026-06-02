@@ -25,7 +25,15 @@
     <v-card>
       <v-data-table :headers="headers" :items="reports" :loading="loading" density="comfortable">
         <template #item.status="{ item }">
-          <v-chip size="small" :color="item.status === 'pending' ? 'warning' : 'success'">{{ item.status }}</v-chip>
+          <div class="d-flex align-center ga-2">
+            <v-chip size="small" :color="statusColor(item.status)">{{ statusLabel(item.status) }}</v-chip>
+            <v-chip v-if="item.duplicate_count > 1" size="x-small" color="info" variant="tonal">
+              合并 {{ item.duplicate_count }} 条
+            </v-chip>
+          </div>
+        </template>
+        <template #item.admin_resolution="{ item }">
+          <span class="text-body-2">{{ item.admin_resolution || '—' }}</span>
         </template>
         <template #item.actions="{ item }">
           <v-btn
@@ -97,9 +105,24 @@ const headers = [
   { title: '对象', key: 'target_type' },
   { title: '目标 ID', key: 'target_id' },
   { title: '状态', key: 'status' },
+  { title: '处理说明', key: 'admin_resolution', sortable: false },
   { title: '时间', key: 'created_at' },
   { title: '操作', key: 'actions', sortable: false },
 ]
+
+function statusLabel(status: string) {
+  if (status === 'pending') return '待处理'
+  if (status === 'resolved') return '已处理'
+  if (status === 'dismissed') return '已驳回'
+  return status || '未知'
+}
+
+function statusColor(status: string) {
+  if (status === 'pending') return 'warning'
+  if (status === 'resolved') return 'success'
+  if (status === 'dismissed') return 'grey'
+  return 'default'
+}
 
 async function load() {
   loading.value = true
@@ -129,10 +152,10 @@ async function submitHandle() {
   if (!current.value) return
   handling.value = true
   try {
-    await platform.handleReport(current.value.id, { action: action.value, resolution: resolution.value })
-    snackbar.showMessage('已处理', 'success')
+    const res = await platform.handleReport(current.value.id, { action: action.value, resolution: resolution.value })
+    snackbar.showMessage(res.data?.message || '处理完成', 'success')
     dialog.value = false
-    load()
+    await load()
   } catch {
     snackbar.showMessage('处理失败', 'error')
   } finally {
