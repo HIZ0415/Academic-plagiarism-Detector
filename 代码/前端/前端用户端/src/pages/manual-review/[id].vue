@@ -1125,15 +1125,15 @@ const degreeOptions = [
 const getDegreeColor = (value: number) => {
   switch (value) {
     case 1:
-      return 'success'
+      return 'error'
     case 2:
-      return 'info'
+      return 'warning'
     case 3:
       return 'yellow'
     case 4:
-      return 'warning'
+      return 'info'
     case 5:
-      return 'error'
+      return 'success'
     default:
       return 'grey'
   }

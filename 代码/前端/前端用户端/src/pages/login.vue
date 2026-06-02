@@ -118,7 +118,7 @@
           <!-- 注册表单 -->
           <template v-else>
             <v-text-field v-model="registerFormData.username" label="请输入用户名" variant="outlined" density="comfortable"
-              class="mb-4" prepend-inner-icon="mdi-account" :rules="[(v: string) => !!v || '用户名不能为空']"
+              class="mb-4" prepend-inner-icon="mdi-account" :rules="registerRules.username" counter="150"
               required></v-text-field>
 
             <v-text-field v-model="registerFormData.email" label="请输入邮箱" variant="outlined" density="comfortable"
@@ -352,6 +352,7 @@ const form = ref(null)
 const orgForm = ref(null)
 
 // 注册表单数据
+const REGISTER_USERNAME_MAX_LENGTH = 150
 const registerFormData = ref({
   username: '',
   email: '',
@@ -391,6 +392,10 @@ const loginRules = {
 }
 
 const registerRules = {
+  username: [
+    (v: string) => !!String(v || '').trim() || '用户名不能为空',
+    (v: string) => String(v || '').trim().length <= REGISTER_USERNAME_MAX_LENGTH || `用户名不能超过${REGISTER_USERNAME_MAX_LENGTH}个字符`
+  ],
   email: [
     (v: string) => !!v || '邮箱不能为空',
     (v: string) => /.+@.+\..+/.test(v) || '请输入有效的邮箱地址'
@@ -465,8 +470,10 @@ const isFormValid = computed(() => {
       password.value.length >= 6
   } else {
     const r = registerFormData.value
+    const username = String(r.username || '').trim()
     return !!(
-      r.username &&
+      username &&
+      username.length <= REGISTER_USERNAME_MAX_LENGTH &&
       r.email &&
       r.password &&
       r.password.length >= 6 &&
@@ -537,14 +544,14 @@ const handleSubmit = async () => {
         errorMessage = '请求超时，请确认 Django 已启动且地址正确'
       } else if (ax.code === 'ERR_NETWORK' || ax.message === 'Network Error') {
         errorMessage =
-          '无法连接后端：请在浏览器打开 http://127.0.0.1:8000/admin/ 若打不开说明 Django 未启动或已崩溃；查看仓库下 `.local-dev/logs/django.stderr.log`。一键脚本启动的用户端请确认 `.env` 里为 `VITE_API_URL=http://127.0.0.1:8000`，网页也请用 http://127.0.0.1:3000 访问'
+          '无法连接后端：请确认 Django 服务已启动、当前环境变量中的 API 地址配置正确，并查看仓库下 `.local-dev/logs/django.stderr.log` 获取详细错误信息。'
       }
       snackbar.showMessage(errorMessage, 'error')
     })
   } else {
     try {
       const response = await user.register({
-        username: registerFormData.value.username,
+        username: registerFormData.value.username.trim(),
         email: registerFormData.value.email,
         password: registerFormData.value.password,
         role: selectedRole.value,

@@ -1588,8 +1588,12 @@ def get_review_request_detail_admin(request, reviewRequest_id):
                 review_request = ReviewRequest.objects.get(id=reviewRequest_id)
 
         # 获取 imgs 数据
+        imgs_source = list(review_request.imgs.all())
+        if not imgs_source and getattr(review_request, 'detection_result', None) and review_request.detection_result.image_upload_id:
+            imgs_source = [review_request.detection_result.image_upload]
+
         imgs = []
-        for img in review_request.imgs.all():
+        for img in imgs_source:
             imgs.append({
                 "id": img.id,
                 "url": serialize_value(img.image, request) if img.image else None,
@@ -1644,8 +1648,16 @@ def get_review_request_detail(request, manual_review_id):
     review_request = manual_review.review_request
 
     # 获取 imgs 数据（来自 ManualReview 的 imgs 多对多关系）
+    imgs_source = list(manual_review.imgs.all())
+    if (
+        not imgs_source
+        and getattr(review_request, 'detection_result', None)
+        and review_request.detection_result.image_upload_id
+    ):
+        imgs_source = [review_request.detection_result.image_upload]
+
     imgs = []
-    for img in manual_review.imgs.all():
+    for img in imgs_source:
         imgs.append({
             "id": img.id,
             "url": serialize_value(img.image, request) if img.image else None,

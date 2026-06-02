@@ -1,9 +1,42 @@
+import json
+
 from rest_framework import serializers, views
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import BaseBackend
 from rest_framework import views, status
 from ..models import ReviewRequest, ManualReview, DetectionTask, User, InvitationCode
 from ..utils.report_generator import generate_manual_review_report
+
+
+PROFILE_TEXT_MAX_LENGTH = 200
+
+
+def _load_profile_payload(raw_profile):
+    text = str(raw_profile or '').strip()
+    if not text:
+        return {}
+    if text.startswith('{'):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return {'bio': text}
+
+
+def _dump_profile_payload(payload):
+    bio = str(payload.get('bio') or '').strip()
+    extra = {k: v for k, v in payload.items() if k != 'bio' and v not in (None, '', [], {})}
+    if extra:
+        if bio:
+            extra['bio'] = bio
+        return json.dumps(extra, ensure_ascii=False)
+    return bio
+
+
+def _profile_text(raw_profile):
+    return str(_load_profile_payload(raw_profile).get('bio') or '').strip()
 
 
 class EmailBackend(BaseBackend):
@@ -22,6 +55,12 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = get_user_model()
         fields = ['username', 'email', 'password', 'organization', 'role', 'invitation_code']
+
+    def validate_username(self, value):
+        username = str(value or '').strip()
+        if not username:
+            raise serializers.ValidationError('用户名不能为空。')
+        return username
 
     def validate_invitation_code(self, value):
         try:
@@ -121,12 +160,28 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         fields = ['username', 'email', 'role', 'profile', 'avatar']  # 这里加入了 profile 字段
 
     username = serializers.CharField(required=False)  # 使 `username` 可选
+    profile = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def validate_username(self, value):
+        username = str(value or '').strip()
+        if not username:
+            raise serializers.ValidationError('用户名不能为空。')
+        return username
+
+    def validate_profile(self, value):
+        text = str(value or '').strip()
+        if len(text) > PROFILE_TEXT_MAX_LENGTH:
+            raise serializers.ValidationError(f'个人简介不能超过{PROFILE_TEXT_MAX_LENGTH}个字符。')
+        return text
 
     def update(self, instance, validated_data):
         instance.username = validated_data.get('username', instance.username)
         instance.email = validated_data.get('email', instance.email)
         instance.role = validated_data.get('role', instance.role)
-        instance.profile = validated_data.get('profile', instance.profile)  # 更新 profile 字段
+        if 'profile' in validated_data:
+            profile_payload = _load_profile_payload(instance.profile)
+            profile_payload['bio'] = validated_data.get('profile', '')
+            instance.profile = _dump_profile_payload(profile_payload)
         instance.avatar = validated_data.get('avatar', instance.avatar)  # 更新头像
         instance.save()
         return instance
@@ -174,6 +229,7 @@ class TokenRefreshView(views.APIView):
 
 class UserDetailSerializer(serializers.ModelSerializer):
     organization_name = serializers.SerializerMethodField(read_only=True)  # 动态获取组织名称
+    profile = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = get_user_model()
@@ -182,6 +238,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
     def get_organization_name(self, obj):
         return obj.organization.name if obj.organization else None
+
+    def get_profile(self, obj):
+        return _profile_text(obj.profile)
 
 
 from rest_framework.permissions import IsAuthenticated
@@ -236,8 +295,14 @@ class AvatarUpdateView(views.APIView):
         serializer = AvatarUpdateSerializer(user, data=request.data)
 
         if serializer.is_valid():
-            serializer.save()  # 保存更新后的头像
-            return Response({"message": "Avatar updated successfully"}, status=status.HTTP_200_OK)
+            updated_user = serializer.save()
+            return Response(
+                {
+                    "message": "Avatar updated successfully",
+                    "avatar": updated_user.avatar.url if updated_user.avatar else None,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

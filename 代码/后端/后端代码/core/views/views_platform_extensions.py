@@ -43,6 +43,30 @@ DEFAULT_MODEL_CATALOG = {
 }
 
 
+def _load_user_profile_payload(raw_profile):
+    text = str(raw_profile or "").strip()
+    if not text:
+        return {}
+    if text.startswith("{"):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return {"bio": text}
+
+
+def _dump_user_profile_payload(payload):
+    bio = str(payload.get("bio") or "").strip()
+    extra = {k: v for k, v in payload.items() if k != "bio" and v not in (None, "", [], {})}
+    if extra:
+        if bio:
+            extra["bio"] = bio
+        return json.dumps(extra, ensure_ascii=False)
+    return bio
+
+
 def _ensure_model_catalog():
     obj, _ = DetectionModelConfig.objects.get_or_create(
         key="catalog",
@@ -90,13 +114,31 @@ def submit_feedback(request):
     if not is_like and not comment:
         return Response({"error": "is_like or comment is required"}, status=400)
 
+    if is_like and not comment:
+        existing_like = Feedback.objects.filter(
+            manual_review=mr,
+            user=request.user,
+            is_like=True,
+            comment__isnull=True,
+        ).first()
+        if existing_like:
+            existing_like.delete()
+            return Response({"message": "Like removed", "liked": False}, status=200)
+
     fb = Feedback.objects.create(
         manual_review=mr,
         user=request.user,
         is_like=is_like,
         comment=comment or None,
     )
-    return Response({"message": "Feedback submitted successfully", "feedback_id": fb.id}, status=201)
+    return Response(
+        {
+            "message": "Feedback submitted successfully",
+            "feedback_id": fb.id,
+            "liked": bool(is_like),
+        },
+        status=201,
+    )
 
 
 @api_view(["GET"])
@@ -140,20 +182,28 @@ def submit_user_report(request):
     if not target_id or not reason:
         return Response({"error": "target_id and reason are required"}, status=400)
 
-    report = UserReport.objects.create(
+    report, created = UserReport.objects.get_or_create(
         reporter=request.user,
         target_type=target_type,
         target_id=int(target_id),
-        report_type=report_type,
-        reason=reason,
+        status="pending",
+        defaults={
+            "report_type": report_type,
+            "reason": reason,
+        },
     )
+    if not created:
+        report.report_type = report_type
+        report.reason = reason
+        report.created_at = timezone.now()
+        report.save(update_fields=["report_type", "reason", "created_at"])
     return Response({"message": "举报已提交", "report_id": report.id}, status=201)
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def admin_list_user_reports(request):
-    if request.user.role != "admin":
+    if not request.user.is_staff:
         return Response({"error": "Admin only"}, status=403)
 
     page = int(request.query_params.get("page", 1))
@@ -196,7 +246,7 @@ def admin_list_user_reports(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def admin_handle_user_report(request, report_id: int):
-    if request.user.role != "admin":
+    if not request.user.is_staff:
         return Response({"error": "Admin only"}, status=403)
     try:
         report = UserReport.objects.get(id=report_id)
@@ -612,11 +662,7 @@ def multimodal_batch_fusion(request):
 @permission_classes([IsAuthenticated])
 def detection_models_catalog(request):
     catalog = _ensure_model_catalog()
-    prefs = {}
-    try:
-        prefs = json.loads(request.user.profile or "{}").get("detection_preferences", {})
-    except (json.JSONDecodeError, TypeError):
-        prefs = {}
+    prefs = _load_user_profile_payload(request.user.profile).get("detection_preferences", {})
     return Response({
         "catalog": catalog,
         "user_preferences": {
@@ -634,18 +680,14 @@ def update_detection_preferences(request):
     mode = request.data.get("mode", "fast")
     if mode not in ("fast", "precise"):
         return Response({"error": "mode must be fast or precise"}, status=400)
-    profile = {}
-    try:
-        profile = json.loads(request.user.profile or "{}")
-    except (json.JSONDecodeError, TypeError):
-        profile = {}
+    profile = _load_user_profile_payload(request.user.profile)
     profile["detection_preferences"] = {
         "mode": mode,
         "text_model_version": request.data.get("text_model_version"),
         "image_model_version": request.data.get("image_model_version"),
         "review_model_version": request.data.get("review_model_version"),
     }
-    request.user.profile = json.dumps(profile, ensure_ascii=False)
+    request.user.profile = _dump_user_profile_payload(profile)
     request.user.save(update_fields=["profile"])
     return Response({"message": "ok", "detection_preferences": profile["detection_preferences"]})
 

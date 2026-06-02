@@ -152,10 +152,10 @@
         <v-card-text>
           <v-form>
             <v-text-field v-model="editForm.username" label="用户名" variant="outlined" class="mb-4"
-              :rules="[v => !v || v.length <= 10 || '用户名不能超过10个字']" counter="10"></v-text-field>
+              :rules="usernameRules" counter="150"></v-text-field>
             <v-text-field v-model="editForm.email" label="邮箱" variant="outlined" class="mb-4" disabled></v-text-field>
             <v-textarea v-model="editForm.profile" label="个人简介" variant="outlined" rows="3"
-              :rules="[v => !v || v.length <= 10 || '个人简介不能超过10个字']" counter="10"></v-textarea>
+              :rules="profileRules" counter="200"></v-textarea>
           </v-form>
         </v-card-text>
         <v-card-actions>
@@ -234,6 +234,8 @@ import {
 
 const route = useRoute()
 const { setMode: setGlobalDetectionMode } = useDetectionMode()
+const USERNAME_MAX_LENGTH = 150
+const PROFILE_MAX_LENGTH = 200
 
 const defaultDetectionMode = ref<DetectionMode>('fast')
 const savingDetectionPrefs = ref(false)
@@ -306,6 +308,24 @@ const editForm = ref({
   profile: '',
   avatar: null as File | null
 })
+const usernameRules = [
+  (v: string) => !!String(v || '').trim() || '用户名不能为空',
+  (v: string) => String(v || '').trim().length <= USERNAME_MAX_LENGTH || `用户名不能超过${USERNAME_MAX_LENGTH}个字符`,
+]
+const profileRules = [
+  (v: string) => String(v || '').trim().length <= PROFILE_MAX_LENGTH || `个人简介不能超过${PROFILE_MAX_LENGTH}个字符`,
+]
+
+function extractBioText(raw: string) {
+  const text = String(raw || '').trim()
+  if (!text.startsWith('{')) return text
+  try {
+    const parsed = JSON.parse(text) as { bio?: unknown }
+    return typeof parsed.bio === 'string' ? parsed.bio : ''
+  } catch {
+    return text
+  }
+}
 
 // 密码重置相关
 const showPasswordDialog = ref(false)
@@ -367,19 +387,8 @@ const startCountdown = () => {
 }
 
 const profileDisplay = computed(() => {
-  const p = (userStore.profile || '').trim()
-  if (!p) return '未设置'
-  if (p.startsWith('{')) {
-    try {
-      const parsed = JSON.parse(p) as { detection_preferences?: unknown }
-      if (parsed.detection_preferences) {
-        return '检测偏好已在右侧卡片中配置'
-      }
-    } catch {
-      // ignore
-    }
-  }
-  return p
+  const bio = extractBioText(userStore.profile || '')
+  return bio || '未设置'
 })
 
 watch(showPasswordDialog, (open) => {
@@ -523,7 +532,7 @@ onMounted(async () => {
     editForm.value = {
       username: userStore.username,
       email: userStore.email,
-      profile: userStore.profile,
+      profile: extractBioText(userStore.profile || ''),
       avatar: null
     }
     // 初始化密码表单
@@ -633,8 +642,11 @@ const publisherLevelLabel = computed(() => {
 })
 
 const isEditFormValid = computed(() => {
-  return (!editForm.value.username || editForm.value.username.length <= 10) &&
-    (!editForm.value.profile || editForm.value.profile.length <= 10)
+  const username = String(editForm.value.username || '').trim()
+  const profile = String(editForm.value.profile || '').trim()
+  return !!username &&
+    username.length <= USERNAME_MAX_LENGTH &&
+    profile.length <= PROFILE_MAX_LENGTH
 })
 
 const formatDateTime = (dateString: string) => {

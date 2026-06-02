@@ -309,14 +309,6 @@ const markAsRead = async (item: Notification) => {
 
 
 const goToHome = () => {
-  if (effectiveRole.value === 'publisher') {
-    router.push('/upload')
-    return
-  }
-  if (effectiveRole.value === 'reviewer') {
-    router.push('/review')
-    return
-  }
   router.push('/')
 }
 

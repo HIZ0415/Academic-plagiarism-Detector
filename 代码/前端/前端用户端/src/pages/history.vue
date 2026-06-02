@@ -296,8 +296,17 @@
     </v-dialog>
 
     <v-card-text class="pa-0 mt-4">
-      <v-data-table v-model="selected" :headers="headers" :items="filteredTasks" :items-per-page="10"
-        class="elevation-1" :show-select="showSelection" item-value="id" hide-default-footer>
+      <v-data-table
+        v-model="selected"
+        v-model:sort-by="tableSortBy"
+        :headers="headers"
+        :items="filteredTasks"
+        :items-per-page="10"
+        class="elevation-1"
+        :show-select="showSelection"
+        item-value="id"
+        hide-default-footer
+      >
         <!-- 任务状态列自定义 -->
         <template v-slot:item.task_id="{ item }">
           <span :title="`原始 ID：${item.task_id}`">{{ formatTaskId(item.task_id) }}</span>
@@ -422,6 +431,7 @@ const currentPage = ref(1)
 const totalTasks = ref(0)
 const totalPages = ref(1)
 const loading = ref(false)
+const tableSortBy = ref([{ key: 'upload_time', order: 'desc' as const }])
 
 // 表格列定义
 const PAPER_TASK_TYPES = ['paper_aigc', 'resource_check'] as const
@@ -733,7 +743,17 @@ function formatBatchLabel(id?: string) {
 function filterByBatch(id: string) {
   const batchId = String(id || '').trim()
   if (!batchId) return
-  router.push({ path: '/history', query: { ...route.query, batch_session_id: batchId } })
+  const nextQuery = { ...route.query } as Record<string, string | string[] | undefined>
+  nextQuery.batch_session_id = batchId
+  delete nextQuery.detail_id
+  delete nextQuery.task_type
+  delete nextQuery.status
+  delete nextQuery.progress
+  delete nextQuery.upload_time
+  delete nextQuery.completion_time
+  delete nextQuery.error_message
+  delete nextQuery.source
+  router.push({ path: '/history', query: nextQuery })
 }
 
 function formatTaskId(id?: string | number) {
@@ -773,7 +793,7 @@ const filteredTasks = computed(() => {
       return id.includes(kw) || name.includes(kw)
     })
   }
-  return sortTasksNewestFirst(list)
+  return list
 })
 
 function applyKeywordSearch() {

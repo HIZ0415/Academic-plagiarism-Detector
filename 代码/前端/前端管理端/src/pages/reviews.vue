@@ -714,7 +714,7 @@ const fetchRequests = async (page: number, pageSize: number) => {
       return {
         id: request.id as number,
         username: String(request.username ?? ''),
-        avatar: request.avatar ? import.meta.env.VITE_API_URL + request.avatar : '',
+        avatar: request.avatar ? resolveBackendMediaUrl(request.avatar) : '',
         state: String(request.state ?? ''),
         file_type: String(request.file_type ?? ''),
         time: String(request.time ?? ''),

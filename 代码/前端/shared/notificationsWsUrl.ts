@@ -36,5 +36,5 @@ export function buildNotificationsWebSocketUrl(token: string | null): string {
     return `${wsProto}//${window.location.host}/ws/notifications/${tq}`
   }
 
-  return `ws://127.0.0.1:8000/ws/notifications/${tq}`
+  return `/ws/notifications/${tq}`
 }

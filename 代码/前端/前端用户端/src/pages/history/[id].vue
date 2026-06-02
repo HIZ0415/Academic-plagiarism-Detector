@@ -140,23 +140,18 @@ function statusColor(s: TaskStatus) {
 
 async function hydrateFromServer() {
   try {
-    const params = { page: 1, page_size: 100 }
-    const res = await publisher.getAllDetectionTask(params)
-    const list = Array.isArray(res.data?.tasks) ? res.data.tasks : []
-    const matched = list.find((x: any) => String(x.task_id) === taskId.value)
-    if (!matched) return
+    const res = await publisher.getAnnualDetail(taskId.value)
+    const matched = res.data || {}
 
-    task.value.task_id = String(matched.task_id)
+    task.value.task_id = String(matched.task_id || taskId.value)
     task.value.status = (matched.status || task.value.status) as TaskStatus
     task.value.upload_time = matched.upload_time || task.value.upload_time
     task.value.completion_time = matched.completion_time || task.value.completion_time
+    task.value.error_message = matched.error_message || task.value.error_message
+    task.value.task_type = (matched.task_type || task.value.task_type || 'image_detection') as UnifiedTaskType
     if (task.value.status === 'completed') task.value.progress = 100
     else if (task.value.status === 'in_progress') task.value.progress = Math.max(task.value.progress, 60)
     else if (task.value.status === 'pending') task.value.progress = Math.max(task.value.progress, 20)
-
-    if (task.value.task_type === 'unknown') {
-      task.value.task_type = 'image_detection'
-    }
   } catch {
     // 保留 query 信息作为回退数据
   }

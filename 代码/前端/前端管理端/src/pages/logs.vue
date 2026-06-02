@@ -238,6 +238,7 @@ import logApi from '@/api/log'
 import userApi from '@/api/user'
 import axios from 'axios'
 import type { UserListItem } from '@/types/core'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 const snackbar = useSnackbarStore()
 const route = useRoute()
@@ -315,9 +316,7 @@ const operationTypeOptions = [
   { title: '专家提交审核结论', value: 'manual_review' },
 ]
 
-const getImageUrl = (url?: string) => {
-  return import.meta.env.VITE_API_URL + (url ?? '')
-}
+const getImageUrl = (url?: string) => resolveBackendMediaUrl(url)
 
 
 const timeRangeOptions = [

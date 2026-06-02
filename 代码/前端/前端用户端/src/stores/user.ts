@@ -57,8 +57,8 @@ export const useUserStore = defineStore('user', {
         const response = await user.updateUserAvatar(formData);
         if (response.data.avatar) {
           this.avatar = resolveBackendMediaUrl(response.data.avatar);
-          this.fetchUserInfo();
         }
+        await this.fetchUserInfo();
         return true;
       } catch (error) {
         console.error('更新头像失败:', error);

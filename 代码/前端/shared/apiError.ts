@@ -79,7 +79,7 @@ export function extractApiError(err: unknown, fallback = '请求失败，请稍�
     )
   }
   if (ax.code === 'ERR_NETWORK' || ax.message === 'Network Error') {
-    return '无法连接后端：请确认 Django 已启动（http://127.0.0.1:8000）；论文 AIGC 检测还需 AI 服务（http://127.0.0.1:8010）。查看 `.local-dev/logs/django.stderr.log` 排查崩溃。'
+    return '无法连接后端：请确认 Django 与 AI 服务已启动，且前端环境变量 VITE_API_URL 指向当前后端地址。'
   }
 
   if (typeof ax.message === 'string' && ax.message.trim()) {
