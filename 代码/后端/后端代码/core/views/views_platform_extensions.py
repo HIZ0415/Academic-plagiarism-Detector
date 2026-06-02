@@ -172,6 +172,43 @@ def list_feedback(request, manual_review_id: int):
 
 # ── 举报 ────────────────────────────────────────────────────────
 
+def _report_group_key(report: UserReport):
+    return (report.reporter_id, report.target_type, report.target_id)
+
+
+def _collapse_duplicate_reports(reports):
+    grouped = {}
+    for report in reports:
+        key = _report_group_key(report)
+        current = grouped.get(key)
+        if current is None:
+            grouped[key] = report
+            continue
+        if current.status != "pending" and report.status == "pending":
+            grouped[key] = report
+            continue
+        if current.status == report.status and report.created_at > current.created_at:
+            grouped[key] = report
+            continue
+        if current.status != "pending" and report.handled_at and current.handled_at:
+            if report.handled_at > current.handled_at:
+                grouped[key] = report
+
+    collapsed = list(grouped.values())
+    counts = {}
+    statuses = {}
+    for report in reports:
+        key = _report_group_key(report)
+        counts[key] = counts.get(key, 0) + 1
+        statuses.setdefault(key, set()).add(report.status)
+    for report in collapsed:
+        key = _report_group_key(report)
+        report.duplicate_count = counts.get(key, 1)
+        report.merged_statuses = sorted(statuses.get(key, {report.status}))
+    collapsed.sort(key=lambda r: r.created_at, reverse=True)
+    return collapsed
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def submit_user_report(request):
@@ -182,21 +219,37 @@ def submit_user_report(request):
     if not target_id or not reason:
         return Response({"error": "target_id and reason are required"}, status=400)
 
-    report, created = UserReport.objects.get_or_create(
+    existing = UserReport.objects.filter(
         reporter=request.user,
         target_type=target_type,
         target_id=int(target_id),
-        status="pending",
-        defaults={
-            "report_type": report_type,
-            "reason": reason,
-        },
-    )
-    if not created:
+    ).order_by("-created_at")
+    report = existing.first()
+    if report is None:
+        report = UserReport.objects.create(
+            reporter=request.user,
+            target_type=target_type,
+            target_id=int(target_id),
+            report_type=report_type,
+            reason=reason,
+        )
+    else:
         report.report_type = report_type
         report.reason = reason
+        report.status = "pending"
+        report.admin_resolution = ""
+        report.handled_by = None
+        report.handled_at = None
         report.created_at = timezone.now()
-        report.save(update_fields=["report_type", "reason", "created_at"])
+        report.save(update_fields=[
+            "report_type",
+            "reason",
+            "status",
+            "admin_resolution",
+            "handled_by",
+            "handled_at",
+            "created_at",
+        ])
     return Response({"message": "举报已提交", "report_id": report.id}, status=201)
 
 
@@ -214,10 +267,11 @@ def admin_list_user_reports(request):
     if request.user.email != "admin@mail.com" and request.user.organization_id:
         org_reviewers = User.objects.filter(organization_id=request.user.organization_id).values_list("id", flat=True)
         qs = qs.filter(reporter_id__in=org_reviewers)
+    collapsed_reports = _collapse_duplicate_reports(list(qs))
     if status_filter:
-        qs = qs.filter(status=status_filter)
+        collapsed_reports = [r for r in collapsed_reports if r.status == status_filter]
 
-    paginator = Paginator(qs, page_size)
+    paginator = Paginator(collapsed_reports, page_size)
     page_obj = paginator.get_page(page)
     items = []
     for r in page_obj.object_list:
@@ -230,6 +284,8 @@ def admin_list_user_reports(request):
             "report_type": r.report_type,
             "reason": r.reason,
             "status": r.status,
+            "duplicate_count": getattr(r, "duplicate_count", 1),
+            "merged_statuses": getattr(r, "merged_statuses", [r.status]),
             "admin_resolution": r.admin_resolution,
             "handled_by": r.handled_by.username if r.handled_by else None,
             "handled_at": timezone.localtime(r.handled_at).strftime("%Y-%m-%d %H:%M:%S") if r.handled_at else None,
@@ -258,11 +314,18 @@ def admin_handle_user_report(request, report_id: int):
     if action not in ("resolved", "dismissed"):
         return Response({"error": "action must be resolved or dismissed"}, status=400)
 
-    report.status = action
-    report.admin_resolution = resolution
-    report.handled_by = request.user
-    report.handled_at = timezone.now()
-    report.save()
+    handled_at = timezone.now()
+    UserReport.objects.filter(
+        reporter_id=report.reporter_id,
+        target_type=report.target_type,
+        target_id=report.target_id,
+    ).update(
+        status=action,
+        admin_resolution=resolution,
+        handled_by=request.user,
+        handled_at=handled_at,
+    )
+    report.refresh_from_db()
 
     Notification.objects.create(
         receiver_id=str(report.reporter_id),
@@ -275,7 +338,7 @@ def admin_handle_user_report(request, report_id: int):
         status="unread",
         url="/community-feedback",
     )
-    return Response({"message": "处理完成", "report_id": report.id})
+    return Response({"message": "处理完成", "report_id": report.id, "status": report.status})
 
 
 # ── 终止人工审核 ────────────────────────────────────────────────
@@ -369,7 +432,9 @@ def community_feedback_feed(request):
             "time": timezone.localtime(task.completion_time or task.upload_time).strftime("%Y-%m-%d %H:%M:%S"),
         })
 
-    my_reports = UserReport.objects.filter(reporter=request.user).order_by("-created_at")[:50]
+    my_reports = _collapse_duplicate_reports(
+        list(UserReport.objects.filter(reporter=request.user).order_by("-created_at")[:50])
+    )
     for r in my_reports:
         items.append({
             "id": f"r-{r.id}",

@@ -10,6 +10,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 from ..models import DetectionTask, DetectionResult, SubDetectionResult
 
@@ -30,13 +31,24 @@ except Exception as e:
     import logging
     logging.getLogger(__name__).warning(f"字体注册失败，PDF报告将使用默认字体: {e}")
 
+try:
+    pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+except Exception as e:
+    import logging
+    logging.getLogger(__name__).warning(f"内置中文字体注册失败: {e}")
+
 
 def _font(bold=False):
-    """有 SimSun 则用宋体，否则回退 Helvetica（避免字体缺失导致 500）。"""
+    """优先使用随项目部署的宋体，缺失时回退到 ReportLab 内置中文字体。"""
+    for name in (('SimSun-Bold', 'SimSun') if bold else ('SimSun',)):
+        try:
+            pdfmetrics.getFont(name)
+            return name
+        except Exception:
+            pass
     try:
-        name = 'SimSun-Bold' if bold else 'SimSun'
-        pdfmetrics.getFont(name)
-        return name
+        pdfmetrics.getFont("STSong-Light")
+        return "STSong-Light"
     except Exception:
         return 'Helvetica-Bold' if bold else 'Helvetica'
 
