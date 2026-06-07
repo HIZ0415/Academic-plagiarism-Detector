@@ -10,6 +10,7 @@ from ..utils.image_preprocessing import (
     preprocess_uploaded_image_resource,
     save_original_upload,
 )
+from ..utils.serializers_safe import serialize_value
 
 ALPHA_ALLOWED_IMAGE_EXT = {'.png', '.jpg', '.jpeg'}
 
@@ -73,7 +74,7 @@ def upload_file(request):
         {
             "message": "File uploaded successfully",
             "file_id": file_management.id,
-            "file_url": f"/media/{file_path}",
+            "file_url": request.build_absolute_uri(f"/media/{file_path}"),
             "image_count": image_count,
         }
     )
@@ -88,7 +89,7 @@ def get_file_details(request, file_id):
         return Response({"message": "File not found"}, status=404)
 
     extracted_images = ImageUpload.objects.filter(file_management=file_management)
-    image_urls = [image.image.url for image in extracted_images]
+    image_urls = [serialize_value(image.image, request) for image in extracted_images]
     is_pdf = file_management.file_type == "application/pdf"
 
     return Response(
@@ -122,7 +123,7 @@ def get_extracted_images(request, file_id):
         image_list.append(
             {
                 "image_id": image.id,
-                "image_url": image.image.url,
+                "image_url": serialize_value(image.image, request),
                 "page_number": image.page_number if image.extracted_from_pdf else None,
                 "extracted_from_pdf": image.extracted_from_pdf,
                 "isDetect": image.isDetect,
@@ -161,7 +162,7 @@ def add_file_tag(request, file_id):
         {
             "message": "File add tag successfully",
             "file_id": file.id,
-            "file_url": f"/media/{file.file_name}",
+            "file_url": request.build_absolute_uri(f"/media/{file.file_name}"),
         }
     )
 
@@ -208,7 +209,7 @@ def get_all_file_images(request, file_management_id):
         results.append(
             {
                 "img_id": image.id,
-                "img_url": image.image.url,
+                "img_url": serialize_value(image.image, request),
                 "isDetect": image.isDetect,
                 "isReview": image.isReview,
                 "isFake": image.isFake,

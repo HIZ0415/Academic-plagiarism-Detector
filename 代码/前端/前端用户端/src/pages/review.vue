@@ -192,12 +192,12 @@ import { useRouter } from 'vue-router'
 import reviewerApi from '@/api/reviewer'
 import { useSnackbarStore } from '@/stores/snackbar'
 import { useUserStore } from '@/stores/user'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 const router = useRouter()
 const snackbar = useSnackbarStore()
 const userStore = useUserStore()
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
 const defaultAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=reviewer'
 
 interface ReviewerTaskRow {
@@ -350,7 +350,7 @@ function mapRow(raw: Record<string, unknown>): ReviewerTaskRow {
     manual_review_id: Number(raw.manual_review_id),
     manual_review_time: String(raw.manual_review_time ?? ''),
     publisher_username: String(raw.publisher_username ?? ''),
-    publisher_avatar: avatar ? (String(avatar).startsWith('http') ? String(avatar) : API_BASE + avatar) : null,
+    publisher_avatar: avatar ? resolveBackendMediaUrl(String(avatar)) : null,
     image_count: Number(raw.image_count ?? 0),
     status: String(raw.status ?? 'undo'),
     review_request_id: Number(raw.review_request_id),

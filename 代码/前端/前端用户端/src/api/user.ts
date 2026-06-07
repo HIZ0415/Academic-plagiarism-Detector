@@ -27,11 +27,7 @@ export default {
     return http.put('/user/update/', data)
   },
   updateUserAvatar(data: any) {
-    return http.put('/user/avatar/', data, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
+    return http.put('/user/avatar/', data)
   },
   requestPasswordReset(email: string) {
     return http.post('/password-reset/', { email })

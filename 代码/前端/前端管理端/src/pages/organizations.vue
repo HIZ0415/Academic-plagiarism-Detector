@@ -367,6 +367,7 @@ import { useSnackbarStore } from '@/stores/snackbar'
 import organization from '@/api/organization'
 import type { DataTableHeader } from 'vuetify'
 import { useUserStore } from '@/stores/user'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 withDefaults(defineProps<{ embed?: boolean }>(), { embed: false })
 
@@ -494,7 +495,7 @@ const formatTime = (data: string) => {
 
 
 const getImgUrl = (logo: any) => {
-  return import.meta.env.VITE_API_URL + logo
+  return resolveBackendMediaUrl(logo)
 }
 
 // 获取组织列表

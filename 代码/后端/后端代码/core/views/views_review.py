@@ -139,7 +139,7 @@ def get_all_reviewers_in_org(request):
             filtered_reviewers.append({
                 'id': reviewer.id,
                 'username': reviewer.username,
-                'avatar': reviewer.avatar.url if reviewer.avatar else None,
+                'avatar': serialize_value(reviewer.avatar, request) if reviewer.avatar else None,
             })
 
     return Response(filtered_reviewers)
@@ -170,7 +170,7 @@ def get_reviewers_for_publisher(request, publisher_id):
     reviewer_list = [{
         'id': user.id,
         'username': user.username,
-        'avatar': user.avatar.url if user.avatar else None,
+        'avatar': serialize_value(user.avatar, request) if user.avatar else None,
     } for user in reviewers]
 
     return Response({
@@ -309,7 +309,7 @@ def get_img_review_all(request):
             reviewers_results.append({
                 'id': reviewer.id,
                 'username': reviewer.username,
-                'avatar': reviewer.avatar.url if reviewer.avatar else None,
+                'avatar': serialize_value(reviewer.avatar, request) if reviewer.avatar else None,
                 'result': image_review.result  # 0/1 表示人工审核的结果是真还是假
             })
 
@@ -485,7 +485,7 @@ def get_request_detail(request, reviewRequest_id):
     for img in review_request.imgs.all():
         images.append({
             'img_id': img.id,
-            'img_url': img.image.url,
+            'img_url': serialize_value(img.image, request),
         })
 
     # 获取AI检测结果
@@ -733,7 +733,7 @@ def get_reviewer_request_detail(request, reviewRequest_id):
     # 获取图片ID列表和URL列表
     image_uploads = review_request.imgs.all()
     image_ids = [img.id for img in image_uploads]
-    image_urls = [img.image.url for img in image_uploads]
+    image_urls = [serialize_value(img.image, request) for img in image_uploads]
 
     # 获取AI检测结果
     ai_detection_result = {
@@ -1054,7 +1054,7 @@ def get_reviewer_manual_request(request):
             'manual_review_id': manual_review.id,
             'manual_review_time': manual_review.review_time.strftime('%Y-%m-%d %H:%M:%S'),
             'publisher_username': publisher.username,
-            'publisher_avatar': publisher.avatar.url if publisher.avatar else None,
+            'publisher_avatar': serialize_value(publisher.avatar, request) if publisher.avatar else None,
             'image_count': image_count,
             'status': manual_review.status,
             'review_request_id': review_request.id,
@@ -1184,7 +1184,7 @@ def get_review_detail(request, manual_review_id):
         'task_type': detection_task.task_type if detection_task else None,
         'detection_task_id': detection_task.id if detection_task else None,
         'publisher_username': publisher.username,
-        'publisher_avatar': publisher.avatar.url if publisher.avatar else None,
+        'publisher_avatar': serialize_value(publisher.avatar, request) if publisher.avatar else None,
     })
 
 
@@ -1226,13 +1226,13 @@ def get_manualReview_from_reviewRequestId(request, review_request_id):
             'reviewer': {
                 'id': manual_review.reviewer.id,
                 'username': manual_review.reviewer.username,
-                'avatar': manual_review.reviewer.avatar.url if manual_review.reviewer.avatar else None,
+                'avatar': serialize_value(manual_review.reviewer.avatar, request) if manual_review.reviewer.avatar else None,
             },
             'status': manual_review.status,
             'review_time': manual_review.review_time.strftime(
                 '%Y-%m-%d %H:%M:%S') if manual_review.review_time else None,
             'image_reviews': reviewers_results,
-            'report_file': manual_review.report_file.url if manual_review.report_file else None
+            'report_file': serialize_value(manual_review.report_file, request) if manual_review.report_file else None
         })
 
     return Response(data, status=status.HTTP_200_OK)
@@ -1345,12 +1345,15 @@ def post_review(request, manual_review_id):
 
     # 更新ReviewRequest状态
     review_request = manual_review.review_request
-    if review_request.manual_reviews.filter(status='completed').count() == review_request.reviewers.count():
+    expected_review_count = review_request.reviewers.count() or review_request.manual_reviews.count()
+    completed_review_count = review_request.manual_reviews.filter(status='completed').count()
+    if expected_review_count > 0 and completed_review_count >= expected_review_count:
         review_request.status1 = 'completed'
         review_request.review_end_time = timezone.now()
     else:
         review_request.status1 = 'in_progress'
-    review_request.save()
+        review_request.review_end_time = None
+    review_request.save(update_fields=['status1', 'review_end_time'])
 
     # 在Log表中记录上传操作
     Log.objects.create(
