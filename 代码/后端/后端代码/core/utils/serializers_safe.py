@@ -7,5 +7,7 @@ def serialize_value(value, request):
     - 其他 → 原样返回（必须是 JSON 可序列化的原生类型）
     """
     if isinstance(value, FieldFile):
-        return value.url if value and value.url else None
+        if not value or not value.url:
+            return None
+        return request.build_absolute_uri(value.url) if request is not None else value.url
     return value

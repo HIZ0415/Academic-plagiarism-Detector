@@ -309,6 +309,7 @@ import publisher from '@/api/publisher'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { useUserStore } from '@/stores/user'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 interface Image {
   result_id: string
@@ -534,17 +535,17 @@ const getProbabilityColor = (probability: number): string => {
 
 const getSelectedImageUrl = (selectedImage: Image | null) => {
   if (selectedImage) {
-    return import.meta.env.VITE_API_URL + selectedImage.image_url
+    return resolveBackendMediaUrl(selectedImage.image_url)
   }
   return ''
 }
 
 const getImageUrl = (url: string) => {
-  return import.meta.env.VITE_API_URL + url
+  return resolveBackendMediaUrl(url)
 }
 
 const getAvatar = (url: string) => {
-  return import.meta.env.VITE_API_URL + url
+  return resolveBackendMediaUrl(url)
 }
 
 const selectedFakeCount = ref(0)

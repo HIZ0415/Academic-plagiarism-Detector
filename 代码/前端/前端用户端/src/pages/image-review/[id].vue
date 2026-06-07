@@ -165,6 +165,7 @@ import { useUserStore } from '@/stores/user'
 import { useSnackbarStore } from '@/stores/snackbar'
 import ResultComponent from '@/components/result.vue'
 import publisher from '@/api/publisher'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 const router = useRouter()
 const route = useRoute()
@@ -306,7 +307,7 @@ const handleNextImage = () => {
 }
 
 const getImageUrl = (url: string) => {
-  return import.meta.env.VITE_API_URL + url
+  return resolveBackendMediaUrl(url)
 }
 
 

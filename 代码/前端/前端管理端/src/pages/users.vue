@@ -361,6 +361,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import userApi from '@/api/user'
 import { useSnackbarStore } from '@/stores/snackbar'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 withDefaults(defineProps<{ embed?: boolean }>(), { embed: false })
 
@@ -773,7 +774,7 @@ const fetchUsers = async (page: number, pageSize: number) => {
       permission: user.permission,
       registerTime: new Date(user.date_joined).getTime(),
       lastLoginTime: user.last_login ? new Date(user.last_login).getTime() : 0,
-      avatar: import.meta.env.VITE_API_URL + user.avatar || '',
+      avatar: user.avatar ? resolveBackendMediaUrl(user.avatar) : '',
       admin_type: user.admin_type,
       organization: user.organization
     }))
@@ -897,7 +898,7 @@ const openUserDetailsDialog = async (user: User) => {
 
     selectedUserDetails.value = {
       ...response.data,
-      avatar: import.meta.env.VITE_API_URL + response.data.avatar,
+      avatar: response.data.avatar ? resolveBackendMediaUrl(response.data.avatar) : '',
     }
     showUserDetailsDialog.value = true
   } catch (error) {

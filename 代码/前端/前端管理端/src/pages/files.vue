@@ -421,6 +421,7 @@ import { useSnackbarStore } from '@/stores/snackbar'
 import fileApi from '@/api/file'
 import userApi from '@/api/user'
 import type { UserListItem } from '@/types/core'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 const snackbar = useSnackbarStore()
 
@@ -746,7 +747,7 @@ const openDeleteDialog = (file: File) => {
 
 
 const getImageUrl = (url?: string) => {
-  return import.meta.env.VITE_API_URL + (url ?? '')
+  return resolveBackendMediaUrl(url)
 }
 
 

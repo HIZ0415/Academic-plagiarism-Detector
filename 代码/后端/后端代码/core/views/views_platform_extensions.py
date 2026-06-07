@@ -33,6 +33,7 @@ from ..models import (
 )
 from ..util import detection_history_url, detection_task_type_label
 from ..utils.report_generator import _load_result_json, _risk_label, generate_comprehensive_forgery_pdf
+from ..utils.serializers_safe import serialize_value
 from .views_manual_review_adapter import _aggregate_manual_review_status
 
 DEFAULT_MODEL_CATALOG = {
@@ -155,7 +156,7 @@ def list_feedback(request, manual_review_id: int):
             "feedback_id": f.id,
             "user_id": f.user_id,
             "username": f.user.username,
-            "avatar": f.user.avatar.url if f.user.avatar else None,
+            "avatar": serialize_value(f.user.avatar, request) if f.user.avatar else None,
             "is_like": f.is_like,
             "comment": f.comment or "",
             "feedback_time": timezone.localtime(f.feedback_time).strftime("%Y-%m-%d %H:%M:%S"),
@@ -315,10 +316,13 @@ def admin_handle_user_report(request, report_id: int):
         return Response({"error": "action must be resolved or dismissed"}, status=400)
 
     handled_at = timezone.now()
-    UserReport.objects.filter(
+    affected_reports = list(UserReport.objects.filter(
         reporter_id=report.reporter_id,
         target_type=report.target_type,
         target_id=report.target_id,
+    ).select_related("reporter"))
+    UserReport.objects.filter(
+        id__in=[item.id for item in affected_reports],
     ).update(
         status=action,
         admin_resolution=resolution,
@@ -327,18 +331,28 @@ def admin_handle_user_report(request, report_id: int):
     )
     report.refresh_from_db()
 
-    Notification.objects.create(
-        receiver_id=str(report.reporter_id),
-        receiver_name=report.reporter.username,
-        sender_id=str(request.user.id),
-        sender_name=request.user.username,
-        category=Notification.GLOBAL,
-        title="举报处理结果",
-        content=f"您对 {report.target_type}#{report.target_id} 的举报已{('成立' if action == 'resolved' else '驳回')}。{resolution}",
-        status="unread",
-        url="/community-feedback",
-    )
-    return Response({"message": "处理完成", "report_id": report.id, "status": report.status})
+    notified_users = {}
+    for item in affected_reports:
+        notified_users[item.reporter_id] = item.reporter
+    result_label = "成立" if action == "resolved" else "驳回"
+    for reporter in notified_users.values():
+        Notification.objects.create(
+            receiver_id=str(reporter.id),
+            receiver_name=reporter.username,
+            sender_id=str(request.user.id),
+            sender_name=request.user.username,
+            category=Notification.GLOBAL,
+            title="举报处理结果",
+            content=f"您对 {report.target_type}#{report.target_id} 的举报已{result_label}。{resolution or '请前往社区反馈查看处理结果。'}",
+            status="unread",
+            url="/community-feedback?tab=report",
+        )
+    return Response({
+        "message": "处理完成",
+        "report_id": report.id,
+        "status": report.status,
+        "notified_count": len(notified_users),
+    })
 
 
 # ── 终止人工审核 ────────────────────────────────────────────────
@@ -377,6 +391,7 @@ def cancel_manual_review_request(request, review_request_id: int):
 def community_feedback_feed(request):
     page = int(request.query_params.get("page", 1))
     page_size = int(request.query_params.get("page_size", 20))
+    category = (request.query_params.get("category") or "all").strip()
     uid = str(request.user.id)
 
     notifs = Notification.objects.filter(receiver_id=uid).order_by("-notified_at")
@@ -384,13 +399,19 @@ def community_feedback_feed(request):
     notified_task_ids = set()
     for n in notifs[:200]:
         cat = "system"
-        if n.category == Notification.GLOBAL:
+        url = n.url or ""
+        if (
+            "tab=report" in url
+            or "举报" in (n.title or "")
+            or "举报" in (n.content or "")
+        ):
+            cat = "report"
+        elif n.category == Notification.GLOBAL:
             cat = "admin"
         elif n.category == Notification.SYSTEM:
             cat = "detection"
         elif n.category in (Notification.P2R, Notification.R2P):
             cat = "review"
-        url = n.url or ""
         for marker in ("detail_id=", "task_id="):
             if marker in url:
                 try:
@@ -443,11 +464,13 @@ def community_feedback_feed(request):
             "title": f"举报处理：{r.get_status_display()}",
             "content": r.admin_resolution or r.reason,
             "status": "read" if r.status != "pending" else "unread",
-            "url": "/community-feedback",
+            "url": "/community-feedback?tab=report",
             "time": timezone.localtime(r.handled_at or r.created_at).strftime("%Y-%m-%d %H:%M:%S"),
         })
 
     items.sort(key=lambda x: x["time"], reverse=True)
+    if category and category != "all":
+        items = [item for item in items if item.get("category") == category]
     paginator = Paginator(items, page_size)
     page_obj = paginator.get_page(page)
     return Response({
@@ -460,7 +483,7 @@ def community_feedback_feed(request):
 
 # ── 综合鉴伪报告（在线）────────────────────────────────────────
 
-def _image_comprehensive_sections(task: DetectionTask) -> dict:
+def _image_comprehensive_sections(task: DetectionTask, request=None) -> dict:
     results = task.detection_results.select_related("image_upload").prefetch_related("sub_results").all()
     suspicious = []
     for dr in results:
@@ -472,11 +495,11 @@ def _image_comprehensive_sections(task: DetectionTask) -> dict:
             masks.append({
                 "method": sub.method,
                 "probability": sub.probability,
-                "mask_image": sub.mask_image.url if sub.mask_image else None,
+                "mask_image": serialize_value(sub.mask_image, request) if sub.mask_image else None,
             })
         suspicious.append({
             "image_id": dr.image_upload_id,
-            "image_url": img.image.url if img and img.image else None,
+            "image_url": serialize_value(img.image, request) if img and img.image else None,
             "confidence_score": dr.confidence_score,
             "masks": masks,
             "page_number": img.page_number if img else None,
@@ -543,7 +566,7 @@ def comprehensive_forgery_report(request, task_id: int):
     }
 
     if ttype == "image_detection":
-        img_sec = _image_comprehensive_sections(task)
+        img_sec = _image_comprehensive_sections(task, request)
         sections["image"] = img_sec
         sections["conclusion"] = {
             "headline": img_sec["summary"],
@@ -663,7 +686,7 @@ def multimodal_batch_fusion(request):
     for t in tasks:
         child = {"task_id": t.id, "task_type": t.task_type, "task_name": t.task_name}
         if t.task_type == "image_detection":
-            sec = _image_comprehensive_sections(t)
+            sec = _image_comprehensive_sections(t, request)
             child["risk"] = sec["risk_level"]
             child["score"] = sec["ai_contribution_ratio"]
             dim_scores["image"] += child["score"]

@@ -1,5 +1,5 @@
 # utils/report_generator.py
-import os, textwrap, json
+import os, json
 from datetime import datetime
 from pathlib import Path
 from django.conf import settings
@@ -39,28 +39,149 @@ except Exception as e:
 
 
 def _font(bold=False):
-    """优先使用随项目部署的宋体，缺失时回退到 ReportLab 内置中文字体。"""
+    """优先使用 ReportLab 内置中文字体，避免误用仅含扩展汉字的 SimSun-ExtB。"""
+    try:
+        pdfmetrics.getFont("STSong-Light")
+        return "STSong-Light"
+    except Exception:
+        pass
     for name in (('SimSun-Bold', 'SimSun') if bold else ('SimSun',)):
         try:
             pdfmetrics.getFont(name)
             return name
         except Exception:
             pass
-    try:
-        pdfmetrics.getFont("STSong-Light")
-        return "STSong-Light"
-    except Exception:
-        return 'Helvetica-Bold' if bold else 'Helvetica'
+    return 'Helvetica-Bold' if bold else 'Helvetica'
 
 
 # ─── 工具函数：自动换行绘制 ───────────────────────────────
-def _draw_multiline(c, x, y, text, max_chars=48, leading=14, font=None, size=9):
+def _wrap_text_by_width(text, font, size, max_width):
+    """按 ReportLab 实际字宽换行，避免中文/长英文被画出页面。"""
+    if text is None:
+        text = ""
+    lines = []
+    for paragraph in str(text).replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if paragraph == "":
+            lines.append("")
+            continue
+        current = ""
+        for char in paragraph:
+            candidate = current + char
+            if current and pdfmetrics.stringWidth(candidate, font, size) > max_width:
+                lines.append(current)
+                current = char
+            else:
+                current = candidate
+        lines.append(current)
+    return lines or [""]
+
+
+def _draw_multiline(c, x, y, text, max_chars=48, leading=14, font=None, size=9,
+                    max_width=None, H=None, MARGIN=40):
     font = font or _font()
     c.setFont(font, size)
-    for line in textwrap.wrap(text, width=max_chars):
+    if max_width is None:
+        max_width = A4[0] - x - MARGIN
+    lines = _wrap_text_by_width(text, font, size, max_width)
+    if max_chars:
+        wrapped = []
+        for line in lines:
+            if pdfmetrics.stringWidth(line, font, size) <= max_width:
+                wrapped.append(line)
+            else:
+                wrapped.extend(_wrap_text_by_width(line, font, size, max_width))
+        lines = wrapped
+    for line in lines:
+        if H and y - leading < MARGIN:
+            c.showPage()
+            y = H - MARGIN
+            c.setFont(font, size)
         c.drawString(x, y, line)
         y -= leading
     return y
+
+
+def _draw_field(c, x, y, label, value, font=None, size=11, leading=16,
+                max_width=None, H=None, MARGIN=40):
+    return _draw_multiline(
+        c,
+        x,
+        y,
+        f"{label}{value}",
+        leading=leading,
+        font=font or _font(),
+        size=size,
+        max_width=max_width,
+        H=H,
+        MARGIN=MARGIN,
+    )
+
+
+def _format_probability(value):
+    if value is None:
+        return "未计算"
+    return f"{float(value) * 100:.1f}%"
+
+
+def _image_risk_label(probability):
+    if probability is None:
+        return "未知风险"
+    probability = float(probability)
+    if probability >= 0.7:
+        return "高风险"
+    if probability >= 0.4:
+        return "中风险"
+    return "低风险"
+
+
+def _build_image_analysis_lines(dr, sub_results):
+    confidence = dr.confidence_score
+    risk = _image_risk_label(confidence)
+    verdict = "疑似存在图像造假风险" if dr.is_fake else "未发现明显造假风险"
+    lines = [
+        f"综合判定：系统给出的造假概率为 {_format_probability(confidence)}，风险等级为{risk}，结论为{verdict}。",
+    ]
+
+    if sub_results:
+        probabilities = [float(sub.probability) for sub in sub_results if sub.probability is not None]
+        if probabilities:
+            max_sub = max(sub_results, key=lambda sub: float(sub.probability or 0))
+            avg_probability = sum(probabilities) / len(probabilities)
+            high_count = sum(1 for value in probabilities if value >= 0.7)
+            medium_count = sum(1 for value in probabilities if 0.4 <= value < 0.7)
+            lines.append(
+                f"多方法检测：共 {len(probabilities)} 个子方法参与判断，平均造假概率为 {_format_probability(avg_probability)}；"
+                f"其中 {high_count} 个方法达到高风险、{medium_count} 个方法处于中风险，最高风险方法为 {max_sub.method}"
+                f"（{_format_probability(max_sub.probability)}）。"
+            )
+        else:
+            lines.append("多方法检测：已记录子方法结果，但未得到有效概率值。")
+    else:
+        lines.append("多方法检测：当前报告未记录子方法明细，建议结合原图和人工复核进一步确认。")
+
+    exif_flags = []
+    if dr.exif_photoshop:
+        exif_flags.append("检测到 Photoshop 修改痕迹")
+    if dr.exif_time_modified:
+        exif_flags.append("检测到拍摄/创建时间修改痕迹")
+    if exif_flags:
+        lines.append(f"元数据分析：{'；'.join(exif_flags)}，该线索会提高图像被篡改的可疑程度。")
+    else:
+        lines.append("元数据分析：未发现 Photoshop 痕迹或时间修改痕迹，EXIF 未提供明显异常证据。")
+
+    if dr.ela_image:
+        lines.append("可视化分析：已生成 ELA 可视化图，可结合高亮区域观察压缩误差是否存在局部异常。")
+    else:
+        lines.append("可视化分析：当前结果未生成 ELA 图，主要依据模型概率和元数据线索进行判断。")
+
+    if confidence is not None and float(confidence) >= 0.7:
+        lines.append("处理建议：该图片风险较高，建议查看原始图片、来源材料和局部掩膜结果，并发起人工审核。")
+    elif confidence is not None and float(confidence) >= 0.4:
+        lines.append("处理建议：该图片存在一定可疑性，建议结合论文上下文、原始实验记录和可视化结果复核。")
+    else:
+        lines.append("处理建议：自动检测风险较低，但如果该图片用于关键结论，仍建议保留原始材料以备核验。")
+
+    return lines
 
 
 MAX_CONTENT_HEIGHT = 40
@@ -95,14 +216,14 @@ def generate_detection_task_report(task: DetectionTask) -> str:
 
     y = H - 120
     c.setFont(fb, 40)
-    c.drawCentredString(W / 2, y, '“听泉鉴图”图像造假检测报告')
+    c.drawCentredString(W / 2, y, '图像检测报告')
     y -= 80
 
     c.setFont(fn, 24)
     c.drawString(MARGIN, y, f"任务编号：{task.id}")
     y -= 40
-    c.drawString(MARGIN, y, f"任务名称：{task.task_name}")
-    y -= 40
+    y = _draw_field(c, MARGIN, y, "任务名称：", task.task_name, font=fn, size=22, leading=30, H=H, MARGIN=MARGIN)
+    y -= 10
     c.drawString(MARGIN, y, f"用户：{task.user.username}")
     y -= 40
 
@@ -134,6 +255,7 @@ def generate_detection_task_report(task: DetectionTask) -> str:
             start=1
     ):
         page_label = f"图片 {dr.image_upload.id}"
+        sub_results = list(dr.sub_results.all())
         c.bookmarkPage(f"img_{dr.image_upload.id}")
         c.addOutlineEntry(page_label, f"img_{dr.image_upload.id}", level=1)
 
@@ -155,8 +277,27 @@ def generate_detection_task_report(task: DetectionTask) -> str:
         # 总体结论
         c.setFont(fn, 11)
         c.drawString(MARGIN, y - 20, f"判定：{'造假' if dr.is_fake else '真实'}")
-        c.drawString(MARGIN, y - 45, f"造假概率：{dr.confidence_score:.2f}")
+        confidence_text = f"{dr.confidence_score:.2f}" if dr.confidence_score is not None else "未计算"
+        c.drawString(MARGIN, y - 45, f"造假概率：{confidence_text}")
         y -= 70
+
+        c.setFont(fb, 11)
+        c.drawString(MARGIN, y, "检测分析：")
+        y -= 18
+        for analysis_line in _build_image_analysis_lines(dr, sub_results):
+            y = _draw_multiline(
+                c,
+                MARGIN + 15,
+                y,
+                f"- {analysis_line}",
+                max_chars=72,
+                font=fn,
+                size=10,
+                H=H,
+                MARGIN=MARGIN,
+            )
+            y -= 4
+        y -= 8
 
         # LLM 结果
         if task.if_use_llm:
@@ -164,7 +305,7 @@ def generate_detection_task_report(task: DetectionTask) -> str:
             c.setFont(fb, 11)
             c.drawString(MARGIN, y, "大语言模型分析：")
             y -= 18
-            y = _draw_multiline(c, MARGIN + 15, y, dr.llm_judgment or "无", max_chars=50)
+            y = _draw_multiline(c, MARGIN + 15, y, dr.llm_judgment or "无", max_chars=50, H=H, MARGIN=MARGIN)
             y -= 110
             if dr.llm_image and os.path.exists(dr.llm_image.path):
                 c.drawImage(ImageReader(dr.llm_image.path), MARGIN + 90, y, width=100, height=100,
@@ -185,10 +326,20 @@ def generate_detection_task_report(task: DetectionTask) -> str:
         c.setFont(fb, 11)
         c.drawString(MARGIN, y, "深度学习检测方法：")
         y -= 20
-        for sub in dr.sub_results.all():
+        for sub in sub_results:
             y = _check_and_create_new_page(c, y, H, MARGIN)  # 调用检查函数
             c.setFont(fn, 10)
-            c.drawString(MARGIN + 10, y, f"{sub.method}  造假概率：{sub.probability:.2f}")
+            y = _draw_multiline(
+                c,
+                MARGIN + 10,
+                y,
+                f"{sub.method}  造假概率：{sub.probability:.2f}",
+                max_chars=80,
+                font=fn,
+                size=10,
+                H=H,
+                MARGIN=MARGIN,
+            )
             if sub.mask_image and os.path.exists(sub.mask_image.path):
                 c.drawImage(ImageReader(sub.mask_image.path), MARGIN + 220, y - 40, width=60, height=60,
                             preserveAspectRatio=True)
@@ -264,8 +415,8 @@ def generate_manual_review_report(review: ManualReview) -> str:
         c.drawString(MARGIN, y, f"检测任务 ID：{detection_task.id}（{task_type or '—'}）")
         y -= 22
         if detection_task.task_name:
-            c.drawString(MARGIN, y, f"任务名称：{detection_task.task_name}")
-            y -= 22
+            y = _draw_field(c, MARGIN, y, "任务名称：", detection_task.task_name, font=fn, size=12, leading=16, H=H, MARGIN=MARGIN)
+            y -= 6
 
     publisher_name = rr.user.username if rr and rr.user_id else "—"
     c.drawString(MARGIN, y, f"发布者：{publisher_name}")
@@ -275,6 +426,8 @@ def generate_manual_review_report(review: ManualReview) -> str:
 
     start_time = timezone.localtime(review.review_time).strftime("%Y-%m-%d %H:%M")
     end_time = rr.review_end_time if rr else None
+    if end_time is None and review.status == "completed":
+        end_time = review.review_time
     finish_time = (
         timezone.localtime(end_time).strftime("%Y-%m-%d %H:%M") if end_time else "尚未完成"
     )
@@ -286,7 +439,7 @@ def generate_manual_review_report(review: ManualReview) -> str:
         c.drawString(MARGIN, y, "发布者申请说明：")
         y -= 18
         c.setFont(fn, 11)
-        y = _draw_multiline(c, MARGIN, y, (rr.reason or "")[:800], max_chars=70, font=fn, size=11)
+        y = _draw_multiline(c, MARGIN, y, (rr.reason or "")[:800], max_chars=70, font=fn, size=11, H=H, MARGIN=MARGIN)
         y -= 20
 
     image_reviews = list(_iter_manual_image_reviews(review))
@@ -299,7 +452,7 @@ def generate_manual_review_report(review: ManualReview) -> str:
 
     if not image_reviews:
         c.setFont(fn, 11)
-        y = _draw_multiline(c, MARGIN, y, "暂无结构化审核条目。", max_chars=70, font=fn, size=11)
+        y = _draw_multiline(c, MARGIN, y, "暂无结构化审核条目。", max_chars=70, font=fn, size=11, H=H, MARGIN=MARGIN)
         y -= 20
     else:
         for idx, img_review in enumerate(image_reviews, start=1):
@@ -351,7 +504,7 @@ def generate_manual_review_report(review: ManualReview) -> str:
                 if score is None and not reason:
                     continue
                 line = f"维度 {i}：得分 {score if score is not None else '—'}；理由：{reason or '无'}"
-                y = _draw_multiline(c, MARGIN + 8, y, line, max_chars=78, font=fn, size=10)
+                y = _draw_multiline(c, MARGIN + 8, y, line, max_chars=78, font=fn, size=10, H=H, MARGIN=MARGIN)
                 y -= 6
                 if y < MARGIN + 60:
                     c.showPage()
@@ -452,8 +605,8 @@ def generate_paper_aigc_report(task: DetectionTask) -> str:
     if task.completion_time:
         info.append(f"Completed: {timezone.localtime(task.completion_time).strftime('%Y-%m-%d %H:%M')}")
     for line in info:
-        c.drawString(MARGIN, y, line)
-        y -= 24
+        y = _draw_multiline(c, MARGIN, y, line, max_chars=80, leading=18, font=_font(), size=14, H=H, MARGIN=MARGIN)
+        y -= 6
 
     if result:
         y -= 20
@@ -468,7 +621,7 @@ def generate_paper_aigc_report(task: DetectionTask) -> str:
         y -= 20
         summary = result.get("summary", "")
         if summary:
-            y = _draw_multiline(c, MARGIN, y, summary, max_chars=70, font=_font(), size=11)
+            y = _draw_multiline(c, MARGIN, y, summary, max_chars=70, font=_font(), size=11, H=H, MARGIN=MARGIN)
         y -= 30
 
         # 段落详情
@@ -480,10 +633,10 @@ def generate_paper_aigc_report(task: DetectionTask) -> str:
             for fc in factual[:6]:
                 y = _check_and_create_new_page(c, y, H, MARGIN)
                 c.setFont(_font(bold=True), 11)
-                c.drawString(MARGIN, y, str(fc.get("title", ""))[:60])
-                y -= 16
+                y = _draw_multiline(c, MARGIN, y, str(fc.get("title", ""))[:180], max_chars=70, font=_font(bold=True), size=11, H=H, MARGIN=MARGIN)
+                y -= 2
                 for reason in (fc.get("reasons") or [])[:3]:
-                    y = _draw_multiline(c, MARGIN + 12, y, f"- {reason}", max_chars=70, font=_font(), size=9)
+                    y = _draw_multiline(c, MARGIN + 12, y, f"- {reason}", max_chars=70, font=_font(), size=9, H=H, MARGIN=MARGIN)
                     y -= 4
             y -= 12
 
@@ -495,13 +648,21 @@ def generate_paper_aigc_report(task: DetectionTask) -> str:
             for p in paragraphs:
                 y = _check_and_create_new_page(c, y, H, MARGIN)
                 c.setFont(_font(), 10)
-                c.drawString(MARGIN + 10, y,
-                             f"P{p.get('index', '?')}: score={p.get('risk_score', 0):.3f} "
-                             f"[{_risk_label(p.get('risk_level'))}]")
-                y -= 16
+                y = _draw_multiline(
+                    c,
+                    MARGIN + 10,
+                    y,
+                    f"P{p.get('index', '?')}: score={p.get('risk_score', 0):.3f} "
+                    f"[{_risk_label(p.get('risk_level'))}]",
+                    max_chars=80,
+                    font=_font(),
+                    size=10,
+                    H=H,
+                    MARGIN=MARGIN,
+                )
                 excerpt = p.get("excerpt", "")[:120]
                 if excerpt:
-                    y = _draw_multiline(c, MARGIN + 20, y, excerpt, max_chars=65, font=_font(), size=9)
+                    y = _draw_multiline(c, MARGIN + 20, y, excerpt, max_chars=65, font=_font(), size=9, H=H, MARGIN=MARGIN)
                     y -= 8
     else:
         y -= 20
@@ -534,8 +695,8 @@ def generate_resource_check_report(task: DetectionTask) -> str:
     c.setFont(_font(), 14)
     for line in [f"Task ID: {task.id}", f"Task Name: {task.task_name}",
                  f"User: {task.user.username}"]:
-        c.drawString(MARGIN, y, line)
-        y -= 24
+        y = _draw_multiline(c, MARGIN, y, line, max_chars=80, leading=18, font=_font(), size=14, H=H, MARGIN=MARGIN)
+        y -= 6
 
     if result:
         y -= 20
@@ -558,13 +719,21 @@ def generate_resource_check_report(task: DetectionTask) -> str:
             for iss in issues:
                 y = _check_and_create_new_page(c, y, H, MARGIN)
                 c.setFont(_font(), 10)
-                c.drawString(MARGIN + 10, y,
-                             f"Ref#{iss.get('reference_index')}: "
-                             f"{iss.get('issue_type', '')} [{iss.get('severity', '')}]")
-                y -= 16
+                y = _draw_multiline(
+                    c,
+                    MARGIN + 10,
+                    y,
+                    f"Ref#{iss.get('reference_index')}: "
+                    f"{iss.get('issue_type', '')} [{iss.get('severity', '')}]",
+                    max_chars=80,
+                    font=_font(),
+                    size=10,
+                    H=H,
+                    MARGIN=MARGIN,
+                )
                 detail = iss.get("detail", "")
                 if detail:
-                    y = _draw_multiline(c, MARGIN + 20, y, detail, max_chars=65, font=_font(), size=9)
+                    y = _draw_multiline(c, MARGIN + 20, y, detail, max_chars=65, font=_font(), size=9, H=H, MARGIN=MARGIN)
                     y -= 8
 
     c.showPage()
@@ -593,8 +762,8 @@ def generate_review_detection_report(task: DetectionTask) -> str:
     c.setFont(_font(), 14)
     for line in [f"Task ID: {task.id}", f"Task Name: {task.task_name}",
                  f"User: {task.user.username}"]:
-        c.drawString(MARGIN, y, line)
-        y -= 24
+        y = _draw_multiline(c, MARGIN, y, line, max_chars=80, leading=18, font=_font(), size=14, H=H, MARGIN=MARGIN)
+        y -= 6
 
     if result:
         y -= 20
@@ -613,7 +782,7 @@ def generate_review_detection_report(task: DetectionTask) -> str:
         y -= 20
         summary = result.get("summary", "")
         if summary:
-            y = _draw_multiline(c, MARGIN, y, summary, max_chars=70, font=_font(), size=11)
+            y = _draw_multiline(c, MARGIN, y, summary, max_chars=70, font=_font(), size=11, H=H, MARGIN=MARGIN)
         y -= 30
 
         sentences = result.get("sentences", [])
@@ -624,13 +793,21 @@ def generate_review_detection_report(task: DetectionTask) -> str:
             for s in sentences:
                 y = _check_and_create_new_page(c, y, H, MARGIN)
                 c.setFont(_font(), 10)
-                c.drawString(MARGIN + 10, y,
-                             f"S{s.get('index', '?')}: prob={s.get('ai_probability', 0):.3f} "
-                             f"[{_risk_label(s.get('risk_level'))}]")
-                y -= 16
+                y = _draw_multiline(
+                    c,
+                    MARGIN + 10,
+                    y,
+                    f"S{s.get('index', '?')}: prob={s.get('ai_probability', 0):.3f} "
+                    f"[{_risk_label(s.get('risk_level'))}]",
+                    max_chars=80,
+                    font=_font(),
+                    size=10,
+                    H=H,
+                    MARGIN=MARGIN,
+                )
                 text = s.get("text", "")[:120]
                 if text:
-                    y = _draw_multiline(c, MARGIN + 20, y, text, max_chars=65, font=_font(), size=9)
+                    y = _draw_multiline(c, MARGIN + 20, y, text, max_chars=65, font=_font(), size=9, H=H, MARGIN=MARGIN)
                     y -= 8
 
     c.showPage()
@@ -662,8 +839,8 @@ def generate_comprehensive_forgery_pdf(task: DetectionTask) -> str:
         f"Type: {task.task_type or 'image_detection'}",
         f"Mode: {task.detection_mode or ('precise' if task.if_use_llm else 'fast')}",
     ]:
-        c.drawString(MARGIN, y, line)
-        y -= 20
+        y = _draw_multiline(c, MARGIN, y, line, max_chars=80, leading=16, font=fn, size=12, H=H, MARGIN=MARGIN)
+        y -= 4
 
     ttype = task.task_type or "image_detection"
     if ttype == "image_detection":
@@ -691,7 +868,7 @@ def generate_comprehensive_forgery_pdf(task: DetectionTask) -> str:
             c.setFont(fn, 11)
             summary = raw.get("summary", "")
             if summary:
-                y = _draw_multiline(c, MARGIN, y, summary, max_chars=72, font=fn, size=10)
+                y = _draw_multiline(c, MARGIN, y, summary, max_chars=72, font=fn, size=10, H=H, MARGIN=MARGIN)
             ratio = raw.get("ai_contribution_ratio")
             if ratio is not None:
                 y -= 8
@@ -700,10 +877,9 @@ def generate_comprehensive_forgery_pdf(task: DetectionTask) -> str:
             for fc in (raw.get("factual_conclusions") or raw.get("factual_issues") or [])[:5]:
                 y = _check_and_create_new_page(c, y, H, MARGIN)
                 c.setFont(fb, 11)
-                c.drawString(MARGIN, y, str(fc.get("title", ""))[:55])
-                y -= 14
+                y = _draw_multiline(c, MARGIN, y, str(fc.get("title", ""))[:180], max_chars=72, font=fb, size=11, H=H, MARGIN=MARGIN)
                 for r in (fc.get("reasons") or [])[:2]:
-                    y = _draw_multiline(c, MARGIN + 10, y, str(r), max_chars=68, font=fn, size=9)
+                    y = _draw_multiline(c, MARGIN + 10, y, str(r), max_chars=68, font=fn, size=9, H=H, MARGIN=MARGIN)
 
     y -= 24
     c.setFont(fb, 12)
@@ -717,7 +893,7 @@ def generate_comprehensive_forgery_pdf(task: DetectionTask) -> str:
     if ttype == "image_detection":
         tips.insert(0, "Verify suspicious regions on original figures.")
     for tip in tips:
-        y = _draw_multiline(c, MARGIN, y, f"- {tip}", max_chars=70, font=fn, size=10)
+        y = _draw_multiline(c, MARGIN, y, f"- {tip}", max_chars=70, font=fn, size=10, H=H, MARGIN=MARGIN)
 
     c.showPage()
     c.save()

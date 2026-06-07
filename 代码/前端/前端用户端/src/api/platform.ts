@@ -1,7 +1,7 @@
 import http from './request'
 
 export default {
-  getCommunityFeedback(params?: { page?: number; page_size?: number }) {
+  getCommunityFeedback(params?: { page?: number; page_size?: number; category?: string }) {
     return http.get('/community-feedback/', { params })
   },
 

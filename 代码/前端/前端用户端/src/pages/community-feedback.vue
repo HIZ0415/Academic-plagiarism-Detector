@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import platform from '@/api/platform'
 import { useSnackbarStore } from '@/stores/snackbar'
 
@@ -62,8 +62,10 @@ type FeedItem = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const snackbar = useSnackbarStore()
-const tab = ref('all')
+const initialTab = typeof route.query.tab === 'string' ? route.query.tab : 'all'
+const tab = ref(['all', 'detection', 'review', 'report', 'admin'].includes(initialTab) ? initialTab : 'all')
 const items = ref<FeedItem[]>([])
 const page = ref(1)
 const totalPages = ref(1)
@@ -115,7 +117,11 @@ function stripMarkdown(s: string) {
 async function load() {
   loading.value = true
   try {
-    const res = await platform.getCommunityFeedback({ page: page.value, page_size: 20 })
+    const res = await platform.getCommunityFeedback({
+      page: page.value,
+      page_size: 20,
+      category: tab.value === 'all' ? undefined : tab.value,
+    })
     items.value = res.data.items || []
     totalPages.value = res.data.total_pages || 1
   } catch {
@@ -131,7 +137,10 @@ function openItem(item: FeedItem) {
   }
 }
 
-watch(tab, () => {})
+watch(tab, () => {
+  page.value = 1
+  void load()
+})
 
 onMounted(load)
 </script>

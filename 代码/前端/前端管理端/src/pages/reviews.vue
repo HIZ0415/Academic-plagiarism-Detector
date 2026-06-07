@@ -263,7 +263,7 @@
             <v-divider></v-divider>
 
             <div v-if="reviewDetails" class="d-flex flex-column gap-4">
-              <div class="d-flex flex-column gap-2">
+              <div v-if="isImageReviewDetail" class="d-flex flex-column gap-2">
                 <div class="text-subtitle-1 font-weight-bold">相关图片</div>
                 <div class="d-flex flex-wrap gap-2">
                   <v-img
@@ -276,6 +276,22 @@
                     class="rounded-lg"
                   ></v-img>
                 </div>
+              </div>
+
+              <div v-else class="d-flex flex-column gap-2">
+                <div class="text-subtitle-1 font-weight-bold">{{ textReviewTitle }}</div>
+                <v-alert v-if="!reviewDetails.text_segments?.length" type="info" variant="tonal" density="compact">
+                  暂无可展示的文本内容。
+                </v-alert>
+                <v-list v-else density="compact" lines="three" class="border rounded">
+                  <v-list-item v-for="segment in reviewDetails.text_segments" :key="segment.id">
+                    <v-list-item-title class="font-weight-medium">{{ segment.label }}</v-list-item-title>
+                    <v-list-item-subtitle class="text-wrap">{{ segment.content }}</v-list-item-subtitle>
+                    <template #append>
+                      <v-chip size="small" variant="tonal" color="primary">{{ segment.ai_note || '—' }}</v-chip>
+                    </template>
+                  </v-list-item>
+                </v-list>
               </div>
 
               <div class="d-flex flex-column gap-2">
@@ -463,11 +479,25 @@ const reviewDetails = ref<{
   detection_task_id?: string
   task_type?: string
   file_type?: string
+  text_summary?: string
+  text_segments?: Array<{ id: number | string, label: string, content: string, ai_note?: string }>
   priority?: string
 } | null>(null)
 const rejectReason = ref('')
 const showRejectDialog = ref(false)
 const processingRequestId = ref<number | null>(null)
+
+const isImageReviewDetail = computed(() => {
+  const taskType = reviewDetails.value?.task_type || reviewDetails.value?.file_type || ''
+  return !taskType || taskType === 'image_detection'
+})
+
+const textReviewTitle = computed(() => {
+  const taskType = reviewDetails.value?.task_type || ''
+  if (taskType === 'review_detection') return 'Review内容'
+  if (taskType === 'resource_check') return '学术资源内容'
+  return '论文内容'
+})
 
 const getStateColor = (state: string) => {
   switch (state) {

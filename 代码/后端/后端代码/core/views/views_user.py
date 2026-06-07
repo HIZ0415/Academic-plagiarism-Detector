@@ -39,6 +39,18 @@ def _profile_text(raw_profile):
     return str(_load_profile_payload(raw_profile).get('bio') or '').strip()
 
 
+def _user_avatar_url(user, request=None):
+    if not getattr(user, 'avatar', None):
+        return None
+    try:
+        url = user.avatar.url
+    except ValueError:
+        return None
+    if request is not None:
+        return request.build_absolute_uri(url)
+    return url
+
+
 class EmailBackend(BaseBackend):
     def authenticate(self, request, email=None, password=None):
         try:
@@ -123,7 +135,7 @@ class UserLoginView(views.APIView):
                     'role': user.role,
                     'organization': user.organization.name if user.organization else None,
                     'profile': user.profile,
-                    'avatar': user.avatar.url
+                    'avatar': _user_avatar_url(user, request)
                 })
             return Response({"message": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -230,6 +242,7 @@ class TokenRefreshView(views.APIView):
 class UserDetailSerializer(serializers.ModelSerializer):
     organization_name = serializers.SerializerMethodField(read_only=True)  # 动态获取组织名称
     profile = serializers.SerializerMethodField(read_only=True)
+    avatar = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = get_user_model()
@@ -241,6 +254,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
     def get_profile(self, obj):
         return _profile_text(obj.profile)
+
+    def get_avatar(self, obj):
+        return _user_avatar_url(obj, self.context.get('request'))
 
 
 from rest_framework.permissions import IsAuthenticated
@@ -255,7 +271,7 @@ class UserDetailView(views.APIView):
 
     def get(self, request):
         user = request.user  # 获取当前认证的用户
-        serializer = UserDetailSerializer(user)  # 使用序列化器返回用户的所有信息
+        serializer = UserDetailSerializer(user, context={'request': request})  # 使用序列化器返回用户的所有信息
         return Response(serializer.data)
 
 
@@ -299,7 +315,7 @@ class AvatarUpdateView(views.APIView):
             return Response(
                 {
                     "message": "Avatar updated successfully",
-                    "avatar": updated_user.avatar.url if updated_user.avatar else None,
+                    "avatar": _user_avatar_url(updated_user, request),
                 },
                 status=status.HTTP_200_OK,
             )
@@ -758,16 +774,15 @@ def generate_manual_review_report_view(request, review_id):
         if request.user.role not in ('reviewer', 'publisher') and not request.user.is_staff:
             return Response({"detail": "Permission denied."}, status=403)
 
-    # 若还没生成过报告，先尝试生成
-    if not review.report_file:
-        try:
-            generate_manual_review_report(review)
-        except Exception as exc:
-            return Response(
-                {"detail": f"Report generation failed: {exc}"},
-                status=500,
-            )
-        review.refresh_from_db()
+    # 每次下载前重新生成，避免下载到状态/完成时间已过期的旧 PDF。
+    try:
+        generate_manual_review_report(review)
+    except Exception as exc:
+        return Response(
+            {"detail": f"Report generation failed: {exc}"},
+            status=500,
+        )
+    review.refresh_from_db()
     if not review.report_file:
         return Response({"detail": "Report is still being generated."}, status=202)
 

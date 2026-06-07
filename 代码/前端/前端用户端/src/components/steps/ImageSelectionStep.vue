@@ -88,6 +88,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useSnackbarStore } from '@/stores/snackbar';
 import upload from '@/api/upload'
+import { resolveBackendMediaUrl } from '@/utils/backendUrl'
 
 const snackbar = useSnackbarStore()
 const task_name = ref('')
@@ -143,7 +144,7 @@ const loadMoreImages = async () => {
     const response = (await upload.getExtractedImages({ file_id: props.fileId, page_number: page.value, page_size: pageSize.value })).data
     const newImages = response.images.map((img: any) => ({
       image_id: img.image_id,
-      image_url: import.meta.env.VITE_API_URL + img.image_url,
+      image_url: resolveBackendMediaUrl(img.image_url),
       page_number: img.page_number,
       extracted_from_pdf: img.extracted_from_pdf,
       selected: false
