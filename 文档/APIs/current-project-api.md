@@ -1,324 +1,325 @@
 # 当前项目 API 文档
 
-## 1. 说明
-本文档对应当前仓库中已经落地的接口实现，分为两层：
+## 1. 文档说明
 
-- 后端对外业务接口：Django 应用，对前端提供统一的 `/api/` 路由。
-- AI 服务内部接口：独立 HTTP 服务，供后端调用，不直接挂载在 Django `/api/` 下。
+本文档是课程组交付版接口文档，依据当前代码中的路由、模型和 AI 服务实现整理。
 
-本文档依据以下代码整理：
+接口分为两类：
 
-- 路由入口：`代码/后端/后端代码/fake_image_detector/urls.py`
-- 业务路由：`代码/后端/后端代码/core/urls.py`
-- AI HTTP 服务：`代码/AI服务/AI服务器代码/ai_http_service.py`
-- AI 服务核心：`代码/AI服务/AI服务器代码/detection_service/service.py`
-- AI 契约结构：`代码/AI服务/AI服务器代码/detection_service/contracts.py`
+| 类型 | 前缀/地址 | 调用方 |
+|---|---|---|
+| Django 业务接口 | `/api/` | 用户端前端、管理端前端 |
+| WebSocket 通知 | `/ws/notifications/` | 用户端前端、管理端前端 |
+| AI 服务接口 | 默认 `http://127.0.0.1:8010` | Django 后端 |
 
-## 2. 接口分层
+除注册、登录、密码重置等公开接口外，业务接口默认需要 JWT：
 
-### 2.1 后端业务接口
-统一前缀：
-
-```text
-/api/
+```http
+Authorization: Bearer <access_token>
 ```
 
-WebSocket 实时通知：
+## 2. 用户认证与账号
 
-```text
-/ws/notifications/
-```
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/register/` | 用户注册，邀请码决定发布者或审稿人角色 |
+| POST | `/api/login/` | 用户端登录，需提交邮箱、密码和角色 |
+| POST | `/api/admin-login/` | 管理端登录，要求用户角色为 `admin` |
+| POST | `/api/logout/` | 用户登出 |
+| POST | `/api/token/refresh/` | 刷新 JWT |
+| GET | `/api/user/details/` | 获取当前用户详情 |
+| PUT | `/api/user/update/` | 更新当前用户资料 |
+| PUT | `/api/user/avatar/` | 更新头像 |
+| POST | `/api/password-reset/` | 请求密码重置验证码 |
+| POST | `/api/password-reset/confirm/` | 验证验证码并重置密码 |
+| GET | `/api/admin/details/` | 获取当前管理员详情 |
+| GET | `/api/admin/details/<user_id>` | 管理端获取指定用户详情 |
 
-### 2.2 AI 服务内部接口
-默认本地开发地址：
+## 3. 用户任务、配额与个人记录
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/user-tasks/` | 当前用户检测任务列表 |
+| GET | `/api/tasks/<task_id>/detail/` | 统一任务详情 |
+| GET | `/api/detection-task/<task_id>/status/` | 用户端查询检测任务状态 |
+| DELETE | `/api/detection-task-delete/<task_id>/` | 删除检测任务 |
+| GET | `/api/task-summary/` | 当前用户任务摘要 |
+| GET | `/api/get-task-summary/` | 任务汇总兼容接口 |
+| GET | `/api/organization/usage/` | 查询组织剩余检测额度 |
+| POST | `/api/organization/recharge-uses/` | 补充组织检测次数 |
+| GET | `/api/single-user-action-log/` | 当前用户操作日志 |
+| GET | `/api/reviewer/tasks/` | 审稿人任务列表扩展接口 |
+| GET | `/api/reviewer/activity_logs/` | 审稿人活动日志 |
+
+## 4. 文件上传与资源管理
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/upload/` | 上传图片、PDF、压缩包等资源 |
+| GET | `/api/upload/<file_id>/` | 获取上传文件详情 |
+| GET | `/api/upload/<file_id>/extract_images/` | 获取文件中提取的图片 |
+| POST | `/api/upload/<file_id>/addTag/` | 更新文件标签 |
+| DELETE | `/api/upload/<file_id>/delete/` | 删除上传文件 |
+| GET | `/api/upload/get_all_file_images/<file_management_id>/` | 获取某文件对应的全部图片 |
+| GET | `/api/get_files/` | 管理端获取文件列表 |
+| DELETE | `/api/delete_image_upload/<image_id>/` | 管理端删除图片记录 |
+
+## 5. 图像检测接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/detection/submit/` | 提交图像检测任务 |
+| GET | `/api/detection/<image_id>/` | 获取单张图片检测结果 |
+| GET | `/api/tasks/<task_id>/results/` | 获取任务全部检测结果 |
+| GET | `/api/tasks/<task_id>/fake_results/` | 获取任务中判定异常的结果 |
+| GET | `/api/tasks/<task_id>/normal_results/` | 获取任务中判定正常的结果 |
+| GET | `/api/results/<result_id>/` | 获取单条检测结果详情 |
+| GET | `/api/results_image/<image_id>/` | 按图片获取检测结果 |
+| GET | `/api/tasks_image/<image_id>/getdr/` | 按图片获取检测结果映射 |
+| GET | `/api/tasks/<task_id>/report/` | 下载任务级检测报告 |
+| GET | `/api/tasks_image/<image_id>/report/` | 下载图片级检测报告 |
+| GET | `/api/tasks/<task_id>/comprehensive-report/` | 获取综合鉴伪报告数据 |
+| GET | `/api/tasks/<task_id>/comprehensive-report/download/` | 下载综合鉴伪报告 |
+| POST | `/api/batch-fusion/` | 多模态批量融合 |
+
+图像检测提交参数包含检测模式、图片列表、任务名称、块大小、URN 参数和是否使用 LLM 等字段。检测结果包含总体真假判断、置信度、子方法结果、mask、EXIF、ELA、LLM 辅助信息等。
+
+## 6. 论文检测与 Review 检测
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/paper/upload/` | 上传论文 PDF 并完成文本预处理 |
+| POST | `/api/paper/aigc/submit/` | 提交论文 AIGC 检测任务 |
+| GET | `/api/paper/tasks/<task_id>/status/` | 查询论文任务状态 |
+| GET | `/api/paper/aigc/<task_id>/result/` | 查询论文 AIGC 检测结果 |
+| POST | `/api/paper/resource-check/submit/` | 提交学术资源规范性检查任务 |
+| GET | `/api/paper/resource-check/<task_id>/result/` | 查询资源检查结果 |
+| POST | `/api/review/submit/` | 提交 Review 文本检测任务 |
+| GET | `/api/review/tasks/<task_id>/status/` | 查询 Review 检测任务状态 |
+| GET | `/api/review/tasks/<task_id>/result/` | 查询 Review 检测结果 |
+
+约束：
+
+- 论文检测仅支持 `.pdf`。
+- Review 检测支持在线文本或 `.txt` 文件。
+- 后端会生成 `paper-preprocess-v1` 或 `review-preprocess-v1` AI 输入。
+
+## 7. 人工审核接口
+
+### 7.1 发布者侧
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/manual-review-requests/` | 创建人工审核申请 |
+| GET | `/api/manual-review-requests/by-detection-task/` | 按检测任务查询人工审核申请 |
+| GET | `/api/manual-review-requests/<review_request_id>/publisher-summary/` | 发布者查看人工审核汇总 |
+| POST | `/api/manual-review-requests/<review_request_id>/cancel/` | 发布者取消人工审核申请 |
+| GET | `/api/get_publisher_review_tasks/` | 发布者查看自己发起的审核申请列表 |
+| GET | `/api/get_request_completion_status/<task_id>/` | 查询审核完成度 |
+| GET | `/api/manual-review/<review_id>/report/` | 下载人工审核报告 |
+
+### 7.2 审稿人侧
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/get_reviewer_tasks/` | 审稿人获取待处理人工审核任务 |
+| GET | `/api/get_review_detail/<manual_review_id>/` | 审稿人查看人工审核任务详情 |
+| POST | `/api/post_review/<manual_review_id>/` | 审稿人提交七项评分、理由和最终结论 |
+| GET | `/api/get-reviewer-request-detail/<reviewRequest_id>/` | 审稿人查看审核申请详情 |
+| GET | `/api/reviewer-manualreview-access/` | 检查审稿人是否可访问人工审核记录 |
+
+### 7.3 管理员审批
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/get_reviewRequest/all/` | 管理端获取人工审核申请列表 |
+| GET | `/api/get_reviewRequest/<reviewRequest_id>/` | 管理端获取审核申请详情 |
+| POST | `/api/handle_reviewRequest/<reviewRequest_id>/` | 管理员审批审核申请 |
+| DELETE | `/api/review-requests/<review_request_id>/delete/` | 管理员删除审核申请 |
+
+### 7.4 旧页面兼容查询
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/publishers/<publisher_id>/reviewers/` | 获取发布者关联的审稿人 |
+| POST | `/api/create_review_task_with_admin_check/` | 创建人工审核申请兼容接口 |
+| GET | `/api/get_request_detail/<reviewRequest_id>/` | 获取审核申请详情 |
+| GET | `/api/get_img_review_all/` | 获取某图全部审稿人结论 |
+| GET | `/api/get_image_review/` | 获取某图某审稿人详情 |
+| GET | `/api/manual-review/<review_request_id>/` | 通过审核申请获取人工审核记录 |
+| GET | `/api/publisher-dectectiontask-access/` | 检查发布者是否可访问检测任务 |
+
+## 8. 反馈、举报与社区反馈
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/feedback/` | 对人工审核结果点赞或评论 |
+| GET | `/api/feedback/<manual_review_id>/` | 获取人工审核结果反馈列表 |
+| POST | `/api/reports/submit/` | 用户提交举报 |
+| GET | `/api/reports/admin/` | 管理端查看举报列表 |
+| POST | `/api/reports/admin/<report_id>/handle/` | 管理员处理举报 |
+| GET | `/api/community-feedback/` | 社区反馈流 |
+
+## 9. 通知接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/notification/get/` | 获取通知列表 |
+| GET | `/api/notification/notify/` | 获取未读通知数量 |
+| POST | `/api/notification/set_as_read/` | 全部标记为已读 |
+| POST | `/api/notification/set_as_read/<notification_id>/` | 单条标记为已读 |
+| POST | `/api/notification/broadcast/` | 管理员广播通知 |
+| WebSocket | `/ws/notifications/` | 实时通知通道 |
+
+## 10. 组织管理接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/organization/create/` | 提交组织申请 |
+| GET | `/api/organization/applications/get_pending/` | 获取待审批组织申请 |
+| GET | `/api/organization/applications/<app_id>/` | 获取组织申请详情 |
+| POST | `/api/organization/<app_id>/approve/` | 批准组织申请 |
+| POST | `/api/organization/<app_id>/reject/` | 拒绝组织申请 |
+| POST | `/api/organizations/create-directly/` | 管理端直接创建组织 |
+| GET | `/api/organizations/` | 获取组织列表 |
+| GET | `/api/organization/<org_id>/` | 获取组织详情 |
+| DELETE | `/api/organization/<org_id>/delete/` | 删除组织 |
+| POST | `/api/organization/<org_id>/permission/` | 更新组织角色权限 |
+| GET | `/api/organization/<org_id>/invitation_codes/` | 获取组织邀请码 |
+| POST | `/api/organization/upload_logo/` | 上传组织 logo |
+
+## 11. 管理端用户、任务、日志与统计
+
+### 11.1 用户与权限
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/get_users/` | 获取用户列表 |
+| POST | `/api/create_user/` | 创建用户 |
+| PUT | `/api/update_user/<user_id>/` | 更新用户 |
+| DELETE | `/api/delete_user/<user_id>/` | 删除用户 |
+| POST | `/api/create-admin/` | 创建管理员 |
+| POST | `/api/user_permission/<user_id>/` | 更新用户权限 |
+| POST | `/api/manage-associations/` | 建立发布者和审稿人关联 |
+
+### 11.2 任务与日志
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/get_task_summary/` | 管理端任务汇总 |
+| GET | `/api/get_detection_task_status/<task_id>/` | 管理端查看检测任务状态 |
+| GET | `/api/get_all_user_tasks/` | 管理端查看所有用户任务 |
+| GET | `/api/user_action_log/` | 获取用户操作日志 |
+| DELETE | `/api/user_action_log/<log_id>/` | 删除日志 |
+| GET | `/api/user_action_log/download/` | 导出日志 |
+| POST | `/api/post_report/<post_id>/` | 帖子举报处理兼容接口 |
+
+### 11.3 统计看板
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/admin_dashboard/` | 管理端首页汇总 |
+| GET | `/api/dashboard/img_tag/` | 图像标签统计 |
+| GET | `/api/dashboard/top_publishers/` | 发布者排行 |
+| GET | `/api/dashboard/top_organizations/` | 组织排行 |
+| GET | `/api/dashboard/daily_active_users/` | 日活用户统计 |
+| GET | `/api/dashboard/daily_active_organizations/` | 日活组织统计 |
+| GET | `/api/dashboard/daily_task_count/` | 每日任务数量 |
+| GET | `/api/dashboard/daily_review_request_count/` | 每日审核申请数量 |
+| GET | `/api/dashboard/daily_completed_manual_review_count/` | 每日完成人工审核数量 |
+| GET | `/api/dashboard/get_sub_method_distribution_by_tag/` | 按标签统计子方法分布 |
+
+## 12. 检测模型配置
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/detection-models/` | 获取检测模型目录 |
+| POST | `/api/detection-preferences/` | 更新用户检测偏好 |
+| GET/POST | `/api/admin/detection-models/` | 管理端查看或更新检测模型配置 |
+| GET | `/api/admin/detection-logs/` | 管理端查看检测日志 |
+
+## 13. AI 服务接口
+
+AI 服务默认本地地址：
 
 ```text
 http://127.0.0.1:8010
 ```
 
-主要接口：
-
-- `GET /health`
-- `POST /api/v1/image-detection/batches`
-- `GET /api/v1/admin/model-registry`
-
-## 3. 通用约定
-- 需要登录的后端接口依赖当前用户上下文进行权限校验。
-- 文件上传接口通常使用 `multipart/form-data`。
-- 文件下载接口返回文件流，其余接口以 JSON 为主。
-- AI 服务当前只提供 `image` 任务的真实检测链路。
-- AI 服务已预留 `paper` 和 `review` 任务类型，但目前仅作占位，不提供真实检测结果。
-
-## 4. 用户认证与个人信息接口
-
-| 路径 | 方法 | 说明 |
+| 方法 | 路径 | 说明 |
 |---|---|---|
-| `/api/register/` | `POST` | 用户注册 |
-| `/api/login/` | `POST` | 普通用户登录 |
-| `/api/logout/` | `POST` | 用户登出 |
-| `/api/token/refresh/` | `POST` | 刷新令牌 |
-| `/api/user/details/` | `GET` | 获取当前用户详情 |
-| `/api/user/update/` | `PUT` | 更新当前用户资料 |
-| `/api/user/avatar/` | `PUT` | 更新头像 |
-| `/api/password-reset/` | `POST` | 请求密码重置验证码 |
-| `/api/password-reset/confirm/` | `POST` | 提交验证码并重置密码 |
-| `/api/admin-login/` | `POST` | 管理员登录 |
+| GET | `/health` | 健康检查，返回服务状态、任务类型、模型 profile 等 |
+| POST | `/api/v1/image-detection/batches` | 图像批量检测主接口 |
+| POST | `/api/v1/detection/batches` | 通用检测兼容入口 |
+| POST | `/api/v1/paper-detection/batches` | 论文检测扩展入口 |
+| POST | `/api/v1/review-detection/batches` | Review 检测扩展入口 |
+| GET | `/api/v1/admin/model-registry` | 查询模型注册表和 profile |
 
-## 5. 用户任务、配额与个人记录接口
+如设置了 `AI_SERVICE_API_TOKEN`，调用 AI 服务需携带：
 
-| 路径 | 方法 | 说明 |
+```http
+Authorization: Bearer <AI_SERVICE_API_TOKEN>
+```
+
+### 13.1 后端到 AI 的请求结构
+
+```json
+{
+  "schema_version": "backend-ai-request-v1",
+  "task_type": "image",
+  "batch_id": "task_1_batch_0",
+  "parameters": {
+    "cmd_block_size": 64,
+    "urn_k": 0.3,
+    "if_use_llm": false,
+    "threshold": 0.5,
+    "model_profile": "minimal_trainable"
+  },
+  "image_names": ["00000123.jpg"],
+  "images_zip_base64": "base64 encoded zip bytes"
+}
+```
+
+### 13.2 AI 服务错误结构
+
+```json
+{
+  "schema_version": "ai-service-error-v1",
+  "error_code": "validation_error",
+  "error_type": "ValidationError",
+  "message": "unsupported schema_version",
+  "status": 400,
+  "retriable": false,
+  "task_type": "image",
+  "batch_id": "task_1_batch_0",
+  "details": {}
+}
+```
+
+## 14. 任务类型与状态
+
+### 14.1 任务类型
+
+| 值 | 说明 |
+|---|---|
+| `image_detection` | 图像检测 |
+| `paper_aigc` | 论文 AIGC 检测 |
+| `resource_check` | 学术资源规范性检查 |
+| `review_detection` | Review 文本检测 |
+
+### 14.2 任务状态
+
+| 值 | 说明 |
+|---|---|
+| `pending` | 待处理 |
+| `in_progress` | 处理中 |
+| `completed` | 已完成 |
+| `failed` | 失败 |
+
+### 14.3 人工审核状态
+
+| 字段 | 值 | 说明 |
 |---|---|---|
-| `/api/detection-task/<task_id>/status/` | `GET` | 用户端查询检测任务状态 |
-| `/api/task-summary/` | `GET` | 当前用户任务摘要 |
-| `/api/get-task-summary/` | `GET` | 任务汇总信息 |
-| `/api/user-tasks/` | `GET` | 当前用户检测任务列表 |
-| `/api/organization/usage/` | `GET` | 查询组织使用情况 |
-| `/api/organization/recharge-uses/` | `POST` | 补充检测次数 |
-| `/api/single-user-action-log/` | `GET` | 当前用户个人操作日志 |
-| `/api/reviewer/tasks/` | `GET` | 审核人员任务列表 |
-| `/api/reviewer/activity_logs/` | `GET` | 审核人员活动日志 |
-| `/api/manual-review/<review_id>/report/` | `GET` | 生成或下载人工审核报告 |
-
-## 6. 文件上传与资源管理接口
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/upload/` | `POST` | 上传图片、PDF、压缩包等资源 |
-| `/api/upload/<file_id>/` | `GET` | 获取上传文件详情 |
-| `/api/upload/<file_id>/extract_images/` | `GET` | 获取文件中提取的图片 |
-| `/api/upload/<file_id>/addTag/` | `POST` | 更新文件标签 |
-| `/api/upload/<file_id>/delete/` | `DELETE` | 删除上传文件 |
-| `/api/upload/get_all_file_images/<file_management_id>/` | `GET` | 获取某文件对应的全部图片 |
-
-## 7. 图像检测、结果与报告接口
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/detection/submit/` | `POST` | 提交图像检测任务 |
-| `/api/detection/<image_id>/` | `GET` | 获取单张图片检测结果 |
-| `/api/tasks/<task_id>/results/` | `GET` | 获取任务全部检测结果 |
-| `/api/tasks/<task_id>/fake_results/` | `GET` | 获取任务中判定异常的结果 |
-| `/api/tasks/<task_id>/normal_results/` | `GET` | 获取任务中判定正常的结果 |
-| `/api/results/<result_id>/` | `GET` | 获取单条检测结果详情 |
-| `/api/results_image/<image_id>/` | `GET` | 按图片获取检测结果 |
-| `/api/tasks_image/<image_id>/getdr/` | `GET` | 按图片获取检测结果映射 |
-| `/api/tasks/<task_id>/report/` | `GET` | 下载任务级检测报告 |
-| `/api/tasks_image/<image_id>/report/` | `GET` | 下载图片级检测报告 |
-| `/api/detection-task-delete/<task_id>/` | `DELETE` | 删除检测任务 |
-
-## 8. 人工审核接口
-
-### 8.1 审核申请与审核任务
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/publishers/<publisher_id>/reviewers/` | `GET` | 获取某发布者可选审核人 |
-| `/api/create_review_task_with_admin_check/` | `POST` | 创建人工审核申请并进入管理员审批流程 |
-| `/api/get_request_completion_status/<task_id>/` | `GET` | 查询审核申请完成状态 |
-| `/api/get_request_detail/<reviewRequest_id>/` | `GET` | 获取审核申请详情 |
-| `/api/get_reviewer_tasks/` | `GET` | 获取审核人员待处理任务 |
-| `/api/get_all_reviewers/` | `GET` | 获取组织内审核人员列表 |
-| `/api/get_publisher_review_tasks/` | `GET` | 获取发布者发起的审核任务列表 |
-| `/api/get-reviewer-request-detail/<reviewRequest_id>/` | `GET` | 审核人员查看审核申请详情 |
-
-### 8.2 审核结果查询与提交
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/get_img_review_all/` | `GET` | 获取某审核任务的全部图片审核结果 |
-| `/api/get_image_review/` | `GET` | 获取指定图片审核结果 |
-| `/api/get_review_detail/<manual_review_id>/` | `GET` | 获取单个人工审核详情 |
-| `/api/post_review/<manual_review_id>/` | `POST` | 提交人工审核结果 |
-| `/api/manual-review/<review_request_id>/` | `GET` | 通过审核申请获取关联人工审核记录 |
-| `/api/publisher-dectectiontask-access/` | `GET` | 检查发布者是否可访问某检测任务 |
-| `/api/reviewer-manualreview-access/` | `GET` | 检查审核人员是否可访问某人工审核记录 |
-
-## 9. 通知与消息接口
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/notification/get/` | `GET` | 获取通知列表 |
-| `/api/notification/notify/` | `GET` | 获取未读通知数量 |
-| `/api/notification/set_as_read/` | `POST` | 全部标记为已读 |
-| `/api/notification/set_as_read/<notification_id>/` | `POST` | 单条标记为已读 |
-| `/api/notification/broadcast/` | `POST` | 管理员广播通知 |
-| `/ws/notifications/` | `WebSocket` | 实时通知推送通道 |
-
-## 10. 组织管理接口
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/organizations/create-directly/` | `POST` | 管理端直接创建组织 |
-| `/api/organization/create/` | `POST` | 提交组织申请 |
-| `/api/organization/applications/get_pending/` | `GET` | 获取待审批组织申请列表 |
-| `/api/organization/applications/<app_id>/` | `GET` | 获取组织申请详情 |
-| `/api/organization/<app_id>/approve/` | `POST` | 通过组织申请 |
-| `/api/organization/<app_id>/reject/` | `POST` | 拒绝组织申请 |
-| `/api/organization/<org_id>/invitation_codes/` | `GET` | 获取组织邀请码列表 |
-| `/api/organizations/` | `GET` | 获取组织列表 |
-| `/api/organization/<org_id>/` | `GET` | 获取组织详情 |
-| `/api/organization/<org_id>/delete/` | `DELETE` | 删除组织 |
-| `/api/organization/<org_id>/permission/` | `POST` | 更新组织角色权限 |
-
-## 11. 管理端接口
-
-### 11.1 管理员与用户管理
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/admin/details/` | `GET` | 获取当前管理员详情 |
-| `/api/admin/details/<user_id>` | `GET` | 获取指定用户详情 |
-| `/api/get_users/` | `GET` | 获取用户列表 |
-| `/api/create_user/` | `POST` | 创建用户 |
-| `/api/update_user/<user_id>/` | `PUT` | 更新用户 |
-| `/api/delete_user/<user_id>/` | `DELETE` | 删除用户 |
-| `/api/create-admin/` | `POST` | 创建管理员 |
-| `/api/user_permission/<user_id>/` | `POST` | 更新用户权限 |
-| `/api/manage-associations/` | `POST` | 建立发布者与审核者关联关系 |
-
-### 11.2 文件与审核治理
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/get_files/` | `GET` | 获取文件列表 |
-| `/api/get_reviewRequest/all/` | `GET` | 获取全部审核申请 |
-| `/api/get_reviewRequest/<reviewRequest_id>/` | `GET` | 获取审核申请详情 |
-| `/api/get_review_request_detail/<manual_review_id>/` | `GET` | 获取人工审核详情 |
-| `/api/handle_reviewRequest/<reviewRequest_id>/` | `POST` | 管理员处理审核申请 |
-| `/api/delete_image_upload/<image_id>/` | `DELETE` | 删除图片上传记录 |
-| `/api/post_report/<post_id>/` | `POST` | 处理举报 |
-
-### 11.3 日志接口
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/user_action_log/` | `GET` | 获取用户操作日志 |
-| `/api/user_action_log/<log_id>/` | `DELETE` | 删除日志 |
-| `/api/user_action_log/download/` | `GET` | 导出日志 |
-
-### 11.4 仪表盘与统计接口
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/admin_dashboard/` | `GET` | 仪表盘汇总信息 |
-| `/api/dashboard/img_tag/` | `GET` | 图像标签统计 |
-| `/api/dashboard/top_publishers/` | `GET` | 发布者排行 |
-| `/api/dashboard/top_organizations/` | `GET` | 组织排行 |
-| `/api/dashboard/daily_active_users/` | `GET` | 日活用户统计 |
-| `/api/dashboard/daily_active_organizations/` | `GET` | 日活组织统计 |
-| `/api/dashboard/daily_task_count/` | `GET` | 每日检测任务数量 |
-| `/api/dashboard/daily_review_request_count/` | `GET` | 每日审核申请数量 |
-| `/api/dashboard/daily_completed_manual_review_count/` | `GET` | 每日完成人工审核数量 |
-| `/api/dashboard/get_sub_method_distribution_by_tag/` | `GET` | 子检测方法分布统计 |
-| `/api/get_task_summary/` | `GET` | 管理端任务汇总 |
-| `/api/get_detection_task_status/<task_id>/` | `GET` | 管理端检测任务状态 |
-| `/api/get_all_user_tasks/` | `GET` | 管理端查询所有用户任务 |
-
-## 12. AI 服务内部接口
-
-### 12.1 健康检查
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/health` | `GET` | 返回 AI 服务状态、支持任务、结果格式、profile 与热加载状态 |
-
-当前健康检查响应包含的关键字段：
-
-- `service`
-- `service_version`
-- `supported_tasks`
-- `reserved_tasks`
-- `result_format`
-- `default_image_profile`
-- `available_image_profiles`
-- `reload_count`
-- `last_reload_at`
-- `last_reload_error`
-
-### 12.2 图像批量检测
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/v1/image-detection/batches` | `POST` | AI 服务图像批量检测入口，供后端调用 |
-
-请求关键字段：
-
-- `task_type`：当前应为 `image`
-- `batch_id`：批次标识，可选
-- `model_version`：模型版本，可选
-- `parameters.model_profile`：模型 profile，可选；课堂最小演示建议使用 `minimal_trainable`
-- `items`：待检测图片列表
-
-响应关键字段：
-
-- `batch_id`
-- `task_type`
-- `model_version`
-- `model_profile`
-- `results`
-- `results[].overall_is_fake`
-- `results[].overall_confidence`
-- `results[].sub_method_results`
-- `results[].evidences`
-
-说明：
-
-- 返回中同时保留后端当前兼容字段与标准化证据对象。
-- `evidences` 为标准化证据列表，是当前 AI 侧统一结果结构。
-
-### 12.3 模型注册表查询
-
-| 路径 | 方法 | 说明 |
-|---|---|---|
-| `/api/v1/admin/model-registry` | `GET` | 查询当前 AI 服务已加载的 registry、profile 和热加载状态 |
-
-查询参数：
-
-- `profile`：可选，传入后仅查看指定 profile 详情
-
-用途：
-
-- 验证服务当前启用了哪些检测方法
-- 查看默认 profile 和默认模型版本
-- 排查热加载后的当前生效配置
-
-## 13. 当前后端与 AI 的协作关系
-- 前端不直接调用 AI 服务。
-- 前端调用 Django `/api/` 接口。
-- Django 后端负责整理检测任务并调用 AI 服务 `/api/v1/image-detection/batches`。
-- AI 服务返回兼容字段和标准化证据对象，后端当前继续消费兼容字段。
-- AI 服务的配置热加载和模型注册查询当前仅暴露在 AI 侧，不直接透出给前端。
-
-## 14. 已知接口层问题
-- `core/urls.py` 中同时存在 `/api/task-summary/`、`/api/get-task-summary/`、`/api/get_task_summary/` 三类近似路径，命名风格不统一。
-- `core/urls.py` 中存在一条定义为 `'/review-requests/<int:review_request_id>/delete/'` 的路由，前面额外带了斜杠，挂到 `/api/` 后可能形成异常路径。
-- 后端业务接口当前仍然以图像检测为中心；论文检测和 Review 检测已形成专项接口与预处理产物，但尚未收敛为与图像检测同等级的统一任务接口。
-- AI 服务虽然已经预留 `paper` 和 `review`，但当前只有 `image` 任务具备可运行链路。
-
-## 15. 后续演进建议
-- 将后端资源对象继续从 `file_id`、`image_id` 扩展为统一资源标识。
-- 将图像检测、论文检测、Review 检测收敛到统一任务提交与统一状态查询接口。
-- 将 AI 服务的模型管理信息逐步纳入管理端统一治理视图。
-- 收敛重复和风格不一致的路径命名，统一 REST 风格。
-
-## 16. 论文与 Review 预处理接口约定
-
-当前后端已为论文检测和专家人工 Review 检测建立本地预处理产物，调用 AI 前统一生成 `backend-ai-request-v1` 外层请求。
-
-### 16.1 论文 PDF 预处理
-
-- 接口：`POST /api/paper/upload/`
-- 支持格式：仅 `.pdf`
-- 后端处理：使用 PyMuPDF 提取文本，执行文本清洗和段落切分。
-- 持久化产物：原始 PDF、`*_raw_text.txt`、`*_cleaned_text.txt`、`*_paragraphs.json`、`*_ai_input.json`。
-- AI 输入：`task_type = paper`，内层 schema 为 `paper-preprocess-v1`。
-- 上传响应新增/保留字段：`paper_file_id`、`file_name`、`upload_time`、`paragraph_count`。
-
-### 16.2 专家人工 Review 预处理
-
-- 接口：`POST /api/review/submit/`
-- 支持输入：`text` 在线文本，或 `file=.txt`
-- 后端处理：解码与编码标准化，清理 UTF-8 BOM、控制字符和多余空白。
-- 持久化产物：`*_raw_text.txt`、`*_cleaned_text.txt`、`*_ai_input.json`。
-- AI 输入：`task_type = review`，内层 schema 为 `review-preprocess-v1`。
-- 提交响应新增/保留字段：`task_id`、`status`、`cleaned_text_length`。
+| `ReviewRequest.status2` | `pending` / `accepted` / `refused` | 管理员审批状态 |
+| `ReviewRequest.status1` | `pending` / `in_progress` / `completed` | 审核流程状态 |
+| `ManualReview.status` | `undo` / `completed` | 审稿人任务状态 |
