@@ -141,3 +141,17 @@ _preview/
 # AI service generated artifacts
 代码/AI服务/AI服务器代码/detection_service/artifacts/minimal_dataset/
 代码/AI服务/AI服务器代码/detection_service/artifacts/*_eval.json
+
+# Local course-report/PPT scratch artifacts generated outside this project
+module3_text.txt
+module4_text.txt
+module3_media/
+module3_media_contact.jpg
+ppt_review/
+ppt_review_contact.jpg
+ppt_review_template_style/
+ppt_review_template_style_contact.jpg
+ppt_review_template_style_final/
+ppt_review_template_style_final_contact.jpg
+tools/make_module3_ppt.ps1
+tools/make_module3_ppt_template_style.ps1
