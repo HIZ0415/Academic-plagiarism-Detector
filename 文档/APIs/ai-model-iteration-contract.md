@@ -1,48 +1,33 @@
-# AI 模型迭代开发接口契约
+# AI 服务接口契约
 
-## 1. 目标
+## 1. 说明
 
-本文档定义当前 AI 服务与后端之间的接口契约，适用于：
+本文档说明 Django 后端与 AI HTTP 服务之间的接口契约。前端不直接调用 AI 服务，所有业务请求均先进入 Django `/api/`。
 
-- 图像检测主链路
-- AI 服务本地最小可运行版本
-- 后续 `paper` / `review` 任务扩展
-
-后端当前统一消费的是 JSON/dict 结果；旧的 `pickle + base64 + tuple/list` 方式仍保留兼容入口，但不再推荐继续迭代。
-
-后端归一化入口：
+AI 服务默认本地地址：
 
 ```text
-代码/后端/后端代码/core/utils/ai_result_schema.py
+http://127.0.0.1:8010
 ```
 
-## 2. HTTP 接口
+## 2. 接口列表
 
-AI 服务当前开放以下接口：
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/health` | 服务健康检查 |
+| POST | `/api/v1/image-detection/batches` | 图像批量检测主接口 |
+| POST | `/api/v1/detection/batches` | 通用检测兼容入口 |
+| POST | `/api/v1/paper-detection/batches` | 论文检测扩展入口 |
+| POST | `/api/v1/review-detection/batches` | Review 检测扩展入口 |
+| GET | `/api/v1/admin/model-registry` | 查询模型注册表和 profile |
 
-```text
-POST /api/v1/image-detection/batches
-GET  /health
-GET  /api/v1/admin/model-registry
-```
+如配置 `AI_SERVICE_API_TOKEN`，请求需携带：
 
-其中：
-
-- `POST /api/v1/image-detection/batches`：图像检测主接口
-- `GET /health`：服务健康检查
-- `GET /api/v1/admin/model-registry`：只读管理接口，用于查看当前 registry、profile 和重载状态
-
-如配置了 `AI_SERVICE_API_TOKEN`，请求需带：
-
-```text
+```http
 Authorization: Bearer <AI_SERVICE_API_TOKEN>
 ```
 
-除成功响应外，AI 服务当前统一返回标准错误对象，见“错误响应结构”一节。
-
-## 3. 图像检测请求
-
-推荐请求结构如下：
+## 3. 后端请求结构
 
 ```json
 {
@@ -64,27 +49,16 @@ Authorization: Bearer <AI_SERVICE_API_TOKEN>
 
 字段说明：
 
-- `schema_version`：当前固定为 `backend-ai-request-v1`
-- `task_type`：当前主链路支持 `image`
-- `batch_id`：建议传入，便于日志与追踪
-- `parameters`：检测参数集合
-- `parameters.model_version`：可选；不传时由 AI 服务按 profile 自动回填
-- `parameters.model_profile`：可选；用于指定模型配置档位
-- `image_names`：ZIP 内图片文件名列表
-- `images_zip_base64`：图片 ZIP 文件内容的 Base64
+| 字段 | 说明 |
+|---|---|
+| `schema_version` | 当前固定为 `backend-ai-request-v1` |
+| `task_type` | 任务类型，图像主链路为 `image` |
+| `batch_id` | 批次标识，便于追踪日志 |
+| `parameters` | 检测参数，包括模型版本、profile、阈值等 |
+| `image_names` | ZIP 内图片文件名列表 |
+| `images_zip_base64` | 图片 ZIP 的 Base64 内容 |
 
-后端当前会生成：
-
-```text
-test/img.zip
-test/data.json
-```
-
-AI 服务也保留了从这两个文件组装请求的本地脚本入口。
-
-## 4. 图像检测响应
-
-当前推荐响应结构如下：
+## 4. 图像检测响应结构
 
 ```json
 {
@@ -113,11 +87,6 @@ AI 服务也保留了从这两个文件组装请求的本地脚本入口。
           "method": "splicing",
           "probability": 0.29,
           "mask": [[0.0, 0.1]]
-        },
-        {
-          "method": "blurring",
-          "probability": 0.0,
-          "mask": []
         }
       ],
       "evidences": [
@@ -133,9 +102,7 @@ AI 服务也保留了从这两个文件组装请求的本地脚本入口。
           "artifacts": {
             "mask": [[0.0, 0.1]]
           },
-          "metadata": {
-            "model_path": "..."
-          }
+          "metadata": {}
         }
       ]
     }
@@ -143,15 +110,32 @@ AI 服务也保留了从这两个文件组装请求的本地脚本入口。
 }
 ```
 
-注意：
+说明：
 
-- `results` 内保留了后端当前落库所需的兼容字段
-- `evidences` 是新的标准化证据对象，后端当前可忽略，但推荐后续使用
-- `batch_id` 已贯穿到顶层响应
+- `overall_is_fake` 和 `overall_confidence` 用于后端落库和前端展示。
+- `sub_method_results` 保存子方法结果和 mask 数据。
+- `evidences` 是标准化证据对象，用于后续扩展更统一的解释性结果。
 
-## 5. 错误响应结构
+## 5. 文本检测响应结构
 
-AI 服务当前定义统一错误响应 schema：
+论文和 Review 文本检测使用 `text-detection-v1` 结果结构：
+
+```json
+{
+  "schema_version": "text-detection-v1",
+  "task_type": "review",
+  "model_version": "review-detector-service-2026-04",
+  "source_name": "review.txt",
+  "overall_is_fake": false,
+  "overall_confidence": 0.31,
+  "summary": "文本检测摘要",
+  "text_length": 1200,
+  "details": {},
+  "evidences": []
+}
+```
+
+## 6. 错误响应结构
 
 ```json
 {
@@ -170,125 +154,25 @@ AI 服务当前定义统一错误响应 schema：
 }
 ```
 
-字段说明：
+常见错误码：
 
-- `schema_version`：当前固定为 `ai-service-error-v1`
-- `error_code`：稳定错误码，便于后端做分类处理
-- `error_type`：AI 服务内部异常类型名
-- `message`：标准错误消息
-- `error`：兼容字段，语义与 `message` 一致；为避免影响现有调用方继续保留
-- `status`：HTTP 状态码数值
-- `retriable`：是否建议重试
-- `task_type`：可选，请求里携带时回传
-- `batch_id`：可选，请求里携带时回传
-- `details`：可选，附加错误上下文
+| 错误码 | 说明 |
+|---|---|
+| `validation_error` | 请求格式或字段不合法 |
+| `task_not_implemented` | 请求的任务类型暂未实现 |
+| `unauthorized` | AI 服务鉴权失败 |
+| `timeout` | 检测超时 |
+| `internal_error` | AI 服务内部错误 |
+| `not_found` | 路径不存在 |
 
-当前稳定错误码约定：
+## 7. 健康检查
 
-| HTTP 状态码 | `error_code` | 说明 |
-|---|---|---|
-| `400` | `validation_error` | 请求结构、字段类型或压缩包内容非法 |
-| `401` | `unauthorized` | `AI_SERVICE_API_TOKEN` 校验失败 |
-| `404` | `not_found` | 路径不存在 |
-| `501` | `task_not_implemented` | 任务类型已预留但尚未实现 |
-| `504` | `timeout` | AI 请求超时 |
-| `500` | `internal_error` | 未分类内部异常 |
+`GET /health` 返回服务状态、支持任务、结果格式、默认 profile、可用 profile、热加载状态等信息。课程演示时可用该接口确认 AI 服务已经启动。
 
-说明：
+## 8. 模型注册表
 
-- `timeout` 当前会返回 `retriable = true`
-- 其余错误默认返回 `retriable = false`
-- 新增错误字段时，优先追加字段，不删除 `error` 兼容字段
+`GET /api/v1/admin/model-registry` 用于查看当前 AI 服务已加载的 registry、profile 和模型版本。可选查询参数：
 
-## 6. 单图结果字段说明
-
-| 字段 | 必填 | 说明 |
-|---|---:|---|
-| `image_name` | 是 | 图片文件名 |
-| `image_id` | 否 | 图片业务 ID；文件名是纯数字时可自动解析 |
-| `overall_is_fake` | 是 | 总体真假判定 |
-| `overall_confidence` | 是 | 总体置信度，范围建议为 `0.0 ~ 1.0` |
-| `llm_text` | 是 | LLM 解释文本；未启用时返回空字符串 |
-| `llm_img` | 是 | LLM 可视化结果；无则为 `null` |
-| `ela` | 是 | ELA 热图；最小 profile 可为空列表 |
-| `exif_flags` | 是 | EXIF 异常标志 |
-| `sub_method_results` | 是 | 子检测方法结果列表 |
-| `sub_method_results[].method` | 是 | 子方法名 |
-| `sub_method_results[].probability` | 是 | 子方法概率；后端也兼容 `prob` |
-| `sub_method_results[].mask` | 是 | 子方法 mask |
-| `evidences` | 否 | 标准化证据对象列表 |
-
-## 7. 健康检查接口
-
-```text
-GET /health
-```
-
-当前典型返回如下：
-
-```json
-{
-  "status": "ok",
-  "service_version": "ai-detection-service-2026-04",
-  "supported_tasks": ["image"],
-  "reserved_tasks": ["paper", "review"],
-  "result_format": "standard-evidence-v1",
-  "registry_version": "image-model-registry-v1",
-  "default_image_profile": "default",
-  "available_image_profiles": ["default", "fast", "minimal_trainable"],
-  "image_profile_details": {
-    "minimal_trainable": {
-      "model_version": "image-detector-minimal-2026-04",
-      "enabled_methods": ["exif", "splicing"]
-    }
-  },
-  "registry_reload": {
-    "reload_count": 0,
-    "last_reload_at": null,
-    "last_reload_error": null
-  }
-}
-```
-
-## 8. 只读管理接口
-
-```text
-GET /api/v1/admin/model-registry
-GET /api/v1/admin/model-registry?profile=minimal_trainable
-```
-
-用途：
-
-- 查看当前 registry 路径与版本
-- 查看默认 profile
-- 查看所有可用 profile
-- 查看指定 profile 的方法配置
-- 查看 registry 热重载状态
-
-该接口为只读接口，不负责在线修改配置。
-
-## 9. `paper` / `review` 预留规则
-
-当前 AI 服务已预留：
-
-- `task_type = "paper"`
-- `task_type = "review"`
-
-请求中允许携带：
-
-```json
-{
-  "payload_base64": "..."
-}
-```
-
-但当前仅保留路由与错误语义，尚未形成真实检测链路；调用时会返回未实现错误。
-
-## 10. 迭代规则
-
-1. 新模型可以替换内部算法，但不要改变后端已消费字段的语义。
-2. 如需扩展能力，优先新增字段，不直接删除旧字段。
-3. 新模型发布时必须提供稳定的 `model_version`。
-4. 如使用多套模型配置，推荐通过 `model_profile` 选择，并让服务自动回填默认 `model_version`。
-5. `sub_method_results[].method` 应保持稳定，避免管理端统计口径漂移。
-6. 如新增顶层管理或观测接口，需同步更新本地部署和启动手册。
+| 参数 | 说明 |
+|---|---|
+| `profile` | 指定后仅查看某个 profile 的详情 |
