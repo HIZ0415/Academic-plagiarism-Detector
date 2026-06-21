@@ -39,8 +39,9 @@
     \item 资源上传、查询与资源管理接口；
     \item 检测任务提交、状态查询、结果查询和报告下载接口；
     \item 人工审核申请、审核执行与审核查询接口；
+    \item 审核互动、社区反馈与举报接口；
     \item 通知与消息接口；
-    \item 管理端用户管理、资源治理、仪表盘统计和日志管理接口。
+    \item 管理端用户管理、资源治理、仪表盘统计、日志管理和模型配置接口。
 \end{itemize}
 
 当前后端主路由由 \texttt{fake\_image\_detector/urls.py} 将 \texttt{core.urls} 挂载在 \texttt{/api/} 下，因此所有 HTTP 接口统一以 \texttt{/api/} 作为访问前缀；实时通知接口通过 WebSocket 路由 \texttt{/ws/notifications/} 暴露。
@@ -72,10 +73,11 @@
 用户认证接口 & HTTP & 提供注册、登录、登出、令牌刷新、用户资料查询与更新、头像更新和密码重置。 \\ \hline
 组织管理接口 & HTTP & 提供组织申请、审批、组织详情、邀请码和组织权限更新。 \\ \hline
 资源上传接口 & HTTP & 提供文件上传、文件详情查询、图片提取结果查询、文件标签更新和文件删除。 \\ \hline
-检测任务接口 & HTTP & 提供图像检测提交、任务状态查询、任务结果列表、任务删除和报告下载。 \\ \hline
-人工审核接口 & HTTP & 提供审核申请创建、审核任务列表、审核详情、审核提交、人工审核报告生成等能力。 \\ \hline
-通知接口 & HTTP + WebSocket & 提供通知列表、未读数量、已读状态更新、广播通知和实时推送。 \\ \hline
-管理端治理接口 & HTTP & 提供管理员登录、用户管理、文件管理、日志查询、仪表盘统计和审核审批。 \\ \hline
+检测任务接口 & HTTP & 提供图像检测提交、统一任务状态查询、任务结果列表、模型选择、任务删除和报告下载。 \\ \hline
+人工审核接口 & HTTP & 提供审核申请创建、公开任务池、审核任务列表、审核详情、审核提交、进度查询、取消审核和人工审核报告生成等能力。 \\ \hline
+审核互动与举报接口 & HTTP & 提供审核任务评论、点赞、评论排序、用户举报和举报处理结果查询。 \\ \hline
+通知接口 & HTTP + WebSocket & 提供通知列表、社区反馈、未读数量、已读状态更新、广播通知和实时推送。 \\ \hline
+管理端治理接口 & HTTP & 提供管理员登录、用户管理、文件/资源管理、举报审核、日志查询、论文/Review 专项日志、仪表盘统计、模型配置和审核审批。 \\ \hline
 \end{longtable}
 
 \subsection{用户认证与个人信息接口}
@@ -202,6 +204,8 @@
 \path{/api/tasks_image/<image_id>/getdr/} & GET & 通过图像获取检测结果映射。 \\ \hline
 \path{/api/tasks/<task_id>/report/} & GET & 下载任务级检测报告。 \\ \hline
 \path{/api/tasks_image/<image_id>/report/} & GET & 下载图像级检测报告。 \\ \hline
+\path{/api/tasks/<task_id>/comprehensive-report/} & GET & 后续统一综合鉴伪报告查看与下载入口，返回图像、论文、Review、人工审核与融合分析章节。 \\ \hline
+\path{/api/detection/models/} & GET & 后续用户侧查询当前可用检测模型、模型版本和快速/精准检测模式。 \\ \hline
 \path{/api/detection-task-delete/<task_id>/} & DELETE & 删除检测任务。 \\ \hline
 \path{/api/user-tasks/} & GET & 获取当前用户检测任务列表。 \\ \hline
 \path{/api/task-summary/} & GET & 获取当前用户任务摘要。 \\ \hline
@@ -210,7 +214,7 @@
 \endgroup
 
 \subsection{人工审核接口}
-人工审核接口构成自动检测之后的复核链路。该类接口覆盖审核申请、审核任务查看、审核结果查看、审核提交和人工审核报告生成。
+人工审核接口构成自动检测之后的复核链路。该类接口覆盖审核申请、公开任务池、审核任务查看、审核结果查看、审核提交、审核取消、互动评论和人工审核报告生成。
 
 \begingroup
 \small
@@ -231,10 +235,17 @@
 \path{/api/get_request_completion_status/<task_id>/} & GET & 查询某检测任务对应审核申请的完成情况。 \\ \hline
 \path{/api/get_request_detail/<reviewRequest_id>/} & GET & 获取审核申请详情。 \\ \hline
 \path{/api/get_publisher_review_tasks/} & GET & 发布者查看本人发起的审核任务。 \\ \hline
+\path{/api/review-tasks/pool/} & GET & 后续公开审核任务池接口，支持按学科、任务类型、紧急程度、风险等级筛选。 \\ \hline
 \path{/api/get_reviewer_tasks/} & GET & 审核人员获取待处理审核任务列表。 \\ \hline
 \path{/api/get-reviewer-request-detail/<reviewRequest_id>/} & GET & 审核人员查看审核申请详情。 \\ \hline
 \path{/api/get_review_detail/<manual_review_id>/} & GET & 获取单个审核任务详情。 \\ \hline
 \path{/api/post_review/<manual_review_id>/} & POST & 提交人工审核结果。 \\ \hline
+\path{/api/review-requests/<review_request_id>/summary/} & GET & 后续获取人工审核汇总结果、分歧说明和阶段性进度。 \\ \hline
+\path{/api/review-requests/<review_request_id>/cancel/} & POST & 后续发起人取消或终止未完成审核任务。 \\ \hline
+\path{/api/review-requests/<review_request_id>/comments/} & GET/POST & 后续查询或发表评论，评论提交时执行敏感词过滤。 \\ \hline
+\path{/api/review-comments/<comment_id>/like/} & POST & 后续点赞或取消点赞审核任务评论。 \\ \hline
+\path{/api/review-requests/<review_request_id>/report/} & POST & 后续举报违规审核任务。 \\ \hline
+\path{/api/review-comments/<comment_id>/report/} & POST & 后续举报违规评论。 \\ \hline
 \path{/api/get_img_review_all/} & GET & 获取审核任务下所有图像审核结果。 \\ \hline
 \path{/api/get_image_review/} & GET & 获取指定图像的人工审核结果。 \\ \hline
 \path{/api/manual-review/<review_id>/report/} & GET & 生成或下载人工审核报告。 \\ \hline
@@ -247,7 +258,7 @@
 \endgroup
 
 \subsection{通知与实时消息接口}
-通知接口分为持久化通知接口和实时推送接口两类。持久化通知负责通知列表和已读状态维护，实时推送接口负责检测完成等事件的在线通知。
+通知接口分为持久化通知接口、社区反馈查询接口和实时推送接口三类。持久化通知负责通知列表和已读状态维护，社区反馈负责将举报处理、评论回复、审核进度、论文/Review 检测反馈和综合报告通知集中呈现，实时推送接口负责检测完成等事件的在线通知。
 
 \begingroup
 \small
@@ -265,6 +276,8 @@
 \hline
 \endlastfoot
 \path{/api/notification/get/} & GET & 获取当前用户通知列表。 \\ \hline
+\path{/api/feedback/} & GET & 后续社区反馈聚合入口，按反馈类型返回举报处理、互动回复、审核进展、论文/Review 检测反馈和报告通知。 \\ \hline
+\path{/api/feedback/<feedback_id>/} & GET & 后续查看单条反馈详情并返回业务跳转链接。 \\ \hline
 \path{/api/notification/notify/} & GET & 获取当前用户未读通知数量。 \\ \hline
 \path{/api/notification/set_as_read/} & POST & 将当前用户全部通知设为已读。 \\ \hline
 \path{/api/notification/set_as_read/<notification_id>/} & POST & 将单条通知设为已读。 \\ \hline
@@ -274,7 +287,7 @@
 \endgroup
 
 \subsection{管理端治理与统计接口}
-管理端接口覆盖管理员资料、仪表盘统计、用户管理、文件管理、审核审批和日志查询等能力。该类接口支撑当前项目的治理能力，也是后续扩展论文检测日志、Review 检测日志和模型配置管理的入口。
+管理端接口覆盖管理员资料、仪表盘统计、用户管理、文件管理、学术资源管理、举报审核、模型配置、审核审批和日志查询等能力。该类接口支撑当前项目的治理能力，也是后续扩展论文检测日志、Review 检测日志和模型配置管理的入口。
 
 \begingroup
 \small
@@ -313,6 +326,15 @@
 \path{/api/user_action_log/} & GET & 查询用户操作日志。 \\ \hline
 \path{/api/user_action_log/<log_id>/} & DELETE & 删除日志。 \\ \hline
 \path{/api/user_action_log/download/} & GET & 导出日志。 \\ \hline
+\path{/api/admin/resources/} & GET & 后续学术资源管理列表，支持按资源类型、学科标签、状态、风险等级检索图像、论文和 Review。 \\ \hline
+\path{/api/admin/resources/<resource_id>/} & GET/PUT/DELETE & 后续查看、修改、状态维护或逻辑删除学术资源。 \\ \hline
+\path{/api/admin/reports/} & GET & 后续用户举报处理队列，支持按对象类型、状态、时间筛选。 \\ \hline
+\path{/api/admin/reports/<report_id>/handle/} & POST & 后续处理审核任务举报和评论举报，记录处置说明并通知相关用户。 \\ \hline
+\path{/api/admin/logs/paper-detection/} & GET & 后续论文检测专项日志查询，支持按任务、用户、时间、状态、模型版本和异常类型筛选。 \\ \hline
+\path{/api/admin/logs/review-detection/} & GET & 后续 Review 检测专项日志查询，支持按任务、用户、时间、状态、模型版本和异常类型筛选。 \\ \hline
+\path{/api/admin/model-configs/} & GET/POST & 后续模型配置列表与新增接口。 \\ \hline
+\path{/api/admin/model-configs/<model_id>/} & GET/PUT/DELETE & 后续模型配置详情、编辑与删除接口。 \\ \hline
+\path{/api/admin/model-configs/<model_id>/status/} & POST & 后续启用、停用或灰度模型配置。 \\ \hline
 \path{/api/get_reviewRequest/all/} & GET & 获取全部审核申请。 \\ \hline
 \path{/api/get_reviewRequest/<reviewRequest_id>/} & GET & 获取审核申请详情。 \\ \hline
 \path{/api/handle_reviewRequest/<reviewRequest_id>/} & POST & 管理员处理审核申请。 \\ \hline
@@ -371,6 +393,8 @@
     \item 引入统一资源接口，将图像、论文和 Review 统一纳入资源上传和资源查询入口；
     \item 引入统一检测任务接口，使图像检测、论文检测和 Review 检测共用任务提交和状态查询协议；
     \item 保留差异化结果接口，分别承载图像可疑区域、论文段落概率和 Review 模板化倾向等差异结果；
+    \item 增加审核互动与举报接口，使评论、点赞、举报和管理端处置结果形成闭环；
+    \item 增加社区反馈聚合接口，使举报处理、评论回复、审核进度、检测反馈和报告通知可在用户端统一展示；
     \item 将论文检测日志、Review 检测日志和模型配置接口纳入管理端统一治理接口空间；
     \item 对现有路径命名、重复路由和个别异常路径进行收敛，提升整体接口规范性。
 \end{itemize}
@@ -460,6 +484,11 @@
     \resizebox{0.98\textwidth}{!}{\input{figures/tikz-ui-records-list-wireframe.tex}}
     \caption{用户端检测记录列表页线框图（最小框架）}
 \end{figure}
+
+\subsubsection{社区反馈与模型选择页面框架}
+\textbf{社区反馈入口：}用户端应在通知中心或独立 \path{/feedback} 页面中集中展示举报处理结果、评论回复、人工审核进度、论文检测反馈、Review 检测反馈和综合报告通知。列表项应包含反馈类型、关联任务、最新状态、是否已读和业务跳转入口。
+
+\textbf{模型展示与选择入口：}检测提交页和任务详情页应展示本次任务使用的模型名称、版本号和检测模式。具备高级权限的用户在提交任务前可在快速检测、精准检测等模式之间选择；前端需依据模型配置接口返回的可用范围禁用无权限或已停用模型。
 
 \subsubsection{检测记录详情页框架（复用统一任务详情）}
 检测记录详情页用于承载三类检测对象的统一任务状态展示，并在同一页面内通过“类型专属结果槽位”挂载图像可疑区域、论文段落级结果或 Review 可疑片段等差异化内容。该页面应提供报告下载与可选的删除、人工审核入口，使用户能从“记录中心”闭环进入报告与复核链路。

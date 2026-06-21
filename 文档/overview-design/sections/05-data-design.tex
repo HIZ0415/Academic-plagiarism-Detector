@@ -41,8 +41,10 @@
 检测任务 & \texttt{DetectionTask} & 记录一次检测提交的任务名称、状态、检测参数、报告文件和归属用户。 \\ \hline
 图像资源 & \texttt{ImageUpload} & 当前项目中的二级资源实体，既可表示用户上传的单张图像，也可表示从 PDF 中提取出的页面图像。 \\ \hline
 检测结果 & \begin{tabular}[t]{@{}l@{}}\texttt{DetectionResult}\\\texttt{SubDetectionResult}\end{tabular} & 存储图像级结论、置信度、ELA/LLM/EXIF 结果以及各子方法的细粒度输出。 \\ \hline
-审核流程 & \begin{tabular}[t]{@{}l@{}}\texttt{ReviewRequest}\\\texttt{ManualReview}\\\texttt{ImageReview}\\\texttt{Feedback}\end{tabular} & 承载人工审核申请、审核执行、逐图评分与审核反馈。 \\ \hline
-日志与通知 & \begin{tabular}[t]{@{}l@{}}\texttt{Log}\\\texttt{Notification}\end{tabular} & 支撑系统审计、管理统计和用户消息触达。 \\ \hline
+审核流程 & \begin{tabular}[t]{@{}l@{}}\texttt{ReviewRequest}\\\texttt{ManualReview}\\\texttt{ImageReview}\\\texttt{Feedback}\end{tabular} & 承载人工审核申请、审核执行、逐图评分、审核汇总、审核取消与审核反馈。 \\ \hline
+审核互动与举报 & \begin{tabular}[t]{@{}l@{}}\texttt{ReviewComment}\\\texttt{ReviewLike}\\\texttt{ReportRecord}\end{tabular} & 建议新增或扩展，用于承载审核任务评论、点赞、敏感词过滤结果、违规举报及管理端处置结果。 \\ \hline
+模型配置 & \begin{tabular}[t]{@{}l@{}}\texttt{ModelConfig}\\\texttt{ModelMode}\end{tabular} & 建议新增，用于记录模型版本、适用任务、启停状态、参数模板和快速/精准检测模式配置。 \\ \hline
+日志与通知 & \begin{tabular}[t]{@{}l@{}}\texttt{Log}\\\texttt{Notification}\end{tabular} & 支撑系统审计、管理统计、论文/Review 专项检测日志和用户消息触达。 \\ \hline
 \end{longtable}
 \endgroup
 
@@ -54,10 +56,10 @@
 当前项目尚未落地统一的 \texttt{Resource} 实体，而是通过 \texttt{FileManagement} 与 \texttt{ImageUpload} 两层结构表达资源关系：前者代表用户上传的原始文件，后者代表参与检测的具体图像对象。对于 PDF 文件，系统会在上传后提取其中的图像页并为每张图建立 \texttt{ImageUpload} 记录。检测任务由 \texttt{DetectionTask} 表示，一个任务通常关联多个 \texttt{ImageUpload} 记录，并统一记录状态和参数。
 
 \subsubsection{结果与审核域}
-自动检测结果以 \texttt{DetectionResult} 为主实体，保存单张图像的真假判定、置信度、LLM 说明、可视化结果和 EXIF 判断。若需要展示多算法结果，则通过 \texttt{SubDetectionResult} 按方法逐条展开。人工审核链路以 \texttt{ReviewRequest} 发起，随后由一个或多个 \texttt{ManualReview} 承接执行，并通过 \texttt{ImageReview} 保存逐图评分、理由、标注点和人工结论，最终可由 \texttt{Feedback} 记录用户对审核结果的反馈。
+自动检测结果以 \texttt{DetectionResult} 为主实体，保存单张图像的真假判定、置信度、LLM 说明、可视化结果和 EXIF 判断。若需要展示多算法结果，则通过 \texttt{SubDetectionResult} 按方法逐条展开。人工审核链路以 \texttt{ReviewRequest} 发起，随后由一个或多个 \texttt{ManualReview} 承接执行，并通过 \texttt{ImageReview} 保存逐图评分、理由、标注点和人工结论，最终可由 \texttt{Feedback} 记录用户对审核结果的反馈。为满足审核任务池和社区互动需求，后续详细设计应补充评论、点赞和举报记录，使审核详情页的互动数据、举报处理结果与通知消息可追溯。
 
 \subsubsection{治理与协同域}
-\texttt{Log} 用于审计谁在何时对哪个对象执行了何种操作，\texttt{Notification} 用于记录站内消息内容、收发双方、类别与未读状态。二者分别支撑管理端治理和用户侧消息协同，是后续统计分析、运行监控和问题追踪的重要基础。
+\texttt{Log} 用于审计谁在何时对哪个对象执行了何种操作，\texttt{Notification} 用于记录站内消息内容、收发双方、类别与未读状态。二者分别支撑管理端治理和用户侧消息协同，是后续统计分析、运行监控和问题追踪的重要基础。模型配置域建议通过 \texttt{ModelConfig} 与 \texttt{ModelMode} 记录模型版本、启停状态和调用模式，并在检测任务、检测结果和日志中保留模型版本引用，保证用户侧模型展示、管理员配置变更和历史检测结果解释的一致性。
 
 \subsection{实体关系说明}
 本系统的数据关系可以概括为“用户/组织 -> 资源 -> 任务 -> 结果 -> 审核 -> 报告/通知/日志”的链式结构。
@@ -69,6 +71,8 @@
     \item 一个 \texttt{DetectionResult} 可以继续关联多个 \texttt{SubDetectionResult}，用于表达多方法检测细节；
     \item 一个 \texttt{ReviewRequest} 针对一个检测结果发起，并可关联多个审核者和多个被审核图像；
     \item 一个 \texttt{ManualReview} 归属于一个审核请求与一个审核员，并进一步关联多个 \texttt{ImageReview}；
+    \item 一个审核请求可关联多条评论、点赞关系和举报记录，举报记录由管理端处理后生成处置结果并通知相关用户；
+    \item 一个检测任务可引用一个或多个模型配置，检测结果与日志需记录实际使用的模型版本和检测模式；
     \item 用户、任务、审核请求和管理操作均可派生出对应的日志记录与通知消息。
 \end{itemize}
 
@@ -85,7 +89,9 @@
 子方法概率与掩码矩阵 & \texttt{SubDetectionResult} & 支撑检测细节解释和可疑区域可视化，便于结果追溯。 \\ \hline
 审核双状态 & \texttt{ReviewRequest} & 通过发布者侧状态与管理员侧状态分离表达审核申请流转。 \\ \hline
 逐图评分与标注点 & \texttt{ImageReview} & 细化人工审核过程，使审核结论具备解释性和可复核性。 \\ \hline
-消息类别与已读状态 & \texttt{Notification} & 区分系统通知、全局通知与用户间通知，并支持通知中心未读管理。 \\ \hline
+评论、点赞与举报状态 & \texttt{ReviewComment}/\texttt{ReviewLike}/\texttt{ReportRecord} & 支撑审核任务互动、敏感词过滤、点赞排序、举报处理队列和处置反馈。 \\ \hline
+模型版本与调用模式 & \texttt{ModelConfig}/\texttt{ModelMode} & 记录模型版本、启停状态、参数模板、默认调用策略和快速/精准检测模式。 \\ \hline
+消息类别与已读状态 & \texttt{Notification} & 区分系统通知、全局通知、社区反馈、举报反馈、检测反馈与用户间通知，并支持通知中心未读管理。 \\ \hline
 \end{longtable}
 
 \subsection{状态设计}
@@ -94,7 +100,10 @@
     \item \textbf{任务状态：} \texttt{DetectionTask} 当前定义为 \texttt{pending}、\texttt{in\_progress}、\texttt{completed}，后续建议补充 \texttt{failed}、\texttt{cancelled} 等异常状态；
     \item \textbf{检测结果状态：} \texttt{DetectionResult} 当前区分 \texttt{in\_progress} 和 \texttt{completed}，并通过 \texttt{is\_under\_review} 表示是否进入人工审核；
     \item \textbf{审核状态：} \texttt{ReviewRequest} 通过 \texttt{status1} 和 \texttt{status2} 分别表示发布者侧流程状态与管理员审批状态，\texttt{ManualReview} 进一步记录审核员执行状态；
-    \item \textbf{通知状态：} \texttt{Notification} 采用 \texttt{unread}/\texttt{read} 两态，满足通知中心场景需要。
+    \item \textbf{审核取消状态：} 人工审核流程需要区分“待分配、审核中、已完成、已取消”等状态，取消后应禁止新的审核提交，但保留历史审核意见和取消日志；
+    \item \textbf{举报处理状态：} 举报记录应至少包含“待处理、已受理、已驳回、已处置”等状态，并记录处理人和处理说明；
+    \item \textbf{模型配置状态：} 模型配置应区分“启用、停用、灰度、废弃”等状态，任务创建时只能选择当前可用且有权限访问的模型；
+    \item \textbf{通知状态：} \texttt{Notification} 采用 \texttt{unread}/\texttt{read} 两态，满足通知中心和社区反馈场景需要。
 \end{itemize}
 
 \subsection{数据流转设计}
@@ -103,9 +112,10 @@
     \item 用户登录后上传原始文件，系统生成 \texttt{FileManagement} 记录；
     \item 若上传对象为 PDF，则系统提取其中图像并生成若干 \texttt{ImageUpload} 记录；若为单图，则直接登记图像记录；
     \item 用户提交检测请求时创建 \texttt{DetectionTask}，并将待检测图像与任务建立关联；
+    \item 任务创建时根据用户选择或默认策略读取模型配置，并在任务与结果中保留模型版本；
     \item 异步检测完成后，系统为每个图像生成 \texttt{DetectionResult} 与若干 \texttt{SubDetectionResult}；
-    \item 若用户申请人工审核，则创建 \texttt{ReviewRequest}，并进一步生成 \texttt{ManualReview} 和 \texttt{ImageReview}；
-    \item 在上述过程中，关键业务动作同步写入 \texttt{Log}，关键状态变化则生成 \texttt{Notification}，供前端展示和管理端统计。
+    \item 若用户申请人工审核，则创建 \texttt{ReviewRequest}，并进一步生成 \texttt{ManualReview} 和 \texttt{ImageReview}；审核过程中产生的评论、点赞、举报和取消记录作为审核互动数据关联到审核请求；
+    \item 在上述过程中，关键业务动作同步写入 \texttt{Log}，论文与 Review 检测形成专项日志视图，关键状态变化则生成 \texttt{Notification}，供前端展示、社区反馈和管理端统计。
 \end{enumerate}
 
 \subsection{完整性与一致性约束}
